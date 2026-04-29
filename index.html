@@ -2802,9 +2802,11 @@ function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver,onVerConfirmacione
           <span style={{color:"var(--color-text-tertiary)",fontSize:20}}>→</span>
         </button>
         {ventasPendientesTransfer>0&&(
-          <button style={{...s.card,margin:"0 0 10px",background:"#1e3a5f",border:"1px solid #f5b942",display:"flex",alignItems:"center",gap:10,width:"100%",textAlign:"left",cursor:"pointer"}}
+          <button style={{...s.card,margin:"0 0 10px",background:"#1e3a5f",border:"1px solid #f5b942",display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left",cursor:"pointer"}}
             onClick={onVerConfirmaciones}>
-              <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Tocá para ir a confirmar →</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:500,color:"#f5b942"}}>🔴 {ventasPendientesTransfer} transferencia{ventasPendientesTransfer>1?"s":""} sin confirmar</div>
+              <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>Tocá para ir a confirmar →</div>
             </div>
             <span style={{color:"#f5b942",fontSize:18}}>→</span>
           </button>
