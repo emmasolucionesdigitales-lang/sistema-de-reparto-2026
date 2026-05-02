@@ -472,7 +472,6 @@ function App() {
   const [fechaActual, setFechaActual] = useLS("cat_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
-  const [ventaLibreFecha, setVentaLibreFecha] = React.useState(()=>new Date().toISOString().slice(0,10));
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
@@ -973,17 +972,6 @@ function App() {
     irA("clientes");
   };
 
-  const registrarVentaLibre = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, op, mt2, sd, fechaKl) => {
-    const c = cliente;
-    const calc = calcVenta(detalle, pago, montoPagado, saldoAplicado, productos);
-    const nVenta = {id:Date.now(), clienteId:c.id, cliente:c.nombre, dia:c.dia, fechaKey:fechaKl,
-      fecha:new Date(fechaKl+"T12:00:00").toLocaleString("es-AR"), detalle, pago, obs:obs||"",
-      saldoAplicado:saldoAplicado||0, envPrest:(envPrest||[]).filter(e=>e.prod&&e.cant),
-      envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc};
-    saveVentas([...ventas, nVenta]);
-    saveClientes(clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo+calc.saldoDelta}:x));
-  };
-
   const eliminarVenta = (ventaId) => {
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
     const nv = ventas.filter(x=>x.id!==ventaId);
@@ -1023,7 +1011,7 @@ function App() {
     <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
       <SyncBar status={syncStatus} isOnline={isOnline} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onVentaLibre={()=>{setVentaLibreFecha(new Date().toISOString().slice(0,10));irA("ventaLibreSeleccionar");}} onAgenda={()=>irA("agenda")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onAgenda={()=>irA("agenda")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onVerConfirmaciones={(dia)=>{setDiaActual(dia);irA("confirmacionesDia");}}
@@ -1229,34 +1217,6 @@ function App() {
         }}
         onVolver={()=>irA("menu")}
       />}
-      {pantalla==="ventaLibreSeleccionar"&&(
-        <div style={s.screen}>
-          <div style={s.header}>
-            <button style={s.backBtn} onClick={()=>irA("menu")}>← Volver</button>
-            <span style={s.headerTitle}>Venta fuera del día</span>
-          </div>
-          <div style={{padding:14}}>
-            <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:12}}>Elegí el cliente al que le vas a registrar una venta:</p>
-            {clientes.filter(c=>c.nombre).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(c=>(
-              <div key={c.id} style={{...s.card,margin:"0 0 8px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}
-                onClick={()=>{setClienteId(c.id);irA("ventaLibre");}}>
-                <div>
-                  <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
-                  <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{c.dia} · {c.barrio||""}</div>
-                </div>
-                <span style={{color:"var(--color-text-tertiary)"}}>→</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {pantalla==="ventaLibre"&&cliente&&(
-        <NuevaVentaLibre
-          cliente={cliente} productos={productos} fechaInicial={ventaLibreFecha}
-          onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,fechaKl)=>{registrarVentaLibre(d,p,m,sa,ep,ed,obs,op,mt2,0,fechaKl);irA("menu");}}
-          onVolver={()=>irA("ventaLibreSeleccionar")}
-        />
-      )}
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} onAjustarEnvases={(vt)=>{const nv=[...ventas,vt];saveVentas(nv);alert("✅ Envases corregidos correctamente");}} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} />}
@@ -1976,7 +1936,7 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onVentaLibre,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona}) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   return (
     <div style={s.screen}>
@@ -2133,7 +2093,6 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
             ["👥","Clientes",onGestionClientes],
             ["📦","Stock",onStock],
             ["🚀","Promoción",onPromocion],
-            ["💰","Venta libre",onVentaLibre],
             ["📅","Agenda",onAgenda],
             ["📊","Resumen",onResumen],
             ["⚙️","Config",onConfig],
@@ -5369,7 +5328,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         {[
           [["precios","💲","Precios"],["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"]],
-          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["equipo","👥","Equipo"]],
+          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"]],
         ].map((fila,fi)=>(
           <div key={fi} style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
             {fila.map(([id,ico,lbl])=>id==="x"?<div key="x"/>:(
@@ -5561,7 +5520,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               Cantidades con las que salís cada día. Se usan como valores por defecto al iniciar el reparto.
               Los sifones se ingresan en cajones (1 cajón = 6 sifones).
             </p>
-            {DIAS.filter(d=>d!=="Lunes").map(function(dia){
+            {DIAS.map(function(dia){
               var c = (cargasDia||CARGA_DIA_DEFAULT)[dia]||{soda:0,b10:0,b20:0};
               var cajones = Math.floor((c.soda||0)/6);
               return (
@@ -5873,113 +5832,11 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           )}
         </div>
       )}
-      {tab==="equipo"&&<RepartidoresPanel syncData={syncData} />}
-    </div>
+          </div>
   );
 }
 
 // ── Panel de gestión de repartidores (tab Equipo en Config) ──
-function RepartidoresPanel({syncData}) {
-  const [repartidores, setRepartidores] = React.useState(()=>{
-    try{return JSON.parse(localStorage.getItem("cat_repartidores_v1")||"[]");}catch{return [];}
-  });
-  const [modo, setModo] = React.useState("lista"); // "lista" | "nuevo" | "editar"
-  const [editando, setEditando] = React.useState(null);
-  const [form, setForm] = React.useState({nombre:"",dia:"Martes",codigo:""});
-  const [msg, setMsg] = React.useState("");
-
-  const generarCodigo = () => {
-    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    return Array.from({length:4},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
-  };
-
-  const guardar = () => {
-    if(!form.nombre.trim()||!form.codigo.trim()){setMsg("Completá nombre y código");return;}
-    const codUpper = form.codigo.trim().toUpperCase();
-    const duplicado = repartidores.some(r=>r.codigo===codUpper&&r.id!==editando?.id);
-    if(duplicado){setMsg("Ese código ya existe, usá otro");return;}
-    let nueva;
-    if(editando) {
-      nueva = repartidores.map(r=>r.id===editando.id?{...r,...form,codigo:codUpper}:r);
-    } else {
-      nueva = [...repartidores,{id:Date.now(),nombre:form.nombre.trim(),dia:form.dia,codigo:codUpper}];
-    }
-    setRepartidores(nueva);
-    localStorage.setItem("cat_repartidores_v1",JSON.stringify(nueva));
-    if(syncData) syncData({repartidores:nueva});
-    setModo("lista"); setEditando(null); setForm({nombre:"",dia:"Martes",codigo:""}); setMsg("");
-  };
-
-  const eliminar = (id) => {
-    if(!window.confirm("¿Eliminar este repartidor?")) return;
-    const nueva = repartidores.filter(r=>r.id!==id);
-    setRepartidores(nueva);
-    localStorage.setItem("cat_repartidores_v1",JSON.stringify(nueva));
-    if(syncData) syncData({repartidores:nueva});
-  };
-
-  return (
-    <div style={{padding:16}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>👥 Repartidores ({repartidores.length})</div>
-        {modo==="lista"&&<button style={{...s.btn,padding:"6px 14px",fontSize:13}} onClick={()=>{setForm({nombre:"",dia:"Martes",codigo:generarCodigo()});setModo("nuevo");}}>+ Nuevo</button>}
-      </div>
-
-      {(modo==="nuevo"||modo==="editar")&&(
-        <div style={{...s.card,marginBottom:14,borderLeft:"3px solid var(--color-accent)"}}>
-          <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",marginBottom:12}}>{modo==="nuevo"?"Nuevo repartidor":"Editar repartidor"}</div>
-          <div style={{marginBottom:10}}>
-            <label style={{fontSize:11,color:"var(--color-text-tertiary)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Nombre *</label>
-            <input style={{...s.input,marginTop:4}} placeholder="Nombre del repartidor" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} />
-          </div>
-          <div style={{marginBottom:10}}>
-            <label style={{fontSize:11,color:"var(--color-text-tertiary)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Día asignado</label>
-            <select style={{...s.input,marginTop:4}} value={form.dia} onChange={e=>setForm(f=>({...f,dia:e.target.value}))}>
-              {DIAS.map(d=><option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div style={{marginBottom:14}}>
-            <label style={{fontSize:11,color:"var(--color-text-tertiary)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Código de acceso *</label>
-            <div style={{display:"flex",gap:8,marginTop:4}}>
-              <input style={{...s.input,fontFamily:"monospace",fontSize:18,fontWeight:700,letterSpacing:"0.15em",flex:1}}
-                placeholder="XXXX" maxLength={6} value={form.codigo}
-                onChange={e=>setForm(f=>({...f,codigo:e.target.value.toUpperCase()}))} />
-              <button style={{...s.btn,padding:"8px 12px",fontSize:12,whiteSpace:"nowrap"}} onClick={()=>setForm(f=>({...f,codigo:generarCodigo()}))}>🎲 Generar</button>
-            </div>
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>El repartidor usa este código para entrar a la app</div>
-          </div>
-          {msg&&<div style={{fontSize:13,color:"var(--color-text-danger)",marginBottom:10}}>{msg}</div>}
-          <div style={{display:"flex",gap:8}}>
-            <button style={{...s.btn,flex:1,fontSize:13}} onClick={()=>{setModo("lista");setEditando(null);setMsg("");}}>Cancelar</button>
-            <button style={{...s.btn,flex:2,fontSize:13,background:"var(--color-accent)",color:"white"}} onClick={guardar}>
-              {modo==="nuevo"?"✅ Crear repartidor":"✅ Guardar cambios"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {repartidores.length===0&&modo==="lista"&&(
-        <div style={{textAlign:"center",padding:"30px 0",color:"var(--color-text-tertiary)",fontSize:14}}>
-          No hay repartidores todavía.<br/>Tocá "+ Nuevo" para agregar uno.
-        </div>
-      )}
-
-      {repartidores.map(r=>(
-        <div key={r.id} style={{...s.card,marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div>
-            <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{r.nombre}</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>📅 {r.dia} · Código: <span style={{fontFamily:"monospace",fontWeight:700,color:"var(--color-text-primary)",letterSpacing:"0.1em"}}>{r.codigo}</span></div>
-          </div>
-          <div style={{display:"flex",gap:6}}>
-            <button style={{...s.btn,padding:"5px 10px",fontSize:12}} onClick={()=>{setForm({nombre:r.nombre,dia:r.dia,codigo:r.codigo});setEditando(r);setModo("editar");}}>✏️</button>
-            <button style={{...s.btn,padding:"5px 10px",fontSize:12,background:"rgba(220,38,38,0.15)",color:"var(--color-text-danger)"}} onClick={()=>eliminar(r.id)}>🗑️</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function EnviarResumenEC({ecToken, ventas}) {
   const [enviando, setEnviando] = React.useState(false);
   const [ultimaSync, setUltimaSync] = React.useState(()=>localStorage.getItem('sm_ec_ultima')||'');
@@ -6027,102 +5884,6 @@ function EnviarResumenEC({ecToken, ventas}) {
     </div>
   );
 }
-
-function NuevaVentaLibre({cliente,productos,fechaInicial,onGuardar,onVolver}) {
-  const [fechaKl,setFechaKl] = React.useState(fechaInicial||new Date().toISOString().slice(0,10));
-  const [cantidades,setCantidades] = useState(()=>{const m={};productos.forEach(p=>{const k=p.nombre==="Sifón 1.5L"?"sifon":p.nombre==="Bidón 10L"?"bidon10":"bidon20";m[p.nombre]=cliente[k]||0;});return m;});
-  const [pago,setPago] = useState("contado");
-  const [monto,setMonto] = useState("");
-  const [usarSaldo,setUsarSaldo] = useState(false);
-  const [envPrest,setEnvPrest] = useState([{prod:"",cant:""}]);
-  const [envDev,setEnvDev] = useState([{prod:"",cant:""}]);
-  const [obs,setObs] = useState("");
-  const detalle = productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
-  const bruto = detalle.reduce((a,d)=>a+d.total,0);
-  const neto = bruto;
-  const saldoDisp = cliente.saldo>0?cliente.saldo:0;
-  const saldoApl = (usarSaldo&&pago!=="fiado")?Math.min(saldoDisp,neto):0;
-  const aPagar = neto-saldoApl;
-  const ER=({list,setList,i})=>(
-    <div style={{...s.row,marginBottom:6}}>
-      <select style={{...s.select,flex:2}} value={list[i].prod} onChange={e=>{const n=[...list];n[i].prod=e.target.value;setList(n);}}>
-        <option value="">— Producto —</option>
-        {productos.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-      </select>
-      <input style={{...s.input,flex:1}} type="number" placeholder="Cant" value={list[i].cant} onChange={e=>{const n=[...list];n[i].cant=e.target.value;setList(n);}} />
-    </div>
-  );
-  return (
-    <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Venta · {cliente.nombre}</span>
-      </div>
-      <div style={{padding:16}}>
-        <div style={{...s.card,margin:"0 0 14px",background:"var(--color-background-tertiary)"}}>
-          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:6}}>📅 Fecha de la venta</label>
-          <input type="date" style={{...s.input,margin:0}} value={fechaKl} onChange={e=>setFechaKl(e.target.value)} />
-        </div>
-        <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Cantidades entregadas</span>
-        {productos.map(p=>(
-          <div key={p.id} style={{...s.card,margin:"0 0 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div><div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</div><div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{fmt(p.precio)} c/u</div></div>
-            <div style={{display:"flex",gap:6,alignItems:"center"}}>
-              <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>setCantidades(q=>({...q,[p.nombre]:Math.max(0,(q[p.nombre]||0)-1)}))}>−</button>
-              <span style={{fontSize:22,fontWeight:500,minWidth:32,textAlign:"center",color:"var(--color-text-primary)"}}>{cantidades[p.nombre]||0}</span>
-              <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>setCantidades(q=>({...q,[p.nombre]:(q[p.nombre]||0)+1}))}>+</button>
-            </div>
-          </div>
-        ))}
-        <div style={s.divider} />
-        <label style={{...s.label,fontSize:13,marginBottom:8}}>Forma de pago</label>
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          {[["contado","Contado"],["transferencia","Transfer."],["fiado","Fiado"]].map(([v,l])=>(
-            <button key={v} style={{...s.btn,flex:1,background:pago===v?"#185FA5":undefined,color:pago===v?"#fff":undefined,border:pago===v?"none":undefined,padding:"9px 4px",fontSize:13}} onClick={()=>setPago(v)}>{l}</button>
-          ))}
-        </div>
-        {saldoDisp>0&&pago!=="fiado"&&(
-          <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-success)",border:"0.5px solid var(--color-border-success)",cursor:"pointer"}} onClick={()=>setUsarSaldo(!usarSaldo)}>
-            <div style={{display:"flex",gap:10,alignItems:"center"}}>
-              <input type="checkbox" checked={usarSaldo} onChange={e=>setUsarSaldo(e.target.checked)} style={{width:18,height:18,cursor:"pointer",accentColor:"#0F6E56"}} />
-              <label style={{fontSize:14,color:"var(--color-text-success)",cursor:"pointer",fontWeight:500}}>Usar saldo a favor — {fmt(saldoDisp)}</label>
-            </div>
-          </div>
-        )}
-        {pago!=="fiado"&&(
-          <div style={{marginBottom:12}}>
-            <label style={s.label}>Monto cobrado (vacío = {fmt(aPagar)} exacto)</label>
-            <input style={s.input} type="number" placeholder={String(Math.round(aPagar))} value={monto} onChange={e=>setMonto(e.target.value)} />
-          </div>
-        )}
-        <div style={s.divider} />
-        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases prestados al cliente</label>
-        {envPrest.map((_,i)=><ER key={i} list={envPrest} setList={setEnvPrest} i={i} />)}
-        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvPrest([...envPrest,{prod:"",cant:""}])}>+ Fila</button>
-        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases devueltos por el cliente</label>
-        {envDev.map((_,i)=><ER key={i} list={envDev} setList={setEnvDev} i={i} />)}
-        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvDev([...envDev,{prod:"",cant:""}])}>+ Fila</button>
-        <div style={s.divider} />
-        <label style={s.label}>Observaciones</label>
-        <textarea style={{...s.input,minHeight:60,resize:"vertical",marginBottom:14}} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Notas opcionales..." />
-        <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-secondary)"}}>
-          <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>A cobrar</span>
-            <span style={{fontSize:26,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(aPagar)}</span>
-          </div>
-        </div>
-        <button style={{...s.btnPrimary,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
-          if(!fechaKl){alert("Elegí una fecha");return;}
-          onGuardar(detalle,pago,monto,saldoApl,envPrest,envDev,obs,"compra",0,fechaKl);
-        }}>
-          Guardar venta
-        </button>
-
-      </div>
-    </div>
-  );
-}
-
 
 function AgendaScreen({recordatorios,clientes,onConfirmar,onEliminar,onNuevo,onVolver}) {
   const [mostrarNuevo,setMostrarNuevo] = React.useState(false);
