@@ -5827,60 +5827,68 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             ))}
           </div>
 
-          {ecToken&&ecToken.length>=8&&(
-            <EnviarResumenEC ecToken={ecToken} ventas={ventas} />
-          )}
+          <EnviarResumenEC ventas={ventas} />
         </div>
       )}
           </div>
   );
 }
 
-// ── Panel de gestión de repartidores (tab Equipo en Config) ──
-function EnviarResumenEC({ecToken, ventas}) {
+function EnviarResumenEC({ventas}) {
   const [enviando, setEnviando] = React.useState(false);
-  const [ultimaSync, setUltimaSync] = React.useState(()=>localStorage.getItem('sm_ec_ultima')||'');
+  const [ultimaSync, setUltimaSync] = React.useState(()=>localStorage.getItem('sm_resumen_ultima')||'');
   const db = window.db;
 
   const enviarResumen = async () => {
-    if(!ecToken||!db){ alert('Error: verificá la conexión'); return; }
+    if(!db){ alert('Error: sin conexión a la base de datos'); return; }
     setEnviando(true);
     try {
       const hoy = new Date().toLocaleDateString('es-AR');
+      const fechaId = new Date().toISOString().slice(0,10); // YYYY-MM-DD como ID del doc
       const ventasHoy = (ventas||[]).filter(v=>v.fecha===hoy);
       const gastos = JSON.parse(localStorage.getItem('lc_gastos')||'[]');
       const gastosHoy = gastos.filter(g=>g.fecha===hoy);
       const totalVentas = ventasHoy.reduce((s,v)=>s+(v.total||0),0);
       const totalGastos = gastosHoy.reduce((s,g)=>s+(g.monto||0),0);
       const movs = [
-        ...ventasHoy.map(v=>({id:'venta_'+v.id,tipo:'ingreso',monto:v.total||0,descripcion:'Venta reparto: '+(v.cliente||''),fecha:hoy,origen:'reparto_multi'})),
-        ...gastosHoy.map(g=>({id:'gasto_'+g.id,tipo:'egreso',monto:g.monto||0,descripcion:'Gasto reparto: '+(g.concepto||''),fecha:hoy,origen:'reparto_multi'}))
+        ...ventasHoy.map(v=>({id:'venta_'+v.id,tipo:'ingreso',monto:v.total||0,descripcion:'Venta reparto: '+(v.cliente||''),fecha:hoy,origen:'reparto'})),
+        ...gastosHoy.map(g=>({id:'gasto_'+g.id,tipo:'egreso',monto:g.monto||0,descripcion:'Gasto reparto: '+(g.concepto||''),fecha:hoy,origen:'reparto'}))
       ];
-      if(!movs.length){ alert('No hay movimientos para enviar hoy'); setEnviando(false); return; }
+      if(!movs.length){ alert('No hay movimientos para guardar hoy'); setEnviando(false); return; }
       const batch = db.batch();
       movs.forEach(m=>{
-        const ref = db.collection('sinc_reparto').doc(ecToken).collection('movimientos').doc(m.id);
+        const ref = db.collection('resumenes_dia').doc(fechaId).collection('movimientos').doc(m.id);
         batch.set(ref, m);
       });
+      // También guardar el totalizador del día en el documento raíz
+      batch.set(db.collection('resumenes_dia').doc(fechaId), {
+        fecha: hoy,
+        fechaId,
+        totalVentas,
+        totalGastos,
+        cantVentas: ventasHoy.length,
+        cantGastos: gastosHoy.length,
+        guardadoEn: new Date().toISOString()
+      }, {merge: true});
       await batch.commit();
       const ahora = new Date().toLocaleString('es-AR');
       setUltimaSync(ahora);
-      localStorage.setItem('sm_ec_ultima', ahora);
-      alert('✅ Resumen enviado!\nVentas: $'+totalVentas.toLocaleString('es-AR')+'\nGastos: $'+totalGastos.toLocaleString('es-AR'));
-    } catch(e){ alert('Error al enviar: '+e.message); }
+      localStorage.setItem('sm_resumen_ultima', ahora);
+      alert('✅ Resumen guardado!\nVentas: $'+totalVentas.toLocaleString('es-AR')+'\nGastos: $'+totalGastos.toLocaleString('es-AR'));
+    } catch(e){ alert('Error al guardar: '+e.message); }
     setEnviando(false);
   };
 
   return (
     <div style={{background:'var(--color-background-secondary)',borderRadius:12,padding:14,border:'0.5px solid var(--color-border-tertiary)',marginTop:12}}>
-      <div style={{fontSize:11,fontWeight:700,color:'var(--color-text-secondary)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:10}}>📤 Enviar resumen del día</div>
+      <div style={{fontSize:11,fontWeight:700,color:'var(--color-text-secondary)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:10}}>📤 Resumen del día</div>
       <button
         onClick={enviarResumen}
         disabled={enviando}
         style={{width:'100%',padding:'12px',borderRadius:10,border:'none',background:'var(--color-accent)',color:'white',fontSize:14,fontWeight:700,cursor:'pointer',marginBottom:8}}>
-        {enviando?'⏳ Enviando...':'📤 Enviar resumen a Emma Control'}
+        {enviando?'⏳ Guardando...':'💾 Guardar resumen del día'}
       </button>
-      {ultimaSync&&<div style={{fontSize:11,color:'var(--color-text-secondary)',textAlign:'center'}}>Última sincronización: {ultimaSync}</div>}
+      {ultimaSync&&<div style={{fontSize:11,color:'var(--color-text-secondary)',textAlign:'center'}}>Último guardado: {ultimaSync}</div>}
     </div>
   );
 }
@@ -6142,7 +6150,7 @@ function ConfigAparienciaLC() {
 
 
 // ============ SISTEMA DE LICENCIAS MULTI ============
-function PantallaActivacionMulti({onActivado, onRepartidor, verificarRepartidor}) {
+function PantallaActivacionMulti({onActivado}) {
   const [codigo, setCodigo] = React.useState(localStorage.getItem("sm_codigo")||"");
   const [paso, setPaso] = React.useState(localStorage.getItem("sm_codigo") ? "datos" : "codigo");
   const [nombre, setNombre] = React.useState("");
@@ -6155,12 +6163,7 @@ function PantallaActivacionMulti({onActivado, onRepartidor, verificarRepartidor}
   async function verificarCodigo() {
     if(!codigo.trim()) { setError("Ingresá el código de activación"); return; }
     setCargando(true); setError("");
-    // Primero verificar si es código de repartidor (local)
-    if(verificarRepartidor) {
-      const rep = verificarRepartidor(codigo.trim());
-      if(rep) { setCargando(false); onRepartidor&&onRepartidor(rep); return; }
-    }
-    // Si no, verificar licencia de dueño en Firebase
+    // Verificar licencia en Firebase
     try {
       const doc = await window.db.collection("licencias").doc(codigo.trim().toUpperCase()).get();
       if(!doc.exists) { setError("Código inválido. Verificá que esté bien escrito."); setCargando(false); return; }
@@ -6274,146 +6277,21 @@ function getDeviceIdMulti() {
   return id;
 }
 
-// ── App Repartidor — vista limitada ──
-function AppRepartidor({repartidor, onSalir}) {
-  const [clientes]   = useLS("cat_clientes_v3", []);
-  const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
-  const ventas = React.useMemo(()=>(ventasRaw||[]),[ventasRaw]);
-  const setVentas = (arg) => setVentasRaw(typeof arg==='function'?prev=>arg(prev):arg);
-  const [productos]  = useLS("cat_productos_v3", PRODUCTOS_INICIALES);
-  const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1",[]);
-  const [pantalla, setPantalla] = React.useState("clientes");
-  const [clienteId, setClienteId] = React.useState(null);
-
-  const hoy = new Date().toISOString().slice(0,10);
-  const fechaActual = hoy;
-  const diaActual = repartidor.dia;
-
-  const clientesDia = (clientes||[]).filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-  const cliente = clientesDia.find(c=>c.id===clienteId);
-
-  const saveVentas = (nv) => {
-    setVentas(nv);
-    // sync a Firebase si está disponible
-    try{ if(window.cloudSave) window.cloudSave({ventas:nv}); }catch(e){}
-  };
-  const saveNoVisitas = (nv) => {
-    setNoVisitas(nv);
-  };
-
-  const irA = (p) => setPantalla(p);
-
-  const prodKey = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
-
-  // Avanzar al siguiente cliente
-  const siguienteCliente = (nv, currentId) => {
-    const ventasIds = new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
-    const noVMap={}; (nv||noVisitas).filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
-    const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
-    const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==currentId);
-    const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==currentId);
-    const sig=normalPend[0]||noestaPend[0];
-    if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
-  };
-
-  return (
-    <div style={s.screen}>
-      {pantalla==="clientes" && (
-        <div>
-          <div style={{...s.header,justifyContent:"space-between"}}>
-            <span style={s.headerTitle}>👤 {repartidor.nombre} · {diaActual}</span>
-            <button style={{...s.btn,fontSize:11,padding:"4px 10px",background:"rgba(220,38,38,0.15)",color:"var(--color-text-danger)"}} onClick={onSalir}>Salir</button>
-          </div>
-          <ListaClientes
-            dia={diaActual} fecha={fechaActual} clientes={clientesDia} ventas={ventas} noVisitas={noVisitas}
-            onCliente={id=>{setClienteId(id);irA("detalleCliente");}}
-            onNuevoCliente={null}
-            onVolver={null}
-          />
-        </div>
-      )}
-      {pantalla==="detalleCliente" && cliente && (
-        <DetalleCliente
-          cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={noVisitas}
-          dia={diaActual} fecha={fechaActual} productos={productos}
-          onVolver={()=>irA("clientes")}
-          onVenta={()=>{setClienteId(cliente.id);irA("venta");}}
-          onEditar={null} onEliminarVenta={null} onEditarVenta={null} onEliminarCliente={null}
-          onNoEstaCliente={()=>{
-            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
-            saveNoVisitas(nv); siguienteCliente(nv, cliente.id);
-          }}
-          onNoQuiereCliente={()=>{
-            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
-            saveNoVisitas(nv); siguienteCliente(nv, cliente.id);
-          }}
-          recordatorios={[]} onGuardarRecordatorio={null} onConfirmarRecordatorio={null}
-          onCobrarSaldo={null} onGuardarAjuste={null}
-        />
-      )}
-      {pantalla==="venta" && cliente && (
-        <NuevaVenta cliente={cliente} productos={productos} fecha={fechaActual}
-          onNoEsta={()=>{
-            const prev=(noVisitas||[]).find(v=>v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual);
-            const motivo=prev?.motivo==="noesta"?"noesta2":"noesta";
-            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo}];
-            saveNoVisitas(nv); siguienteCliente(nv, cliente.id);
-          }}
-          onNoQuiere={()=>{
-            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
-            saveNoVisitas(nv); siguienteCliente(nv, cliente.id);
-          }}
-          onGuardar={(venta)=>{
-            const nv=[...ventas,{...venta,id:Date.now(),clienteId:cliente.id,dia:diaActual,fechaKey:fechaActual,repartidorId:repartidor.id,repartidorNombre:repartidor.nombre}];
-            saveVentas(nv); siguienteCliente(noVisitas, cliente.id);
-          }}
-          onVolver={()=>irA("detalleCliente")}
-          ventaHoy={ventas.find(v=>v.clienteId===cliente.id&&v.fechaKey===fechaActual)}
-          saldoCliente={cliente.saldo||0}
-        />
-      )}
-    </div>
-  );
-}
 
 function AppConLicenciaMulti() {
   const [acceso, setAcceso] = React.useState(()=>{
     const lic = localStorage.getItem("sm_codigo");
     const pin = localStorage.getItem("sm_pin");
-    const repCod = localStorage.getItem("sm_rep_codigo");
-    if(repCod) return "repartidor";
     if(!lic) return "activacion";
     if(!pin) return "activacion";
     return "pin";
   });
   const [pinActual, setPinActual] = React.useState(()=>localStorage.getItem("sm_pin"));
-  const [repartidorActual, setRepartidorActual] = React.useState(()=>{
-    try{return JSON.parse(localStorage.getItem("sm_rep_data")||"null");}catch{return null;}
-  });
-
-  // Verificar si el código ingresado es de un repartidor
-  const verificarCodigoRepartidor = (codigo) => {
-    try {
-      const repartidores = JSON.parse(localStorage.getItem("cat_repartidores_v1")||"[]");
-      return repartidores.find(r=>r.codigo===codigo.toUpperCase());
-    } catch { return null; }
-  };
 
   if(acceso === "activacion") return (
-    <PantallaActivacionMulti onActivado={(pin)=>{ setPinActual(pin); setAcceso("pin"); }} onRepartidor={(rep)=>{
-      localStorage.setItem("sm_rep_codigo", rep.codigo);
-      localStorage.setItem("sm_rep_data", JSON.stringify(rep));
-      setRepartidorActual(rep);
-      setAcceso("repartidor");
-    }} verificarRepartidor={verificarCodigoRepartidor} />
+    <PantallaActivacionMulti onActivado={(pin)=>{ setPinActual(pin); setAcceso("pin"); }} />
   );
   if(acceso === "pin") return <PantallaPINMulti pinCorrecto={pinActual} onOk={()=>setAcceso("app")}/>;
-  if(acceso === "repartidor") return <AppRepartidor repartidor={repartidorActual} onSalir={()=>{
-    localStorage.removeItem("sm_rep_codigo");
-    localStorage.removeItem("sm_rep_data");
-    setRepartidorActual(null);
-    setAcceso("activacion");
-  }}/>;
   return <ErrorBoundary><App/></ErrorBoundary>;
 }
 // ============ FIN SISTEMA DE LICENCIAS ============
