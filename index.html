@@ -5423,7 +5423,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         {[
           [["precios","💲","Precios"],["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"]],
-          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"]],
+          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["emma","🔗","Vincular"]],
         ].map((fila,fi)=>(
           <div key={fi} style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
             {fila.map(([id,ico,lbl])=>id==="x"?<div key="x"/>:(
@@ -5800,8 +5800,19 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:12}}>Clientes: {clientes.length} · Ventas: {ventas.length} · Planillas: {Object.keys(planillas).length}</div>
             <button style={s.btnPrimary} onClick={()=>exportarExcel(clientes,ventas,productos,planillas)}>Descargar Excel</button>
           </div>
-          <div style={{...s.card,margin:0,borderLeft:"3px solid #EF9F27"}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔄 Forzar sincronización</div>
+          <div style={{...s.card,margin:0,borderLeft:"3px solid #e05c5c",background:"rgba(224,92,92,0.05)"}}>
+            <div style={{fontSize:14,fontWeight:500,color:"#e05c5c",marginBottom:4}}>🗑️ Borrar todos los clientes</div>
+            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12}}>Elimina permanentemente toda la lista de clientes. Las ventas y planillas no se tocan. Usá esto solo si querés empezar de cero.</div>
+            <button style={{...s.btn,width:"100%",padding:"12px",fontSize:14,background:"#3a1a1a",color:"#e05c5c",border:"0.5px solid #e05c5c"}} onClick={()=>{
+              if(window.confirm(`⚠️ ATENCIÓN\n\nEsto va a borrar los ${clientes.length} clientes de la app.\n\nLas ventas y planillas NO se tocan.\n\n¿Estás seguro?`)){
+                if(window.confirm("Última confirmación: ¿borrar TODOS los clientes?")){
+                  setClientes([]);
+                  if(syncData)syncData({clientes:[]});
+                  alert("✅ Todos los clientes fueron eliminados.");
+                }
+              }
+            }}>Borrar todos los clientes</button>
+          </div>
             <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12}}>Si en un dispositivo no aparecen los clientes, usá este botón desde el dispositivo donde SÍ se ven bien. Sube todos los datos actuales a la nube y los demás dispositivos los van a recibir al reabrir la app.</div>
             <button style={{...s.btn,width:"100%",padding:"12px",fontSize:14,background:"#EF9F27",color:"#fff",border:"none"}} onClick={()=>{
               if(window.confirm("¿Subir todos los datos actuales a la nube? Esto va a sobreescribir lo que haya guardado.")){
