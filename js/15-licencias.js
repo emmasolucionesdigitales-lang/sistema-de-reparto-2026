@@ -89,13 +89,28 @@ function PantallaActivacionMulti({onActivado}) {
 
 function PantallaPINMulti({pinCorrecto, onOk}) {
   const [pin, setPin] = React.useState("");
-  const [intentos, setIntentos] = React.useState(4);
+  const [intentos, setIntentos] = React.useState(0);
+  const [mostrarReset, setMostrarReset] = React.useState(false);
+
   function verificar(d) {
     const nuevo = pin + d;
     setPin(nuevo);
     if(nuevo.length === 4) {
       if(Number(nuevo) === Number(pinCorrecto)) { onOk(); }
-      else { setIntentos(i=>i-1); setPin(""); }
+      else {
+        const nv = intentos + 1;
+        setIntentos(nv);
+        setPin("");
+        if(nv >= 2) setMostrarReset(true);
+      }
+    }
+  }
+
+  function resetearApp() {
+    if(window.confirm("¿Querés reingresar tu código de activación para recuperar el PIN?")) {
+      localStorage.removeItem("sm_pin");
+      localStorage.removeItem("sm_codigo");
+      location.reload();
     }
   }
   const s = {
@@ -114,12 +129,17 @@ function PantallaPINMulti({pinCorrecto, onOk}) {
       <div style={s.h1}>Sistema de Reparto</div>
       <div style={s.sub}>Ingresá tu PIN de acceso</div>
       <div style={s.dots}>{[0,1,2,3].map(i=><div key={i} style={pin.length>i?s.dotFill:s.dot}/>)}</div>
-      {intentos < 4 && <div style={s.err}>PIN incorrecto ({intentos} intentos restantes)</div>}
+      {intentos > 0 && <div style={s.err}>PIN incorrecto ({intentos} intento{intentos!==1?"s":""} fallido{intentos!==1?"s":""})</div>}
       <div style={s.grid}>
         {[1,2,3,4,5,6,7,8,9].map(d=><button key={d} style={s.key} onClick={()=>verificar(String(d))}>{d}</button>)}
         <div/><button style={s.key} onClick={()=>verificar("0")}>0</button>
         <button style={{...s.key,fontSize:18}} onClick={()=>setPin(p=>p.slice(0,-1))}>⌫</button>
       </div>
+      {mostrarReset&&(
+        <button onClick={resetearApp} style={{marginTop:16,background:"none",border:"none",color:"#5daaff",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>
+          ¿Olvidaste tu PIN? Reingresar código →
+        </button>
+      )}
     </div>
   );
 }
