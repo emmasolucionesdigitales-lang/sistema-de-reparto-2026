@@ -70,6 +70,20 @@ self.addEventListener('fetch',e=>{
       }
       window.db = firebase.firestore();
 
+      // Firebase licencias — app-control-de-apps (central de licencias)
+      var licConfig = {
+        apiKey: "AIzaSyAFQ4ybqIoVV3rWe1FMjMVUZ-qzLNZbdBk",
+        authDomain: "app-control-de-apps.firebaseapp.com",
+        projectId: "app-control-de-apps",
+        storageBucket: "app-control-de-apps.firebasestorage.app",
+        messagingSenderId: "761424199819",
+        appId: "1:761424199819:web:513eeaf0e54f4e1401d48e"
+      };
+      try {
+        var licApp = firebase.apps.find(function(a){return a.name==='licencias';}) || firebase.initializeApp(licConfig,'licencias');
+        window.dbLicencias = firebase.firestore(licApp);
+      } catch(e){ console.log('Licencias init:',e); }
+
       // Firebase secundario: Emma Control (para enviar datos de integración)
       var ecConfig = {
         apiKey: "AIzaSyBbLoljOPJgjNvVN7bfOuMl8NrUjFB-agU",

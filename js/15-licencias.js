@@ -18,7 +18,7 @@ function PantallaActivacionMulti({onActivado}) {
     setCargando(true); setError("");
     // Verificar licencia en Firebase
     try {
-      const doc = await window.db.collection("licencias").doc(codigo.trim().toUpperCase()).get();
+      const doc = await window.dbLicencias.collection("licencias").doc(codigo.trim().toUpperCase()).get();
       if(!doc.exists) { setError("Código inválido. Verificá que esté bien escrito."); setCargando(false); return; }
       const data = doc.data();
       if(data.estado === "inactivo") { setError("Esta licencia está desactivada. Contactá a Emma Soluciones."); setCargando(false); return; }
@@ -41,7 +41,7 @@ function PantallaActivacionMulti({onActivado}) {
     setCargando(true); setError("");
     try {
       const cod = codigo.trim().toUpperCase();
-      await window.db.collection("licencias").doc(cod).update({
+      await window.dbLicencias.collection("licencias").doc(cod).update({
         negocio: nombre, celular, email,
         deviceId: getDeviceIdMulti(),
         estado: "usado", activadoEn: new Date().toISOString()
