@@ -41,6 +41,10 @@ function PantallaActivacionMulti({onActivado}) {
     setCargando(true); setError("");
     try {
       const cod = codigo.trim().toUpperCase();
+      const snap = await window.dbLicencias.collection("licencias").doc(cod).get();
+      const lic = snap.data();
+      if(lic.email&&lic.email.trim().toLowerCase()!==email.trim().toLowerCase()){setError("El email no coincide con el registrado. Contactá al administrador.");setCargando(false);return;}
+      if(lic.celular&&lic.celular.trim()!==celular.trim()){setError("El celular no coincide con el registrado. Contactá al administrador.");setCargando(false);return;}
       await window.dbLicencias.collection("licencias").doc(cod).update({
         negocio: nombre, celular, email,
         deviceId: getDeviceIdMulti(),
