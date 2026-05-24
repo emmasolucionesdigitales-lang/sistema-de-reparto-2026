@@ -2,8 +2,8 @@
 // ◆  13-config.js — Config · EnviarResumenEC
 // ════════════════════════════════════════════════════════════════════
 
-function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken}) {
-  const [tab,setTab]=useState("precios");
+function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken,tabInicial}) {
+  const [tab,setTab]=useState(tabInicial||"stock");
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
   const [importandoClientes,setImportandoClientes]=useState(false);
@@ -17,8 +17,8 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Configuración</span></div>
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         {[
-          [["precios","💲","Precios"],["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"]],
-          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["emma","🔗","Vincular"]],
+          [["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"],["backup","💾","Backup"]],
+          [["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["emma","🔗","Vincular"],["x","",""]],
         ].map((fila,fi)=>(
           <div key={fi} style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
             {fila.map(([id,ico,lbl])=>id==="x"?<div key="x"/>:(
@@ -40,12 +40,14 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           </div>
         ))}
       </div>
-      {tab==="precios"&&<div style={{padding:16}}>
-        {/* Lista de artículos */}
+      {tab==="stock"&&<div style={{padding:16}}>
+
+        {/* ── Precios y costos ── */}
+        <div style={{...s.card,margin:"0 0 14px",background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)",padding:"10px 14px"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"var(--color-text-info)"}}>💲 Precios y costos</span>
+        </div>
         {productos.map(p=>{
           const editing = editandoId===p.id;
-          const [pr,setPr] = [p.precio, v=>setProductos(productos.map(x=>x.id===p.id?{...x,precio:Number(v)||0}:x))];
-          const [co,setCo] = [p.costo, v=>setProductos(productos.map(x=>x.id===p.id?{...x,costo:Number(v)||0}:x))];
           const margen = p.precio>0?Math.round(((p.precio-p.costo)/p.precio)*100):0;
           return (
             <div key={p.id} style={{...s.card,margin:"0 0 10px",borderLeft:editing?"3px solid #185FA5":"0.5px solid var(--color-border-tertiary)"}}>
@@ -54,7 +56,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                   <div>
                     <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</div>
                     <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:4}}>
-                      Venta: <b>{fmt(p.precio)}</b> · Costo: {fmt(p.costo)} · 
+                      Venta: <b>{fmt(p.precio)}</b> · Costo: {fmt(p.costo)} ·
                       <span style={{color:margen>40?"var(--color-text-success)":margen>20?"var(--color-text-warning)":"var(--color-text-danger)"}}> {margen}% margen</span>
                     </div>
                   </div>
@@ -70,22 +72,10 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                     <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setEditandoId(null)}>Cancelar</button>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                    <div>
-                      <label style={s.label}>Nombre</label>
-                      <input style={s.input} defaultValue={p.nombre} id={`nm-${p.id}`} />
-                    </div>
-                    <div>
-                      <label style={s.label}>Precio de venta $</label>
-                      <input style={s.inputNum} type="number" defaultValue={p.precio} id={`pr-${p.id}`} />
-                    </div>
-                    <div>
-                      <label style={s.label}>Costo de llenado $</label>
-                      <input style={s.inputNum} type="number" defaultValue={p.costo} id={`co-${p.id}`} />
-                    </div>
-                    <div>
-                      <label style={s.label}>Unidad (ej: 1.5L)</label>
-                      <input style={s.input} defaultValue={p.unidad||""} id={`un-${p.id}`} placeholder="opcional" />
-                    </div>
+                    <div><label style={s.label}>Nombre</label><input style={s.input} defaultValue={p.nombre} id={`nm-${p.id}`} /></div>
+                    <div><label style={s.label}>Precio de venta $</label><input style={s.inputNum} type="number" defaultValue={p.precio} id={`pr-${p.id}`} /></div>
+                    <div><label style={s.label}>Costo de llenado $</label><input style={s.inputNum} type="number" defaultValue={p.costo} id={`co-${p.id}`} /></div>
+                    <div><label style={s.label}>Unidad (ej: 1.5L)</label><input style={s.input} defaultValue={p.unidad||""} id={`un-${p.id}`} placeholder="opcional" /></div>
                   </div>
                   <button style={s.btnPrimary} onClick={()=>{
                     const nm=document.getElementById(`nm-${p.id}`).value;
@@ -100,8 +90,6 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             </div>
           );
         })}
-
-        {/* Agregar nuevo artículo */}
         {editandoId==="nuevo"?(
           <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #4dd9a0"}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
@@ -128,82 +116,38 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           <button style={{...s.btn,width:"100%",padding:"10px",fontSize:13,marginBottom:16,borderStyle:"dashed"}}
             onClick={()=>setEditandoId("nuevo")}>+ Agregar nuevo artículo</button>
         )}
-
-        {/* Calculadora de costo real */}
         <CalculadoraCostoReal productos={productos} ventas={ventas} />
-      </div>}
-      {tab==="envases"&&(
-  <div style={{padding:16}}>
-    <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:12,lineHeight:1.7}}>
-      <b>En la calle:</b> envases en poder de clientes (automático).<br/>
-      <b>En depósito:</b> envases nuevos o retirados.<br/>
-      <b>De venta:</b> los que cargás cada mañana según el día.
-    </p>
-    {/* Dispenser */}
-    <div style={{...s.card,margin:"0 0 14px"}}>
-      <p style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:12}}>Dispenser</p>
-      <div style={s.grid2}>
-        <div style={s.metricCard}>
-          <div style={s.metricLabel}>En poder de clientes</div>
-          <div style={{fontSize:22,fontWeight:500,color:"var(--color-text-primary)",marginTop:6}}>{prestados.dispenser||0}</div>
+
+        {/* ── Stock en depósito ── */}
+        <div style={{...s.card,margin:"16px 0 14px",background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)",padding:"10px 14px"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"var(--color-text-info)"}}>📦 Stock en depósito</span>
         </div>
-        <div style={s.metricCard}>
-          <div style={s.metricLabel}>En depósito</div>
-          <input style={{...s.inputNum,marginTop:6,fontSize:18,fontWeight:500,textAlign:"center"}} type="number" min={0}
-            value={stock.dispenser_deposito||""} placeholder="0"
-            onChange={e=>setStock({...stock,dispenser_deposito:Number(e.target.value)})} />
-        </div>
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:10,paddingTop:10,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-        <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total en circulación</span>
-        <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{(prestados.dispenser||0)+(stock.dispenser_deposito||0)}</span>
-      </div>
-    </div>
-    {productos.map(p=>{
-      const key=stockKeys[p.nombre]; if(!key) return null;
-      const enCalle=prestados[key];
-      const enDeposito=num(stock[key+"_deposito"]);
-      const enVenta=DIAS.reduce((obj,d)=>{obj[d]=num((stock[key+"_venta"]||{})[d]||0);return obj;},{});
-      return (
-        <div key={p.id} style={{...s.card,margin:"0 0 14px"}}>
-          <p style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:12}}>{p.nombre}</p>
-          <div style={s.grid3}>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>En la calle</div>
-              <div style={{fontSize:22,fontWeight:500,color:"var(--color-text-primary)",marginTop:6}}>{enCalle}</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>clientes</div>
-            </div>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>En depósito</div>
-              <input style={{...s.inputNum,marginTop:6,fontSize:18,fontWeight:500,textAlign:"center"}} type="number" min={0}
-                value={enDeposito||""} placeholder="0"
-                onChange={e=>setStock({...stock,[key+"_deposito"]:Number(e.target.value)})} />
-            </div>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>Total</div>
-              <div style={{fontSize:22,fontWeight:500,color:"#185FA5",marginTop:6}}>{enCalle+enDeposito}</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>en circulación</div>
-            </div>
-          </div>
-          <div style={{marginTop:10,paddingTop:10,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:6,fontWeight:500}}>Envases de venta por día</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {DIAS.map(d=>(
-                <div key={d} style={{flex:1,minWidth:60}}>
-                  <label style={{...s.label,textAlign:"center",fontSize:11}}>{d.slice(0,3)}</label>
-                  <input type="number" min={0} placeholder="0"
-                    style={{...s.inputNum,textAlign:"center",fontSize:14}}
-                    value={enVenta[d]||""}
-                    onChange={e=>setStock({...stock,[key+"_venta"]:{...(stock[key+"_venta"]||{}),[d]:Number(e.target.value)}})} />
+        <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
+          Control de stock en los 3 lugares. Al iniciar reparto el camión se carga desde la sodería automáticamente.
+        </p>
+        {[["soderia","🏭 Sodería"],["casa","🏠 Casa"],["camion","🚚 Camión"]].map(([lugar,titulo])=>(
+          <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
+            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>{titulo}</div>
+            <div style={s.grid3}>
+              {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
+                <div key={k}>
+                  <label style={{...s.label,textAlign:"center"}}>{l}</label>
+                  <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                    value={stock?.[lugar]?.[k]??0}
+                    onChange={e=>{
+                      const ns=JSON.parse(JSON.stringify(stock||{}));
+                      if(!ns[lugar]) ns[lugar]={sifon:0,bidon10:0,bidon20:0};
+                      ns[lugar][k]=Number(e.target.value)||0;
+                      setStock(ns);
+                    }}
+                  />
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      );
-    })}
-  </div>
-)}
+        ))}
+        <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("✅ Stock guardado");}}>Guardar stock</button>
+      </div>}
       {tab==="cargas"&&(
           <div style={{padding:16}}>
             <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
@@ -257,35 +201,6 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               );
             })}
             <button style={s.btnPrimary} onClick={()=>{ setCargasDia(Object.assign({},cargasDia)); alert("Cargas guardadas"); }}>Guardar cargas</button>
-          </div>
-        )}
-        {tab==="stock"&&(
-          <div style={{padding:16}}>
-            <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
-              Control de stock en los 3 lugares. Al iniciar reparto el camión se carga desde la sodería automáticamente.
-            </p>
-            {[["soderia","🏭 Sodería"],["casa","🏠 Casa"],["camion","🚚 Camión"]].map(([lugar,titulo])=>(
-              <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
-                <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>{titulo}</div>
-                <div style={s.grid3}>
-                  {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
-                    <div key={k}>
-                      <label style={{...s.label,textAlign:"center"}}>{l}</label>
-                      <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
-                        value={stock?.[lugar]?.[k]??0}
-                        onChange={e=>{
-                          const ns=JSON.parse(JSON.stringify(stock||{}));
-                          if(!ns[lugar]) ns[lugar]={sifon:0,bidon10:0,bidon20:0};
-                          ns[lugar][k]=Number(e.target.value)||0;
-                          setStock(ns);
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("Stock guardado");}}>Guardar stock</button>
           </div>
         )}
         {tab==="historial"&&(
@@ -395,18 +310,28 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:12}}>Clientes: {clientes.length} · Ventas: {ventas.length} · Planillas: {Object.keys(planillas).length}</div>
             <button style={s.btnPrimary} onClick={()=>exportarExcel(clientes,ventas,productos,planillas)}>Descargar Excel</button>
           </div>
-          <div style={{...s.card,margin:0,borderLeft:"3px solid #e05c5c",background:"rgba(224,92,92,0.05)"}}>
-            <div style={{fontSize:14,fontWeight:500,color:"#e05c5c",marginBottom:4}}>🗑️ Borrar todos los clientes</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12}}>Elimina permanentemente toda la lista de clientes. Las ventas y planillas no se tocan. Usá esto solo si querés empezar de cero.</div>
-            <button style={{...s.btn,width:"100%",padding:"12px",fontSize:14,background:"#3a1a1a",color:"#e05c5c",border:"0.5px solid #e05c5c"}} onClick={()=>{
-              if(window.confirm(`⚠️ ATENCIÓN\n\nEsto va a borrar los ${clientes.length} clientes de la app.\n\nLas ventas y planillas NO se tocan.\n\n¿Estás seguro?`)){
-                if(window.confirm("Última confirmación: ¿borrar TODOS los clientes?")){
-                  setClientes([]);
-                  if(syncData)syncData({clientes:[]});
-                  alert("✅ Todos los clientes fueron eliminados.");
-                }
-              }
-            }}>Borrar todos los clientes</button>
+          <div style={{borderTop:"1px solid var(--color-border-secondary)",paddingTop:16,marginTop:4}}>
+            <div style={{fontSize:11,color:"#e05c5c",fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>⚠️ Zona peligrosa</div>
+            <button style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #e05c5c",
+              background:"rgba(220,38,38,0.1)",color:"#e05c5c",fontSize:13,fontWeight:600,cursor:"pointer"}}
+              onClick={async ()=>{
+                if(!window.confirm("⚠️ ¿Borrar TODOS los clientes, ventas y movimientos?\n\nEsto NO se puede deshacer.\nLos productos y stock se conservan.")) return;
+                // Limpiar via syncData (Firestore)
+                if(syncData) syncData({
+                  clientes:[], ventas:[], planillas:{}, noVisitas:[],
+                  prospectos:[], recordatorios:[], histPrecios:[], mantVeh:[]
+                });
+                // Limpiar localStorage
+                Object.keys(localStorage)
+                  .filter(k=>k.startsWith("lc_")&&!k.startsWith("lc_ec_")&&!k.startsWith("lc_dark")&&!k.startsWith("lc_tema"))
+                  .forEach(k=>localStorage.removeItem(k));
+                window.location.reload();
+              }}>
+              🗑️ Borrar clientes, ventas y movimientos
+            </button>
+            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6,textAlign:"center"}}>
+              Los productos y stock se conservan
+            </div>
           </div>
           <div style={{...s.card,margin:0,borderLeft:"3px solid #EF9F27"}}>
             <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔄 Forzar sincronización</div>
@@ -554,6 +479,25 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           </div>
 
           <EnviarResumenEC ventas={ventas} />
+
+          {/* Soporte técnico */}
+          <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:14,border:"0.5px solid var(--color-border-tertiary)"}}>
+            <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>💬 Soporte técnico</div>
+            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12,lineHeight:1.6}}>
+              ¿Tenés algún problema o consulta? Escribinos por WhatsApp.
+            </div>
+            <a href="https://wa.me/5493813399962?text=Hola%2C+necesito+ayuda+con+Sistema+de+Reparto"
+              target="_blank" rel="noopener"
+              style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                padding:"13px",borderRadius:10,background:"#0a2e1f",
+                border:"1px solid #4dd9a0",color:"#4dd9a0",
+                fontSize:14,fontWeight:600,textDecoration:"none"}}>
+              💬 Abrir WhatsApp
+            </a>
+            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:8,textAlign:"center"}}>
+              Emma Soluciones Digitales · +54 9 381 339-9962
+            </div>
+          </div>
         </div>
       )}
           </div>

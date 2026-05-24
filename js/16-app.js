@@ -95,6 +95,7 @@ function App() {
   );
   const [cloudSetup, setCloudSetup] = useState(false);
   const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
+  const [tabConfig, setTabConfig] = useState("stock");
   const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
   const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
@@ -557,7 +558,7 @@ function App() {
     <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
       <SyncBar status={syncStatus} isOnline={isOnline} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onAgenda={()=>irA("agenda")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={(tab)=>{setTabConfig(tab||"precios");irA("config");}} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onAgenda={()=>irA("agenda")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onVerConfirmaciones={(dia)=>{setDiaActual(dia);irA("confirmacionesDia");}}
@@ -703,7 +704,6 @@ function App() {
             .sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999));
           saveClientes(nc);irA("clientes");
         }} onVolver={()=>irA("clientes")} />}
-      {pantalla==="historial" && <CargaHistorica clientes={clientes} productos={productos} onGuardar={(vts)=>{saveVentas([...ventas,...vts]);irA("menu");}} onVolver={()=>irA("menu")} />}
       {pantalla==="promocion"       && <Promocion prospectos={prospectos} clientes={clientes} onSave={saveProspectos} onConvertir={(p)=>{
         const nuevo={...p,id:Date.now(),saldo:0,sifon:0,bidon10:1,bidon20:0};
         saveClientes([...clientes,nuevo]);
@@ -720,19 +720,19 @@ function App() {
         const orden = datos.orden;
         let nuevos;
         if(orden&&clientes.some(c=>c.dia===datos.dia&&c.orden===orden)){
-          // Shift all clients with same day and order >= new order
           nuevos = clientes.map(c=>c.dia===datos.dia&&(c.orden||0)>=orden?{...c,orden:(c.orden||0)+1}:c);
         } else { nuevos = [...clientes]; }
         saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
       }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{
           setClienteId(c.id);
-          // Asegurar que fechaActual esté seteado a hoy
           const hoyKey = new Date().toISOString().slice(0,10);
           if(!fechaActual) setFechaActual(hoyKey);
-          // Si no hay diaActual, usar el día del cliente como fallback
           if(!diaActual) setDiaActual(c.dia);
           irA("venta");
-        }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}} ventas={ventas} />}
+        }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}}
+        onHistorial={()=>{setTabConfig("historial");irA("config");}}
+        onBackup={()=>{setTabConfig("backup");irA("config");}}
+        ventas={ventas} />}
       {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
@@ -765,7 +765,7 @@ function App() {
       />}
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} onAjustarEnvases={(vt)=>{const nv=[...ventas,vt];saveVentas(nv);alert("✅ Envases corregidos correctamente");}} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
-      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} />}
+      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} tabInicial={tabConfig} />}
     </div>
     {/* Botón flotante de escala — fuera del zoom para que no se afecte */}
     <button

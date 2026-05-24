@@ -2,7 +2,7 @@
 // ◆  11-gestion.js — GestionClientes · FormCliente
 // ════════════════════════════════════════════════════════════════════
 
-function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas}) {
+function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas,onHistorial,onBackup}) {
   const [fotoClienteId,setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
   const [busqueda,setBusqueda]   = useState("");
@@ -73,6 +73,30 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
         <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>
           {filtrados.length} clientes{filtroDia!=="todos"?` · ${filtroDia}`:""}
         </p>
+
+        {/* Accesos rápidos */}
+        {(onHistorial||onBackup)&&(
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            {onHistorial&&(
+              <button style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                padding:"9px",borderRadius:10,border:"0.5px solid var(--color-border-secondary)",
+                background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",
+                fontSize:12,fontWeight:500,cursor:"pointer"}}
+                onClick={onHistorial}>
+                📋 Historial
+              </button>
+            )}
+            {onBackup&&(
+              <button style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                padding:"9px",borderRadius:10,border:"0.5px solid var(--color-border-secondary)",
+                background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",
+                fontSize:12,fontWeight:500,cursor:"pointer"}}
+                onClick={onBackup}>
+                💾 Backup / Importar
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Formulario nuevo cliente */}
