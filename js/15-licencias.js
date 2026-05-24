@@ -10,6 +10,7 @@ function PantallaActivacionMulti({onActivado}) {
   const [celular, setCelular] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [pin, setPin] = React.useState("");
+  const [terminos, setTerminos] = React.useState(false);
   const [error, setError] = React.useState("");
   const [cargando, setCargando] = React.useState(false);
 
@@ -38,6 +39,7 @@ function PantallaActivacionMulti({onActivado}) {
 
   async function activarApp() {
     if(!nombre||!celular||!email||!pin) { setError("Completá todos los campos"); return; }
+    if(!terminos) { setError("Debés aceptar los Términos y Condiciones para continuar"); return; }
     setCargando(true); setError("");
     try {
       const cod = codigo.trim().toUpperCase();
@@ -48,7 +50,9 @@ function PantallaActivacionMulti({onActivado}) {
       await window.dbLicencias.collection("licencias").doc(cod).update({
         negocio: nombre, celular, email,
         deviceId: getDeviceIdMulti(),
-        estado: "usado", activadoEn: new Date().toISOString()
+        estado: "usado",
+        aceptoTerminos: true, fechaAceptoTerminos: new Date().toISOString(),
+        activadoEn: new Date().toISOString()
       });
       localStorage.setItem("sm_codigo", cod);
       localStorage.setItem("sm_pin", pin);
@@ -82,9 +86,17 @@ function PantallaActivacionMulti({onActivado}) {
           <input style={s.inp} placeholder="Número de celular *" value={celular} onChange={e=>setCelular(e.target.value)} type="tel" />
           <input style={s.inp} placeholder="Email *" value={email} onChange={e=>setEmail(e.target.value)} type="email" />
           <input style={s.inp} placeholder="PIN de acceso (lo recibiste con el código) *" value={pin} onChange={e=>setPin(e.target.value)} type="number" />
-          <button style={s.btn} onClick={activarApp} disabled={cargando}>{cargando?"Activando...":"Activar app →"}</button>
+          <label style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",marginTop:4}}>
+            <input type="checkbox" checked={terminos} onChange={e=>setTerminos(e.target.checked)}
+              style={{marginTop:3,width:18,height:18,flexShrink:0}} />
+            <span style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.5}}>
+              Acepto los <span style={{color:"#7c3aed",fontWeight:600}}>Términos y Condiciones</span> del servicio.
+              La aplicación se contrata en modalidad mensual. El acceso se suspende si el pago no se realiza antes del día 11 de cada mes.
+            </span>
+          </label>
         </>}
         {error && <div style={s.err}>{error}</div>}
+        {paso === "datos" && <button style={s.btn} onClick={activarApp} disabled={cargando}>{cargando?"Activando...":"Activar app →"}</button>}
         <p style={{fontSize:11,color:"#4a5568",marginTop:16}}>Emma Soluciones Digitales · 3813399962</p>
       </div>
     </div>
