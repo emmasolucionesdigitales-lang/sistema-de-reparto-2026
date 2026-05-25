@@ -169,9 +169,9 @@ self.addEventListener('notificationclick',e=>{
       });
     } catch(e) { console.error("Firebase init error:", e); window.db = null; }
 
-    function cloudSave(data) {
-      if(!window.db) return Promise.resolve(false);
-      var col = window.db.collection("lc2");
+    function cloudSave(data, negocioId) {
+      if(!window.db || !negocioId) return Promise.resolve(false);
+      var col = window.db.collection("negocios").doc(negocioId).collection("datos");
       var saves = [
         col.doc("config").set({
           planillas: data.planillas || {},
@@ -206,9 +206,9 @@ self.addEventListener('notificationclick',e=>{
       return Promise.all(saves).then(function(){return true;}).catch(function(e){console.error("Save err",e);return false;});
     }
 
-    function cloudLoad() {
-      if(!window.db) return Promise.resolve(null);
-      var col = window.db.collection("lc2");
+    function cloudLoad(negocioId) {
+      if(!window.db || !negocioId) return Promise.resolve(null);
+      var col = window.db.collection("negocios").doc(negocioId).collection("datos");
       return Promise.all([
         col.doc("config").get(),
         col.doc("clientes_meta").get(),
@@ -322,7 +322,7 @@ self.addEventListener('notificationclick',e=>{
   }
   async function guardarSub(sub){
     if(!window.db) return;
-    await window.db.collection('lc2').doc('push_sub').set({sub:JSON.stringify(sub)});
+    var _nid=window._negocioId||'_'; await window.db.collection('negocios').doc(_nid).collection('datos').doc('push_sub').set({sub:JSON.stringify(sub)});
   }
   async function activarNotif(){
     if(!('serviceWorker' in navigator)||!('PushManager' in window)){alert('Tu navegador no soporta notificaciones.');return false;}
@@ -336,7 +336,7 @@ self.addEventListener('notificationclick',e=>{
     const reg=await navigator.serviceWorker.ready;
     const sub=await reg.pushManager.getSubscription();
     if(sub) await sub.unsubscribe();
-    if(window.db) await window.db.collection('lc2').doc('push_sub').delete();
+    var _nid2=window._negocioId||'_'; if(window.db) await window.db.collection('negocios').doc(_nid2).collection('datos').doc('push_sub').delete();
   }
   async function estadoNotif(){
     if(!('PushManager' in window)) return false;

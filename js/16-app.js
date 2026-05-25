@@ -3,6 +3,16 @@
 // ════════════════════════════════════════════════════════════════════
 
 function App() {
+  // ── negocioId desde licencia ────────────────────────────────────
+  const negocioId = React.useMemo(()=>{
+    try {
+      const lic = JSON.parse(localStorage.getItem("sr_licencia")||"{}");
+      const cod = lic.codigo || localStorage.getItem("sm_codigo") || "";
+      window._negocioId = cod; // para push_sub
+      return cod;
+    } catch { return ""; }
+  }, []);
+
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
     const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"]; // historial does NOT need dia
@@ -148,7 +158,7 @@ function App() {
     if (!apiKey || !binId) return;
     setSyncStatus("saving");
     setSyncStatus("loading");
-    cloudLoad().then(function(data) {
+    cloudLoad(negocioId).then(function(data) {
       if(!data) { setSyncStatus("idle"); return; }
       if (data.clientes?.length)   setClientes(data.clientes);
       if (data.ventas?.length)     setVentasRaw(data.ventas);
@@ -213,7 +223,7 @@ function App() {
         setSyncStatus("offline_pending");
         return;
       }
-      cloudSave(data).then(function(ok){
+      cloudSave(data, negocioId).then(function(ok){
         if(ok){
           localStorage.removeItem("sr_offline_pending");
           setPendingOfflineSync(false);
@@ -240,7 +250,7 @@ function App() {
         setSyncStatus("saving");
         try {
           const data = JSON.parse(pending);
-          cloudSave(data).then(ok=>{
+          cloudSave(data, negocioId).then(ok=>{
             if(ok){ localStorage.removeItem("sr_offline_pending"); setPendingOfflineSync(false); setSyncStatus("saved"); setTimeout(()=>setSyncStatus("idle"),2500); }
             else { setSyncStatus("error"); setTimeout(()=>setSyncStatus("offline_pending"),3000); }
           }).catch(()=>{ setSyncStatus("error"); setTimeout(()=>setSyncStatus("offline_pending"),3000); });
