@@ -95,7 +95,7 @@ function App() {
   );
   const [cloudSetup, setCloudSetup] = useState(false);
   const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
-  const [tabConfig, setTabConfig] = useState("precios");
+  const [tabConfig, setTabConfig] = useState("stock");
   const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
   const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
@@ -730,8 +730,8 @@ function App() {
           if(!diaActual) setDiaActual(c.dia);
           irA("venta");
         }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}}
-        onHistorial={()=>{setTabConfig("historial");irA("config");}}
-        onBackup={()=>{setTabConfig("backup");irA("config");}}
+        onHistorial={undefined}
+        onBackup={undefined}
         ventas={ventas} />}
       {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
