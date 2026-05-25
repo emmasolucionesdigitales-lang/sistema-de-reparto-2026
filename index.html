@@ -150,6 +150,18 @@ self.addEventListener('notificationclick',e=>{
         batch.commit().then(function(){ console.log('✅ Datos enviados a Emma Control'); })
           .catch(function(e){ console.log('Error Emma Control:', e); });
       };
+      // ── Brevo email ──────────────────────────────────────────────
+      var BREVO_KEY_IND = "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";
+      window.enviarEmailBrevoRM = async function({to, toName, subject, htmlContent}) {
+        try {
+          await fetch("https://api.brevo.com/v3/smtp/email", {
+            method:"POST",
+            headers:{"Content-Type":"application/json","api-key":BREVO_KEY_IND},
+            body:JSON.stringify({sender:{name:"Sistema de Reparto · Emma Soluciones",email:"carabajalponce1980@gmail.com"},to:[{email:to,name:toName||to}],subject,htmlContent})
+          });
+        } catch(e) { console.error("Brevo error:", e); }
+      };
+
       window.db.enablePersistence({synchronizeTabs:false}).catch(function(err){
         if(err.code==="failed-precondition"||err.code==="unimplemented"){
           console.warn("Offline persistence not available:", err.code);

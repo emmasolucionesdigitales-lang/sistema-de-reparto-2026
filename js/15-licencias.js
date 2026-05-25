@@ -28,6 +28,10 @@ function PantallaActivacionMulti({onActivado}) {
         // Ya activado en este dispositivo, pedir PIN
         localStorage.setItem("sm_codigo", codigo.trim().toUpperCase());
         localStorage.setItem("sm_pin", String(data.pin));
+        localStorage.setItem("sr_licencia", JSON.stringify({
+          email: data.email||"", negocio: data.negocio||"",
+          nombre: data.negocio||"", celular: data.celular||""
+        }));
         onActivado(data.pin);
         return;
       }
@@ -56,6 +60,13 @@ function PantallaActivacionMulti({onActivado}) {
       });
       localStorage.setItem("sm_codigo", cod);
       localStorage.setItem("sm_pin", pin);
+      localStorage.setItem("sr_licencia", JSON.stringify({
+        email: email.trim(),
+        negocio: nombre.trim(),
+        nombre: nombre.trim(),
+        celular: celular.trim(),
+        codigo: cod
+      }));
       onActivado(Number(pin));
     } catch(e) { setError("Error al activar. Intentá de nuevo."); }
     setCargando(false);
