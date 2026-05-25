@@ -95,7 +95,7 @@ function App() {
   );
   const [cloudSetup, setCloudSetup] = useState(false);
   const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
-  const [tabConfig, setTabConfig] = useState("stock");
+  const [tabConfig, setTabConfig] = useState("precios");
   const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
   const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];

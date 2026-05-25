@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 
 function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken,tabInicial}) {
-  const [tab,setTab]=useState(tabInicial||"stock");
+  const [tab,setTab]=useState(tabInicial||"precios");
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
   const [importandoClientes,setImportandoClientes]=useState(false);
@@ -17,7 +17,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Configuración</span></div>
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         {[
-          [["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"],["backup","💾","Backup"]],
+          [["precios","💲","Precios"],["cargas","🚚","Cargas"],["historial","📋","Historial"],["backup","💾","Backup"]],
           [["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["emma","🔗","Vincular"],["x","",""]],
         ].map((fila,fi)=>(
           <div key={fi} style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
@@ -40,11 +40,12 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           </div>
         ))}
       </div>
-      {tab==="stock"&&<div style={{padding:16}}>
+      {tab==="precios"&&<div style={{padding:16}}>
 
         {/* ── Precios y costos ── */}
         <div style={{...s.card,margin:"0 0 14px",background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)",padding:"10px 14px"}}>
           <span style={{fontSize:13,fontWeight:700,color:"var(--color-text-info)"}}>💲 Precios y costos</span>
+          <span style={{fontSize:11,color:"var(--color-text-tertiary)",marginLeft:8}}>El stock físico se edita en la pantalla de Stock</span>
         </div>
         {productos.map(p=>{
           const editing = editandoId===p.id;
@@ -117,36 +118,6 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             onClick={()=>setEditandoId("nuevo")}>+ Agregar nuevo artículo</button>
         )}
         <CalculadoraCostoReal productos={productos} ventas={ventas} />
-
-        {/* ── Stock en depósito ── */}
-        <div style={{...s.card,margin:"16px 0 14px",background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)",padding:"10px 14px"}}>
-          <span style={{fontSize:13,fontWeight:700,color:"var(--color-text-info)"}}>📦 Stock en depósito</span>
-        </div>
-        <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
-          Control de stock en los 3 lugares. Al iniciar reparto el camión se carga desde la sodería automáticamente.
-        </p>
-        {[["soderia","🏭 Sodería"],["casa","🏠 Casa"],["camion","🚚 Camión"]].map(([lugar,titulo])=>(
-          <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>{titulo}</div>
-            <div style={s.grid3}>
-              {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
-                <div key={k}>
-                  <label style={{...s.label,textAlign:"center"}}>{l}</label>
-                  <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
-                    value={stock?.[lugar]?.[k]??0}
-                    onChange={e=>{
-                      const ns=JSON.parse(JSON.stringify(stock||{}));
-                      if(!ns[lugar]) ns[lugar]={sifon:0,bidon10:0,bidon20:0};
-                      ns[lugar][k]=Number(e.target.value)||0;
-                      setStock(ns);
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("✅ Stock guardado");}}>Guardar stock</button>
       </div>}
       {tab==="cargas"&&(
           <div style={{padding:16}}>
