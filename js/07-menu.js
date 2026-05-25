@@ -619,6 +619,24 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
         </div>
         <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
 
+        {/* ── Botón enviar informe ── */}
+        {onCerrarDia&&ventas.length>0&&!yaCerrado&&(()=>{
+          const yaEnviado = !!localStorage.getItem(`sr_informe_${fecha}_${dia}`);
+          return (
+            <button style={{width:"100%",padding:"14px",borderRadius:10,border:"none",
+              background:"#4c1d95",color:"#e9d5ff",fontSize:15,fontWeight:600,cursor:"pointer",marginTop:10,
+              opacity:yaEnviado?0.6:1}}
+              onClick={async()=>{
+                if(yaEnviado){alert("El informe del día ya fue enviado a tu email.");return;}
+                const ok = await onCerrarDia();
+                if(ok) alert("✅ Informe enviado por email.");
+                else alert("❌ No se pudo enviar. Verificá tu conexión.");
+              }}>
+              📊 {yaEnviado?"Informe ya enviado":"Cerrar día y enviar informe"}
+            </button>
+          );
+        })()}
+
         {/* ── Botón Cerrar día / actualizar stock ── */}
         {!yaCerrado ? (
           <button style={{width:"100%",padding:"14px",borderRadius:10,border:"2px solid #f5b942",background:"#2e1f06",color:"#f5b942",fontSize:15,fontWeight:600,cursor:"pointer",marginTop:10}}
