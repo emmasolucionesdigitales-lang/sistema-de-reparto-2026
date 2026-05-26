@@ -602,7 +602,10 @@ function App() {
             if(!vts.length) return null;
             const fechas = [...new Set(vts.map(v=>v.fechaKey))].sort().reverse();
             return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
-          }).filter(Boolean)} zonasReparto={zonasReparto} onSetZona={(dia,zona)=>{const nz={...zonasReparto,[dia]:zona};setZonasReparto(nz);syncData({zonasReparto:nz});}} />}
+          }).filter(Boolean)} zonasReparto={zonasReparto} onSetZona={(dia,zona)=>{const nz={...zonasReparto,[dia]:zona};setZonasReparto(nz);syncData({zonasReparto:nz});}}
+          onDiaHoy={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("inicioReparto");}}
+          onDiaResumen={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("planilla");}}
+          noVisitas={noVisitas||[]} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
           ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia")}
@@ -718,17 +721,23 @@ function App() {
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,sd)=>{
   registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd);
-  // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
     ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),
-    ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)
+    ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta"||v.motivo==="salteado")).map(v=>v.clienteId)
   ]);
   visitadosIds.add(clienteId);
   const siguiente = clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
-  if(siguiente){ setClienteId(siguiente.id); irA("detalleCliente"); }
+  if(siguiente){ setClienteId(siguiente.id); irA("venta"); }
   else irA("clientes");
-}} onVolver={()=>irA("detalleCliente")} />}
+}}
+        onSaltar={()=>{
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),
+            {clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado"}];
+          saveNoVisitas(nv);
+          irA("clientes");
+        }}
+        onVolver={()=>irA("detalleCliente")} />}
       {pantalla==="nuevoCliente"   && <NuevoCliente diaActual={diaActual} onGuardar={(datos)=>{
           const orden=datos.orden;
           let base=clientes;
