@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  08-clientes.js — ListaClientes · DetalleCliente · EditCliente
+// ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -15,9 +15,15 @@ function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospect
   );
   const visitados = new Set([...atendidos,...visitadosSinVenta]);
   const prospectosDelDia = (prospectos||[]).filter(p=>p.dia===dia&&p.estado==="activo");
-  const visitadosProspectos = new Set(
+  const noVMapProspectos = {};
+  (noVisitas||[]).filter(v=>v.fecha===fecha).forEach(v=>{noVMapProspectos[v.clienteId]=v.motivo;});
+  const ventasProspectos = new Set(
     ventas.filter(v=>prospectosDelDia.some(p=>p.id===v.clienteId)).map(v=>v.clienteId)
   );
+  const visitadosProspectos = new Set([
+    ...ventasProspectos,
+    ...prospectosDelDia.filter(p=>noVMapProspectos[p.id]==="noquiso").map(p=>p.id)
+  ]);
 
   const marcarNoVisita = (id,motivo) => {
     const prev = noVMap[id];
@@ -52,6 +58,12 @@ function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospect
     const [fotoOpen,setFotoOpen] = React.useState(false);
     const atendido=atendidos.has(c.id), est=noVMap[c.id];
     const bc=atendido?"#1D9E75":est==="noesta"?"#EF9F27":(est==="noesta2"||est==="noquiso")?"#E24B4A":"var(--color-border-tertiary)";
+    // Envases extra que tiene el cliente (historial completo, no solo hoy)
+    const envExtra={sifon:0,bidon10:0,bidon20:0};
+    (todasVentas||ventas).filter(v=>v.clienteId===c.id).forEach(v=>{
+      (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envExtra[k]+=Number(e.cant)||0;});
+      (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envExtra[k]-=Number(e.cant)||0;});
+    });
     return (
       <>
       <div style={{...s.card,borderLeft:`3px solid ${bc}`,opacity:(visitados.has(c.id))?0.65:est==="noesta"?0.85:1}}>
@@ -70,9 +82,9 @@ function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospect
           </div>
           <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontWeight:700,fontSize:18,color:"#e2ecff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
                 {c.nombre}
-                {c.foto&&<span style={{fontSize:11,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
+                {c.foto&&<span style={{fontSize:10,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
               </div>
               {(recordatorios||[]).some(r=>r.clienteId===c.id&&!r.confirmado)&&(
                 <span style={{fontSize:13,flexShrink:0}} title="Recordatorio pendiente">🔔</span>
@@ -83,26 +95,30 @@ function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospect
                   <button style={{background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6,background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)"}}
                     onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(c.id,vt.id);}}
                     title={vt.transConfirmada?"Transfer. confirmada — tocá para desmarcar":"Tocá para confirmar transferencia"}>
-                    <span style={{fontSize:18}}>{vt.transConfirmada?"🟢":"🔴"}</span>
-                    {!vt.transConfirmada&&<span style={{fontSize:13,fontWeight:700,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
+                    <span style={{fontSize:15}}>{vt.transConfirmada?"🟢":"🔴"}</span>
+                    {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
                   </button>
                 );
               })()}
             </div>
-            <div style={{fontSize:17,color:"#c8d8e8",fontWeight:500,marginTop:3,lineHeight:1.3}}>
+            <div style={{fontSize:17,color:"var(--color-text-secondary)",marginTop:2}}>
               {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
             </div>
-            {c.notas&&<div style={{fontSize:13,color:"var(--color-text-warning)",marginTop:3}}>📝 {c.notas}</div>}
-            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:7}}>
-              <TagsCliente cliente={c} ventas={ventasTodas||ventas}/>
-
-            </div>
-            {/* Badges de estado */}
-            <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
-              {atendido    && <span style={{...s.badge("success"),fontSize:12}}>✓ Entregado</span>}
-              {est==="noesta" && !atendido  && <span style={{...s.badge("warning"),fontSize:12}}>🔄 No estaba (1ra vez)</span>}
-              {est==="noesta2"  && <span style={{...s.badge("warning"),fontSize:12}}>No estaba</span>}
-              {est==="noquiso"  && <span style={{...s.badge("danger"),fontSize:12}}>No quiso</span>}
+            {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
+              {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
+              {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
+              {c.bidon20>0  && <span style={s.tag}>20L×{c.bidon20}</span>}
+              {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
+              {atendido    && <span style={s.badge("success")}>✓ Listo</span>}
+              {est==="noesta" && !atendido  && <span style={s.badge("warning")}>🔄 No estaba aún</span>}
+              {est==="noesta2"  && <span style={s.badge("warning")}>No estaba</span>}
+              {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
+              {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
+              {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
+              {envExtra.sifon>0   && <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>🔁 Sif×{envExtra.sifon}</span>}
+              {envExtra.bidon10>0 && <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>🔁 10L×{envExtra.bidon10}</span>}
+              {envExtra.bidon20>0 && <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>🔁 20L×{envExtra.bidon20}</span>}
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
@@ -196,7 +212,7 @@ function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospect
                     {p.bidon10>0&&<span style={s.tag}>10L×{p.bidon10}</span>}
                     {p.bidon20>0&&<span style={s.tag}>20L×{p.bidon20}</span>}
                     {p.dispenser>0&&<span style={{...s.tag,color:"#5daaff"}}>Disp×{p.dispenser}</span>}
-                    {visitadosProspectos.has(p.id)&&<span style={s.badge("success")}>✓ Registrado</span>}
+                    {ventasProspectos.has(p.id)&&<span style={s.badge("success")}>✓ Registrado</span>}
                   </div>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
@@ -208,8 +224,15 @@ function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospect
                 <div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}}>
                   <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
                     onClick={()=>onNoEstaProspecto&&onNoEstaProspecto(p.id)}>No estaba</button>
+                  <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
+                    onClick={()=>onNoQuiereProspecto&&onNoQuiereProspecto(p.id)}>No quiere</button>
                   <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:500}}
                     onClick={()=>onVentaProspecto&&onVentaProspecto(p)}>Registrar entrega →</button>
+                </div>
+              )}
+              {visitadosProspectos.has(p.id)&&noVMapProspectos[p.id]==="noquiso"&&(
+                <div style={{marginTop:6,textAlign:"right"}}>
+                  <span style={s.badge("danger")}>🙅 No quiso</span>
                 </div>
               )}
             </div>
@@ -440,7 +463,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                   {ventaHoy.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")} · {ventaHoy.pago}
                 </div>
               </div>
-            : <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                        : <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
                 <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1,minWidth:90}}
                   onClick={()=>{onNoEstaCliente&&onNoEstaCliente();}}>
                   🔄 No está
@@ -454,6 +477,14 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                 </button>
               </div>
           }
+          {/* Cobrar deuda rápido */}
+          {cliente.saldo<0&&!ventaHoy&&(
+            <button
+              style={{width:"100%",background:"#0a2e1f",color:"#4dd9a0",border:"1.5px solid #4dd9a0",borderRadius:10,padding:"12px",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+              onClick={()=>setMostrarPagoSaldo(true)}>
+              💰 Cobrar deuda · {fmt(Math.abs(cliente.saldo))}
+            </button>
+          )}
 
           {/* Historial colapsable */}
           <details style={{marginTop:4}}>
@@ -678,3 +709,58 @@ function EditCliente({cliente,onGuardar,onEliminarCliente}) {
   );
 }
 
+
+function FiadosPendientes({clientes,onCobrar,onVolver}) {
+  const [pagando,setPagando]=React.useState(null);
+  const [monto,setMonto]=React.useState('');
+  const [pago,setPago]=React.useState('contado');
+  const conDeuda=clientes.filter(c=>c.saldo<0).sort((a,b)=>a.saldo-b.saldo);
+  const totalDeuda=conDeuda.reduce((a,c)=>a+Math.abs(c.saldo),0);
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <div style={{flex:1}}>
+          <div style={s.headerTitle}>💰 Fiados pendientes</div>
+          <div style={{fontSize:11,color:'var(--color-text-danger)'}}>{conDeuda.length} clientes · {fmt(totalDeuda)} total</div>
+        </div>
+      </div>
+      {conDeuda.length===0&&<div style={{padding:40,textAlign:'center',color:'var(--color-text-success)',fontSize:15}}>✅ Sin fiados pendientes</div>}
+      {conDeuda.map(c=>(
+        <div key={c.id} style={{...s.card,margin:'6px 14px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:500,color:'var(--color-text-primary)'}}>{c.nombre}</div>
+              <div style={{fontSize:11,color:'var(--color-text-tertiary)'}}>{c.dia}{c.barrio?' · '+c.barrio:''}</div>
+            </div>
+            <span style={{fontSize:16,fontWeight:700,color:'var(--color-text-danger)'}}>{fmt(Math.abs(c.saldo))}</span>
+          </div>
+          {pagando===c.id?(
+            <div style={{display:'flex',flexDirection:'column',gap:8,paddingTop:8,borderTop:'0.5px solid var(--color-border-tertiary)'}}>
+              <div style={{display:'flex',gap:6}}>
+                {['contado','transferencia'].map(p=>(
+                  <button key={p} style={{flex:1,padding:'7px',fontSize:12,borderRadius:8,border:'0.5px solid var(--color-border-secondary)',background:pago===p?'#185FA5':'var(--color-background-tertiary)',color:pago===p?'#e2eaf4':'var(--color-text-secondary)',cursor:'pointer',fontWeight:pago===p?600:400}}
+                    onClick={()=>setPago(p)}>{p==='contado'?'💵 Efectivo':'💳 Transfer.'}</button>
+                ))}
+              </div>
+              <input style={{...s.input}} type='number' placeholder={fmt(Math.abs(c.saldo))+' (total)'} value={monto} onChange={e=>setMonto(e.target.value)} />
+              <div style={{display:'flex',gap:6}}>
+                <button style={{...s.btn,flex:1}} onClick={()=>{setPagando(null);setMonto('');}}>Cancelar</button>
+                <button style={{...s.btnPrimary,flex:2,padding:'9px'}} onClick={()=>{
+                  const m=Number(monto)||Math.abs(c.saldo);
+                  onCobrar(c.id,m,pago);
+                  setPagando(null);setMonto('');
+                }}>✓ Confirmar cobro</button>
+              </div>
+            </div>
+          ):(
+            <button style={{width:'100%',padding:'9px',background:'#0a2e1f',color:'#4dd9a0',border:'1px solid #4dd9a0',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer'}}
+              onClick={()=>{setPagando(c.id);setMonto(String(Math.abs(c.saldo)));setPago('contado');}}>
+              💰 Cobrar deuda
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
