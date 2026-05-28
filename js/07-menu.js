@@ -26,7 +26,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           <div style={{fontSize:11,fontWeight:500,color:"#5daaff",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔔 Recordatorios pendientes</div>
           {recordatoriosActivos.slice(0,5).map(r=>(
             <div key={r.id} style={{...s.card,margin:"0 0 6px",background:"#1e2e4a",border:"0.5px solid #5daaff",display:"flex",gap:8,alignItems:"flex-start"}}>
-              <div style={{flex:1,cursor:"pointer"}} onClick={()=>onAgenda&&onAgenda()}>
+              <div style={{flex:1,cursor:"pointer"}} onClick={()=>onGestionClientes&&onGestionClientes()}>
                 <div style={{fontSize:12,fontWeight:500,color:"#5daaff"}}>{r.clienteNombre} · {r.dia} <span style={{fontSize:10,opacity:0.7}}>→ tocá para ver</span></div>
                 <div style={{fontSize:12,color:"var(--color-text-primary)",marginTop:2}}>{r.tipo==="cobro"?"💰":"🏠"} {r.motivo}</div>
                 <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>{r.fecha}{r.hora?` · ${r.hora}`:""}</div>
@@ -140,11 +140,9 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
                 const [open,setOpen]=React.useState(false);
                 return (
                   <div style={{...s.card,margin:"4px 0 0",background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-secondary)"}}>
-                    {/* Header siempre visible — toca para desplegar */}
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setOpen(o=>!o)}>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
                         <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📦 Stock</span>
-                        {/* Resumen compacto siempre visible */}
                         <div style={{display:"flex",gap:6}}>
                           {[[totCaj,"caj"],[totB10,"10L"],[totB20,"20L"]].map(([v,u],i)=>(
                             <span key={i} style={{fontSize:12,fontWeight:600,color:Number(v)<3?"var(--color-text-danger)":Number(v)<8?"var(--color-text-warning)":"var(--color-text-info)"}}>{v}<span style={{fontSize:10,fontWeight:400,color:"var(--color-text-tertiary)",marginLeft:1}}>{u}</span></span>
@@ -153,7 +151,6 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
                       </div>
                       <span style={{fontSize:13,color:"var(--color-text-tertiary)",transition:"transform 0.2s",display:"inline-block",transform:open?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
                     </div>
-                    {/* Detalle desplegable */}
                     {open&&<div style={{marginTop:12}}>
                       {[["🏭 Sodería",[sCaj,sB10,sB20],"primary"],["👥 En clientes",[envCCaj,envC.bidon10,envC.bidon20],"info"],["📦 Total general",[totCaj,totB10,totB20],"info"]].map(([titulo,vals,color],gi)=>(
                         <div key={gi} style={{marginBottom:gi<2?10:0}}>
@@ -177,28 +174,43 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           )}
           </React.Fragment>);
         })}
+
+        {/* ── MENÚ INFERIOR SIMPLIFICADO ── */}
         <div style={s.divider} />
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,paddingBottom:8}}>
+
+        {/* Fila 1: Clientes y Stock (más grandes, más importantes) */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,paddingBottom:4}}>
           {[
-            ["👥","Clientes",onGestionClientes],
-            ["📦","Stock",onStock],
-            ["🚀","Promoción",onPromocion],
-            ["📅","Agenda",onAgenda],
-            ["📊","Resumen",onResumen],
-            ["💰","Fiados",onFiados],
-            ["⚙️","Config",onConfig],
-          ].map(([ico,lbl,fn])=>(
+            {ico:"👥",lbl:"Clientes",fn:onGestionClientes,bg:"#185FA5",desc:"Lista · Fiados · Agenda · Excel"},
+            {ico:"📦",lbl:"Stock",fn:onStock,bg:"#1a5e35",desc:"Inventario · Resumen"},
+          ].map(({ico,lbl,fn,bg,desc})=>(
             <button key={lbl} onClick={fn} style={{
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,
-              padding:"14px 6px",borderRadius:12,cursor:"pointer",
-              border:"2px solid transparent",
-              background:"var(--color-background-tertiary)",
-              boxShadow:"0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",
-              color:"var(--color-text-secondary)",
-              transition:"all 0.15s",
+              padding:"18px 8px",borderRadius:14,cursor:"pointer",border:"none",
+              background:bg,color:"#e2eaf4",
+              boxShadow:"0 3px 10px rgba(0,0,0,0.35)",
             }}>
-              <span style={{fontSize:22}}>{ico}</span>
-              <span style={{fontSize:11,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>{lbl}</span>
+              <span style={{fontSize:30}}>{ico}</span>
+              <span style={{fontSize:14,fontWeight:700}}>{lbl}</span>
+              <span style={{fontSize:9,opacity:0.75,textAlign:"center",lineHeight:1.4}}>{desc}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Fila 2: Promoción y Config (secundarios, más chicos) */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,paddingBottom:8}}>
+          {[
+            {ico:"🚀",lbl:"Promoción",fn:onPromocion},
+            {ico:"⚙️",lbl:"Config",fn:()=>onConfig&&onConfig("precios")},
+          ].map(({ico,lbl,fn})=>(
+            <button key={lbl} onClick={fn} style={{
+              display:"flex",flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,
+              padding:"12px 10px",borderRadius:12,cursor:"pointer",border:"none",
+              background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",
+              boxShadow:"0 2px 6px rgba(0,0,0,0.2)",
+            }}>
+              <span style={{fontSize:20}}>{ico}</span>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{lbl}</span>
             </button>
           ))}
         </div>
@@ -335,11 +347,9 @@ function DetalleVentasDia({ventas, clientes}) {
 }
 
 function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,onCerrarDia,initCierre}) {
-  // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
   const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId));
   const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&(!v.dia||v.dia===dia)&&v.fechaKey===fecha);
-  // Auto-calcular desde ventas del dia
   const CAJON_SODA = 6;
   const getProdCosto = (nombre) => { const p=(productos||[]).find(x=>x.nombre===nombre); return p?(p.costo||0):0; };
   const costSifon  = getProdCosto("Sifón 1.5L") || 133.33;
@@ -347,18 +357,15 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const costB20    = getProdCosto("Bidón 20L")   || 1100;
   const COSTO_CAJON_SODA = costSifon * CAJON_SODA;
   const prodKey = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
-  // Todas las ventas del día para envases y plata
   const todasVentasDia = [...ventasPropias,...ventasExtraDia];
   const totalesPorProd = {b10:{vacios:0,plata:0,llenar:0},b20:{vacios:0,plata:0,llenar:0},soda:{vacios:0,plata:0,llenar:0,cajones:0}};
   todasVentasDia.forEach(v=>{ v.detalle.forEach(d=>{ const k=prodKey[d.nombre]; if(!k) return; totalesPorProd[k].vacios+=d.cantidad; totalesPorProd[k].plata+=d.total; }); });
-  // Cajones: resto ≤ 3 no suma, resto ≥ 4 suma un cajón más
   const calcCajones = (sifones) => { const full=Math.floor(sifones/CAJON_SODA); return (sifones%CAJON_SODA)>=4 ? full+1 : full; };
   const sodaCajones = calcCajones(totalesPorProd.soda.vacios);
   totalesPorProd.soda.cajones = sodaCajones;
   totalesPorProd.soda.llenar  = sodaCajones * COSTO_CAJON_SODA;
   totalesPorProd.b10.llenar   = totalesPorProd.b10.vacios * costB10;
   totalesPorProd.b20.llenar   = totalesPorProd.b20.vacios * costB20;
-  // Peso desde carga inicial del día
   const sifonesCargados = Number(planilla?.productos?.soda?.llenos||0);
   const b10Cargados     = Number(planilla?.productos?.b10?.llenos||0);
   const b20Cargados     = Number(planilla?.productos?.b20?.llenos||0);
@@ -367,12 +374,10 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const bultosAuto = cajonesCargados + b10Cargados + b20Cargados;
   const totalVentaPlata  = Object.values(totalesPorProd).reduce((a,p)=>a+p.plata,0);
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a,p)=>a+p.llenar,0);
-  // Totales ventas de otros días
   const extraEfectivo = ventasExtraDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const extraTrans    = ventasExtraDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const extraFiado    = ventasExtraDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
   const extraTotal    = extraEfectivo + extraTrans + extraFiado;
-  // Cobranza — solo ventas propias del día
   const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const cobTransBruto = todasVentasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
@@ -397,14 +402,11 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const setGasto=(i,campo,v)=>{const g=[...(datos.gastos||[])];g[i]={...g[i],[campo]:v};setDatos(d=>({...d,gastos:g}));};
   const addGasto=()=>setDatos(d=>({...d,gastos:[...(d.gastos||[]),{cat:"propina",monto:""}]}));
   const delGasto=(i)=>setDatos(d=>({...d,gastos:d.gastos.filter((_,j)=>j!==i)}));
-
   const totalGastos=(datos.gastos||[]).reduce((a,g)=>a+num(g.monto),0);
   const efectivo=num(datos.efectivo), fiado=num(datos.fiado), retenciones=num(datos.retenciones);
   const sobrante=efectivo-(totalVentaPlata-fiado);
   const ganancia=(cobEfectivo - totalVentaLlenar - totalGastos) + cobTransNeto;
   const totalLlenosIngresados=PRODUCTOS_CONFIG.reduce((a,p)=>a+num(datos.productos[p.id]?.llenos),0);
-
-  // ── Cierre del día / stock ──
   const planKeyToStockKey = {"soda":"sifon","b10":"bidon10","b20":"bidon20"};
   const PROD_LABEL = {soda:"Sifones",b10:"Bidón 10L",b20:"Bidón 20L"};
   const [mostrarCierre, setMostrarCierre] = useState(!!(initCierre && !planilla._diaCerrado));
@@ -446,8 +448,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
     if(onCerrarDia) setTimeout(()=>onCerrarDia(), 800);
   };
 
-
-  // ── Early return: pantalla de cierre ─────────────────────────────
   if(mostrarCierre){
     const llenosVuelta={
       soda: realesLlenos.soda!==""?Number(realesLlenos.soda):Math.floor(sobrantes.soda/CAJON_SODA),
@@ -464,8 +464,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
           <span style={s.headerTitle}>Cierre del día · {dia}</span>
         </div>
         <div style={{padding:16}}>
-
-          {/* LO QUE CARGASTE HOY */}
           <span style={{...s.sectionTitle,padding:"0 0 8px"}}>LO QUE CARGASTE HOY</span>
           <div style={{...s.card,margin:"0 0 12px"}}>
             {[
@@ -479,8 +477,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               </div>
             ))}
           </div>
-
-          {/* MOVIMIENTOS DEL DÍA */}
           <span style={{...s.sectionTitle,padding:"0 0 8px"}}>MOVIMIENTOS DEL DÍA (REGISTRADOS)</span>
           <div style={{...s.card,margin:"0 0 12px",padding:"10px 12px"}}>
             <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",marginBottom:8}}>
@@ -503,8 +499,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               </div>
             ))}
           </div>
-
-          {/* CONFIRMÁ LO QUE TRAÉS DE VUELTA */}
           <span style={{...s.sectionTitle,padding:"0 0 8px"}}>CONFIRMÁ LO QUE TRAÉS DE VUELTA</span>
           <div style={{...s.card,margin:"0 0 12px",padding:"10px 12px"}}>
             <div style={{display:"grid",gridTemplateColumns:"1.5fr 1fr 1fr",gap:4,marginBottom:8}}>
@@ -544,8 +538,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               );
             })}
           </div>
-
-          {/* VUELVE A SODERÍA */}
           <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-success)",border:"1.5px solid var(--color-text-success)",padding:"14px 16px"}}>
             <div style={{fontSize:12,fontWeight:600,color:"var(--color-text-success)",marginBottom:10}}>Vuelve a sodería</div>
             <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid rgba(77,217,160,0.2)"}}>
@@ -561,11 +553,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{llenosVuelta.b20} un</span>
             </div>
           </div>
-
-          <button
-            style={{width:"100%",padding:"16px",borderRadius:10,border:"none",
-              background:"var(--color-background-tertiary)",borderTop:"2px solid #f5b942",
-              color:"#f5b942",fontSize:15,fontWeight:700,cursor:"pointer"}}
+          <button style={{width:"100%",padding:"16px",borderRadius:10,border:"none",background:"var(--color-background-tertiary)",borderTop:"2px solid #f5b942",color:"#f5b942",fontSize:15,fontWeight:700,cursor:"pointer"}}
             onClick={confirmarCierre}>
             ✓ Cerrar día y actualizar stock
           </button>
@@ -573,6 +561,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
       </div>
     );
   }
+
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -585,8 +574,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
         </div>
       </div>
       <div style={{padding:16}}>
-
-        {/* Datos de salida — ingreso manual */}
         <span style={{...s.sectionTitle,padding:"0 0 8px"}}>Al salir a repartir</span>
         <div style={s.grid3}>
           {[["fecha","Fecha","text"],["peso","Peso kg","number"],["bultos","Bultos","number"]].map(([k,l,t])=>(
@@ -595,15 +582,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             </div>
           ))}
         </div>
-        {/* Desglose de peso y bultos */}
-        {(pesoAuto>0||bultosAuto>0)&&(
-          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:10,lineHeight:1.7,background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 10px"}}>
-            {bultosAuto>0&&<div>📦 <b>Bultos auto:</b> {cajonesCargados||cajonesLlenos||0} cajones soda + {b10Cargados||b10Llenos||0} bid.10L + {b20Cargados||b20Llenos||0} bid.20L = <b>{bultosAuto}</b></div>}
-            {pesoAuto>0&&<div>⚖️ <b>Peso auto:</b> {cajonesCargados||cajonesLlenos||0}×13kg + {b10Cargados||b10Llenos||0}×10kg + {b20Cargados||b20Llenos||0}×20kg = <b>{pesoAuto} kg</b></div>}
-          </div>
-        )}
-
-        {/* Llenos — ingreso manual, vacios/plata/llenar auto desde ventas */}
         <span style={{...s.sectionTitle,padding:"12px 0 8px"}}>Envases cargados (solo ingresá los llenos)</span>
         <div style={{background:"var(--color-background-secondary)",borderRadius:10,overflow:"hidden",marginBottom:4}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",padding:"6px 10px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
@@ -637,8 +615,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
           </div>
         </div>
         <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:12}}>Vacíos, plata y llenar se calculan automáticamente desde las ventas del día.</p>
-
-        {/* Gastos extras */}
         <div style={s.divider} />
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <span style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.06em"}}>Gastos extras (efectivo)</span>
@@ -669,10 +645,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <input style={{...s.input,marginBottom:6}} placeholder="Descripción (opcional)" value={g.desc||""} onChange={e=>setGasto(i,"desc",e.target.value)} />
               <div style={{display:"flex",gap:6}}>
                 <button style={{flex:1,padding:"7px",borderRadius:8,border:"none",background:"#0a2e1f",color:"#4dd9a0",fontSize:12,fontWeight:500,cursor:"pointer",opacity:!g.monto?0.5:1}}
-                  disabled={!g.monto}
-                  onClick={()=>setGasto(i,"confirmado",true)}>
-                  ✓ Confirmar y guardar
-                </button>
+                  disabled={!g.monto} onClick={()=>setGasto(i,"confirmado",true)}>✓ Confirmar y guardar</button>
                 <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
               </div>
             </div>
@@ -681,19 +654,11 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
           <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total gastos extras</span>
           <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-danger)"}}>−{fmt(totalGastos)}</span>
         </div>}
-
-        {/* Cobranza */}
         <div style={s.divider} />
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0 8px"}}>
           <span style={{fontSize:10,color:"var(--color-text-tertiary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.07em"}}>Cobranza del día</span>
           <button style={{...s.btn,fontSize:11,padding:"3px 10px"}}
-            onClick={()=>setDatos(d=>({...d,
-              peso:String(pesoAuto||d.peso||""),
-              bultos:String(bultosAuto||d.bultos||""),
-              efectivo:String(Math.round(cobEfectivo)),
-              retenciones:String(cobTransDesc),
-              fiado:String(Math.round(cobFiado))
-            }))}>
+            onClick={()=>setDatos(d=>({...d,peso:String(pesoAuto||d.peso||""),bultos:String(bultosAuto||d.bultos||""),efectivo:String(Math.round(cobEfectivo)),retenciones:String(cobTransDesc),fiado:String(Math.round(cobFiado))}))}>
             ↻ Autocompletar desde ventas
           </button>
         </div>
@@ -704,7 +669,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             </div>
           ))}
         </div>
-        {/* Desglose de transferencias */}
         {cobTransBruto>0&&(
           <div style={{...s.card,margin:"10px 0",background:"var(--color-background-tertiary)"}}>
             <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Detalle transferencias</div>
@@ -716,32 +680,24 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             ))}
           </div>
         )}
-        {cobSaldos>0&&(
-          <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}>
-              <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Cobrado de deuda anterior</span>
-              <span style={{fontSize:13,fontWeight:500,color:"#4dd9a0"}}>{fmt(cobSaldos)}</span>
-            </div>
+        {cobSaldos>0&&<div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Cobrado de deuda anterior</span>
+            <span style={{fontSize:13,fontWeight:500,color:"#4dd9a0"}}>{fmt(cobSaldos)}</span>
           </div>
-        )}
+        </div>}
         <div style={{marginTop:12}}>
           <label style={s.label}>Observaciones</label>
           <textarea style={{...s.input,minHeight:56,resize:"vertical"}} placeholder="Notas del día..." value={datos.obs||""} onChange={e=>set("obs",e.target.value)} />
         </div>
-
-        {/* Resumen */}
         <div style={s.divider} />
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Resumen del día</span>
-
-        {/* Detalle de ventas — recuadrado azul, colapsable */}
         {todasVentasDia.length>0
           ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} />
           : <div style={{...s.card,margin:"0 0 8px",padding:"12px 16px",background:"var(--color-background-tertiary)"}}>
               <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>📋 Sin ventas registradas para este día</span>
             </div>
         }
-
-        {/* Ventas del día */}
         <div style={{...s.card,margin:"0 0 8px",background:"var(--color-background-secondary)",padding:"14px 16px"}}>
           <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Ventas registradas</div>
           {[
@@ -754,26 +710,19 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
             </div>
           ))}
-          {/* Cobros de deuda — separados por forma de pago */}
-          {cobSaldosEfec>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · efectivo</span>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobSaldosEfec)}</span>
-            </div>
-          )}
-          {cobSaldosTrans>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · transferencia</span>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobSaldosTrans)}</span>
-            </div>
-          )}
+          {cobSaldosEfec>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+            <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · efectivo</span>
+            <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobSaldosEfec)}</span>
+          </div>}
+          {cobSaldosTrans>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+            <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · transferencia</span>
+            <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobSaldosTrans)}</span>
+          </div>}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Total cobrado</span>
             <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto+cobSaldos)}</span>
           </div>
         </div>
-
-        {/* Ventas de clientes de otros días */}
         {ventasExtraDia.length>0&&(
           <div style={{...s.card,margin:"0 0 8px",background:"var(--color-background-secondary)",padding:"14px 16px",borderLeft:"3px solid var(--color-border-info)"}}>
             <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-info)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>📦 Ventas de otros días ({ventasExtraDia.length})</div>
@@ -786,9 +735,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
                 </div>
               );
             })}
-            {extraEfectivo>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}><span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Contado</span><span style={{fontSize:11,color:"var(--color-text-primary)"}}>{fmt(extraEfectivo)}</span></div>}
-            {extraTrans>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}><span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Transfer.</span><span style={{fontSize:11,color:"var(--color-text-info)"}}>{fmt(extraTrans)}</span></div>}
-            {extraFiado>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}><span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Fiado</span><span style={{fontSize:11,color:"var(--color-text-warning)"}}>{fmt(extraFiado)}</span></div>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
               <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Total otros días</span>
               <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(extraTotal)}</span>
@@ -814,51 +760,33 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             <span style={{fontSize:18,fontWeight:500,color:(cobEfectivo-totalVentaLlenar-totalGastos)>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(cobEfectivo-totalVentaLlenar-totalGastos)}</span>
           </div>
         </div>
-
-        {/* Transferencias */}
         {cobTransBruto>0&&(
           <div style={{...s.card,margin:"0 0 8px",padding:"14px 16px"}}>
             <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Transferencias</div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Monto total</span>
-              <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(cobTransBruto)}</span>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>Retención 2.5% (informativo)</span>
-              <span style={{fontSize:12,color:"var(--color-text-danger)"}}>−{fmt(cobTransDesc)}</span>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 2px"}}>
-              <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Neto a acreditar</span>
-              <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobTransNeto)}</span>
-            </div>
-            {/* Detalle colapsable — todas confirmadas y pendientes */}
-            <DetalleTransferencias
-              ventas={todasVentasDia.filter(v=>v.pago==="transferencia")}
-              ventasPendTrans={ventasPendTrans}
-            />
+            {[["Monto total",fmt(cobTransBruto),"primary"],["Retención 2.5% (informativo)",`−${fmt(cobTransDesc)}`,"danger"],["Neto a acreditar",fmt(cobTransNeto),"info"]].map(([l,v,c])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <span style={{fontSize:l.length>25?11:13,color:"var(--color-text-secondary)"}}>{l}</span>
+                <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
+              </div>
+            ))}
+            <DetalleTransferencias ventas={todasVentasDia.filter(v=>v.pago==="transferencia")} ventasPendTrans={ventasPendTrans} />
           </div>
         )}
-
-        {/* Fiado */}
         <div style={{...s.card,margin:"0 0 8px",padding:"14px 16px"}}>
           <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Fiado pendiente</div>
           <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
             <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Fiado del día</span>
             <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(cobFiado)}</span>
           </div>
-          {cobSaldos>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>− Cobros de saldos anteriores</span>
-              <span style={{fontSize:13,color:"var(--color-text-success)"}}>−{fmt(cobSaldos)}</span>
-            </div>
-          )}
+          {cobSaldos>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+            <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>− Cobros de saldos anteriores</span>
+            <span style={{fontSize:13,color:"var(--color-text-success)"}}>−{fmt(cobSaldos)}</span>
+          </div>}
           <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Fiado neto pendiente</span>
             <span style={{fontSize:16,fontWeight:500,color:fiadoNeto>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{fmt(Math.abs(fiadoNeto))}{fiadoNeto<0?" (a favor)":""}</span>
           </div>
         </div>
-
-        {/* Ganancia */}
         <div style={{...s.card,margin:"0 0 16px",padding:"14px 16px",background:"var(--color-background-secondary)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
@@ -869,14 +797,10 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
           </div>
         </div>
         <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
-
-        {/* ── Botón enviar informe ── */}
         {onCerrarDia&&ventas.length>0&&!yaCerrado&&(()=>{
           const yaEnviado = !!localStorage.getItem(`sr_informe_${fecha}_${dia}`);
           return (
-            <button style={{width:"100%",padding:"14px",borderRadius:10,border:"none",
-              background:"#4c1d95",color:"#e9d5ff",fontSize:15,fontWeight:600,cursor:"pointer",marginTop:10,
-              opacity:yaEnviado?0.6:1}}
+            <button style={{width:"100%",padding:"14px",borderRadius:10,border:"none",background:"#4c1d95",color:"#e9d5ff",fontSize:15,fontWeight:600,cursor:"pointer",marginTop:10,opacity:yaEnviado?0.6:1}}
               onClick={async()=>{
                 if(yaEnviado){alert("El informe del día ya fue enviado a tu email.");return;}
                 const ok = await onCerrarDia();
@@ -887,8 +811,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             </button>
           );
         })()}
-
-        {/* ── Botón Cerrar día / actualizar stock ── */}
         {!yaCerrado ? (
           <button style={{width:"100%",padding:"14px",borderRadius:10,border:"2px solid #f5b942",background:"#2e1f06",color:"#f5b942",fontSize:15,fontWeight:600,cursor:"pointer",marginTop:10}}
             onClick={()=>setMostrarCierre(true)}>
@@ -906,7 +828,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
 
 function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,onVolver}) {
   const prodKeys = {"Sifón 1.5L":"soda","Bidón 10L":"b10","Bidón 20L":"b20"};
-  const CAJON = 6; // sifones por cajón
+  const CAJON = 6;
   const [llenos,setLlenos] = useState(()=>{
     const precarga = (cargasDia||CARGA_DIA_DEFAULT)[dia]||CARGA_DIA_DEFAULT[dia]||{};
     const m={};
@@ -917,7 +839,6 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
     return m;
   });
   const yaIniciado = planilla?.iniciado;
-
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -933,9 +854,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
             {yaIniciado?"Podés modificar las cantidades iniciales si hay un error.":"Ingresá la cantidad de envases llenos con los que salís hoy."}
           </div>
         </div>
-
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Envases llenos al salir</span>
-
         {productos.map(p=>{
           const k=prodKeys[p.nombre]; if(!k) return null;
           return (
@@ -961,14 +880,12 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
             </div>
           );
         })}
-
         <div style={{...s.card,margin:"12px 0 20px",background:"var(--color-background-secondary)"}}>
           <div style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:6}}>Total envases cargados</div>
           <div style={{fontSize:28,fontWeight:500,color:"var(--color-text-primary)"}}>
             {Object.values(llenos).reduce((a,v)=>a+(Number(v)||0),0)}
           </div>
         </div>
-
         <button style={s.btnPrimary}
           onClick={()=>{
             const nuevaPlanilla = {
@@ -990,10 +907,10 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
           <button style={{...s.btn,width:"100%",padding:"12px",fontSize:13,borderRadius:10,marginTop:6}}
             onClick={()=>{
               const nuevaPlanilla = {
-                ...planilla,
+                ...(planilla||planillaDiaVacia()),
                 iniciado:true,
                 productos: Object.fromEntries(
-                  Object.entries(cajones).map(([k,v])=>[k,{
+                  Object.entries(llenos).map(([k,v])=>[k,{
                     ...(planilla?.productos?.[k]||{}),
                     llenos:v
                   }])
@@ -1005,7 +922,6 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
           </button>
         )}
       </div>
-      {/* Stock sodería */}
       {stock?.soderia&&(
         <div style={{...s.card,margin:"10px 14px 0",background:"var(--color-background-tertiary)"}}>
           <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Stock actual · Sodería</div>
@@ -1022,4 +938,3 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
     </div>
   );
 }
-

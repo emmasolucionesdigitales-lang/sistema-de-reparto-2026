@@ -832,7 +832,14 @@ function App() {
         }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}}
         onHistorial={undefined}
         onBackup={undefined}
-        ventas={ventas} />}
+        ventas={ventas}
+        prospectos={prospectos||[]}
+        recordatorios={recordatorios||[]}
+        onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+        onImportar={(nuevosClientes, nuevosProspectos)=>{
+          if(nuevosClientes.length) saveClientes([...clientes,...nuevosClientes]);
+          if(nuevosProspectos.length) saveProspectos([...prospectos,...nuevosProspectos]);
+        }} />}
       {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
