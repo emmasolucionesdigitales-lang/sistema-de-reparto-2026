@@ -45,14 +45,21 @@ function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
 // ════════════════════════════════════════════════════════════════════
 
 function App() {
-  // ── negocioId desde licencia ────────────────────────────────────
+  // ── negocioId desde licencia (con fallback a device ID permanente) ──
   const negocioId = React.useMemo(()=>{
     try {
       const lic = JSON.parse(localStorage.getItem("sr_licencia")||"{}");
       const cod = lic.codigo || localStorage.getItem("sm_codigo") || "";
-      window._negocioId = cod; // para push_sub
-      return cod;
-    } catch { return ""; }
+      if(cod) { window._negocioId = cod; return cod; }
+      // Sin código: usar device ID permanente (individual app)
+      let devId = localStorage.getItem("sr_device_id");
+      if(!devId) {
+        devId = "ind_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
+        localStorage.setItem("sr_device_id", devId);
+      }
+      window._negocioId = devId;
+      return devId;
+    } catch { return "ind_fallback"; }
   }, []);
 
   const [pantalla, setPantalla]   = useState(()=>{
@@ -693,7 +700,7 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} onCerrarDia={()=>cerrarDia(fechaActual,diaActual)} initCierre={initCierre} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);}} onVolver={()=>irA("menu")} onCerrarDia={()=>cerrarDia(fechaActual,diaActual)} initCierre={initCierre} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{

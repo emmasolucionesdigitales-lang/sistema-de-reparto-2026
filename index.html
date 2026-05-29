@@ -42,14 +42,20 @@
     db.enablePersistence().catch(()=>{});
 
     // Funciones de Firestore usadas por la app
-    async function cloudSave(uid, datos) {
-      if(!uid || uid === "") { console.warn("cloudSave: uid vacío, ignorado"); return; }
-      await db.collection("users").doc(uid).collection("datos").doc("main").set(datos);
+    // cloudSave(data, id) — orden correcto: data primero, id segundo
+    async function cloudSave(data, id) {
+      if(!id || id === "") { console.warn("cloudSave: id vacío — configurá el código en Configuración"); return false; }
+      try {
+        await db.collection("users").doc(id).collection("datos").doc("main").set(data);
+        return true;
+      } catch(e) { console.error("cloudSave:", e); return false; }
     }
-    async function cloudLoad(uid) {
-      if(!uid || uid === "") { console.warn("cloudLoad: uid vacío, ignorado"); return null; }
-      const doc = await db.collection("users").doc(uid).collection("datos").doc("main").get();
-      return doc.exists ? doc.data() : null;
+    async function cloudLoad(id) {
+      if(!id || id === "") return null;
+      try {
+        const doc = await db.collection("users").doc(id).collection("datos").doc("main").get();
+        return doc.exists ? doc.data() : null;
+      } catch(e) { console.error("cloudLoad:", e); return null; }
     }
   </script>
 
