@@ -1,4 +1,46 @@
 // ════════════════════════════════════════════════════════════════════
+// ◆  usarInformes — Envío de resúmenes por email
+// ════════════════════════════════════════════════════════════════════
+function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
+  const getLic = () => { try{ return JSON.parse(localStorage.getItem("sr_licencia")||"{}"); }catch{ return {}; } };
+  const fmtP = (n) => "$" + Math.round(Number(n)||0).toLocaleString("es-AR");
+  const enviarDiario = async (fecha, dia) => {
+    const lic = getLic();
+    if(!lic.email || !window.enviarEmailBrevoRM) return false;
+    try {
+      const ventasDia=(ventas||[]).filter(v=>v.fechaKey===fecha&&v.dia===dia&&!v._esCobro&&!v._esAjuste);
+      const ef=ventasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+      const tr=ventasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+      const fi=ventasDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
+      const ret=Math.round(tr*0.025); const trN=tr-ret;
+      const cS=(productos||[]).find(p=>p.nombre==="Sifón 1.5L")?.costo||133.33;
+      const cB10=(productos||[]).find(p=>p.nombre==="Bidón 10L")?.costo||800;
+      const cB20=(productos||[]).find(p=>p.nombre==="Bidón 20L")?.costo||1100;
+      let costo=0; ventasDia.forEach(v=>(v.detalle||[]).forEach(d=>{if(d.nombre==="Sifón 1.5L")costo+=(d.cantidad||0)*cS;if(d.nombre==="Bidón 10L")costo+=(d.cantidad||0)*cB10;if(d.nombre==="Bidón 20L")costo+=(d.cantidad||0)*cB20;}));
+      const plan=(planillas||{})[`${dia}_${fecha}`]||{};
+      const gastos=(plan.gastos||[]).filter(g=>g.confirmado&&g.monto);
+      const tg=gastos.reduce((a,g)=>a+Math.round(Number(g.monto)||0),0);
+      const mano=ef-costo-tg; const gan=(ef+trN)-costo-tg;
+      const neg=lic.negocio||lic.nombre||"Sistema de Reparto";
+      const fila=(l,v,col="")=>`<tr><td style="padding:7px 0;color:#555;border-bottom:1px solid #eee">${l}</td><td style="text-align:right;font-weight:600;border-bottom:1px solid #eee;color:${col||"#222"}">${v}</td></tr>`;
+      const sep=(t)=>`<tr><td colspan="2" style="padding:10px 0 4px;font-size:11px;font-weight:700;color:#999;text-transform:uppercase">${t}</td></tr>`;
+      const html=`<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#f9fafb"><div style="background:#185FA5;border-radius:12px 12px 0 0;padding:20px 24px"><h2 style="color:#fff;margin:0;font-size:18px">📋 Cierre del día · ${dia} ${fecha}</h2><p style="color:#c8dcf0;margin:4px 0 0;font-size:13px">${neg}</p></div><div style="background:#fff;border-radius:0 0 12px 12px;padding:20px 24px"><div style="background:#f0f7ff;border-radius:10px;padding:16px;margin-bottom:20px;text-align:center"><div style="font-size:32px;font-weight:800;color:#185FA5">${fmtP(ef+tr+fi)}</div><div style="color:#666;font-size:13px">${ventasDia.length} entregas</div></div><table style="width:100%;border-collapse:collapse;font-size:14px">${sep("💵 Cobranza")}${fila("Efectivo",fmtP(ef))}${fila("Transferencias (neto)",fmtP(trN),"#185FA5")}${fi>0?fila("Fiado",fmtP(fi),"#f5a623"):""}${sep("📦 Costos")}${fila("Llenado","−"+fmtP(costo),"#e05c5c")}${gastos.length>0?sep("💸 Gastos extras"):""}${gastos.map(g=>fila(g.cat+(g.desc?` · ${g.desc}`:""),"−"+fmtP(g.monto),"#e05c5c")).join("")}${sep("💰 Resultado")}${fila("<b>Plata en mano</b>","<b>"+fmtP(mano)+"</b>",mano>=0?"#0a7c3e":"#e05c5c")}${fila("<b>Ganancia neta</b>","<b>"+fmtP(gan)+"</b>",gan>=0?"#0a7c3e":"#e05c5c")}</table></div><p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Sistema de Reparto · Emma Soluciones Digitales</p></div>`;
+      await window.enviarEmailBrevoRM({to:lic.email,toName:neg,subject:`📋 Cierre ${dia} ${fecha} · ${fmtP(ef+tr+fi)} · Mano ${fmtP(mano)}`,htmlContent:html});
+      return true;
+    } catch(e){console.error("enviarDiario:",e);return false;}
+  };
+  const enviarSemanal = async (fecha) => {
+    const lic=getLic(); if(!lic.email||!window.enviarEmailBrevoRM) return false;
+    try{const d=new Date(fecha+"T12:00:00");const lp=new Date(d);lp.setDate(d.getDate()-6);const desde=lp.toISOString().slice(0,10);const vs=(ventas||[]).filter(v=>v.fechaKey>=desde&&v.fechaKey<=fecha&&!v._esCobro&&!v._esAjuste);const t=vs.reduce((a,v)=>a+(v.neto||0),0);await window.enviarEmailBrevoRM({to:lic.email,toName:lic.negocio||"",subject:`📊 Semana ${desde}→${fecha} · ${fmtP(t)}`,htmlContent:`<div style="font-family:sans-serif;padding:20px"><h2 style="color:#7b3fc9">📊 Resumen semanal</h2><p>${desde} al ${fecha}</p><div style="font-size:28px;font-weight:700;color:#7b3fc9">${fmtP(t)}</div><p>${vs.length} entregas</p></div>`});return true;}catch(e){return false;}
+  };
+  const enviarMensual = async (mes, anio) => {
+    const lic=getLic(); if(!lic.email||!window.enviarEmailBrevoRM) return false;
+    try{const p=`${anio}-${String(mes).padStart(2,"0")}`;const vs=(ventas||[]).filter(v=>(v.fechaKey||"").startsWith(p)&&!v._esCobro&&!v._esAjuste);const t=vs.reduce((a,v)=>a+(v.neto||0),0);const mn=["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];await window.enviarEmailBrevoRM({to:lic.email,toName:lic.negocio||"",subject:`📅 ${mn[mes]} ${anio} · ${fmtP(t)}`,htmlContent:`<div style="font-family:sans-serif;padding:20px"><h2 style="color:#1a7a5e">📅 ${mn[mes]} ${anio}</h2><div style="font-size:28px;font-weight:700;color:#1a7a5e">${fmtP(t)}</div><p>${vs.length} entregas</p></div>`});return true;}catch(e){return false;}
+  };
+  return { enviarDiario, enviarSemanal, enviarMensual };
+}
+
+// ════════════════════════════════════════════════════════════════════
 // ◆  15-app.js — Componente App principal
 // ════════════════════════════════════════════════════════════════════
 
@@ -316,8 +358,61 @@ function App() {
   const saveVentas   = (v) => { setVentasRaw(v);   syncData({ventas:v}); };
   const savePlanillasCloud = (v) => { setPlanillas(v); syncData({planillas:v}); };
 
-  // ── INFORMES EMAIL (no disponible en app individual) ────────────
-  const cerrarDia = async (fecha, dia) => { return false; };
+  // ── INFORMES EMAIL ──────────────────────────────────────────────
+  const {enviarDiario, enviarSemanal, enviarMensual} = usarInformes({ventas,clientes,planillas,noVisitas:noVisitas||[],productos});
+  const cerrarDia = async (fecha, dia) => {
+    const key = `sr_informe_${fecha}_${dia}`;
+    if(localStorage.getItem(key)) return true;
+    setSyncStatus("saving");
+    const ok = await enviarDiario(fecha, dia);
+    if(ok) {
+      localStorage.setItem(key, "1");
+      const d = new Date(fecha+"T12:00:00");
+      if(d.getDay()===6) {
+        const okSem = await enviarSemanal(fecha);
+        if(okSem) localStorage.setItem(`sr_informe_sem_${fecha}`,"1");
+      }
+      const manana = new Date(d); manana.setDate(d.getDate()+1);
+      if(manana.getMonth()!==d.getMonth()) {
+        const okMes = await enviarMensual(d.getMonth()+1, d.getFullYear());
+        if(okMes) localStorage.setItem(`sr_informe_mes_${d.getFullYear()}_${d.getMonth()+1}`,"1");
+      }
+    }
+    setSyncStatus(ok?"saved":"error");
+    setTimeout(()=>setSyncStatus("idle"),3000);
+    return ok;
+  };
+
+  // ── Helper: siguiente pendiente (clientes + prospectos del día) ──
+  const getSiguienteDelDia = (nvActual, excludeId) => {
+    const clientesDia = clientes.filter(cc=>cc.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
+    const prospDelDia  = (prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo");
+    const visitadosIds = new Set([
+      ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),
+      ...(nvActual||noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual).map(v=>v.clienteId)
+    ]);
+    if(excludeId) visitadosIds.add(excludeId);
+    // Primero clientes regulares
+    const sigCl = clientesDia.find(cc=>!visitadosIds.has(cc.id)&&!cc._esProspecto);
+    if(sigCl) return {item:sigCl, esProspecto:false};
+    // Luego prospectos
+    const sigPr = prospDelDia.find(p=>!visitadosIds.has(p.id));
+    if(sigPr) return {item:sigPr, esProspecto:true};
+    return null;
+  };
+  const irAlSiguiente = (sig) => {
+    if(!sig) { irA("clientes"); return; }
+    if(sig.esProspecto) {
+      if(!clientes.find(cc=>cc.id===sig.item.id)) {
+        saveClientes([...clientes,{...sig.item,saldo:0,_esProspecto:true}]);
+      }
+      setClienteId(sig.item.id);
+      irA("venta");
+    } else {
+      setClienteId(sig.item.id);
+      irA("venta");
+    }
+  };
   const saveStock    = (v) => { setStock(v);    syncData({stock:v}); };
   const saveProductos= (v) => {
     // Registrar cambio de precio en historial
@@ -722,17 +817,12 @@ function App() {
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),...(nv).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
-          const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
-          if(siguiente){setClienteId(siguiente.id);irA("venta");}else irA("clientes");
+          irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onNoQuiere={()=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
-          const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
-          visitadosIds.add(clienteId);
-          const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
-          if(siguiente){setClienteId(siguiente.id);irA("venta");}else irA("clientes");
+          irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,sd)=>{
   registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd);
@@ -742,9 +832,7 @@ function App() {
     ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta"||v.motivo==="salteado")).map(v=>v.clienteId)
   ]);
   visitadosIds.add(clienteId);
-  const siguiente = clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
-  if(siguiente){ setClienteId(siguiente.id); irA("venta"); }
-  else irA("clientes");
+  irAlSiguiente(getSiguienteDelDia(noVisitas, clienteId));
 }}
         onSaltar={()=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),
@@ -760,7 +848,7 @@ function App() {
           const noestaPend=clientesDia.filter(c=>nvMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==clienteId);
           const saltadosPend=clientesDia.filter(c=>nvMap[c.id]==="salteado"&&c.id!==clienteId);
           const sig=normalPend[0]||noestaPend[0]||saltadosPend[0];
-          if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
+          irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onVolver={()=>irA("detalleCliente")} />}
       {pantalla==="nuevoCliente"   && <NuevoCliente diaActual={diaActual} onGuardar={(datos)=>{
