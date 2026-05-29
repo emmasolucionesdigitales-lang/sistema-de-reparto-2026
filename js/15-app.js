@@ -316,30 +316,8 @@ function App() {
   const saveVentas   = (v) => { setVentasRaw(v);   syncData({ventas:v}); };
   const savePlanillasCloud = (v) => { setPlanillas(v); syncData({planillas:v}); };
 
-  // ── INFORMES EMAIL ──────────────────────────────────────────────
-  const {enviarDiario, enviarSemanal, enviarMensual} = usarInformes({ventas,clientes,planillas,noVisitas:noVisitas||[],productos});
-  const cerrarDia = async (fecha, dia) => {
-    const key = `sr_informe_${fecha}_${dia}`;
-    if(localStorage.getItem(key)) return;
-    setSyncStatus("saving");
-    const ok = await enviarDiario(fecha, dia);
-    if(ok) {
-      localStorage.setItem(key, "1");
-      const d = new Date(fecha+"T12:00:00");
-      if(d.getDay()===6) {
-        const okSem = await enviarSemanal(fecha);
-        if(okSem) localStorage.setItem(`sr_informe_sem_${fecha}`,"1");
-      }
-      const manana = new Date(d); manana.setDate(d.getDate()+1);
-      if(manana.getMonth()!==d.getMonth()) {
-        const okMes = await enviarMensual(d.getMonth()+1, d.getFullYear());
-        if(okMes) localStorage.setItem(`sr_informe_mes_${d.getFullYear()}_${d.getMonth()+1}`,"1");
-      }
-    }
-    setSyncStatus(ok?"saved":"error");
-    setTimeout(()=>setSyncStatus("idle"),3000);
-    return ok;
-  };
+  // ── INFORMES EMAIL (no disponible en app individual) ────────────
+  const cerrarDia = async (fecha, dia) => { return false; };
   const saveStock    = (v) => { setStock(v);    syncData({stock:v}); };
   const saveProductos= (v) => {
     // Registrar cambio de precio en historial
