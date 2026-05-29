@@ -41,9 +41,11 @@
 
     // Funciones de Firestore usadas por la app
     async function cloudSave(uid, datos) {
+      if(!uid || uid === "") { console.warn("cloudSave: uid vacío, ignorado"); return; }
       await db.collection("users").doc(uid).collection("datos").doc("main").set(datos);
     }
     async function cloudLoad(uid) {
+      if(!uid || uid === "") { console.warn("cloudLoad: uid vacío, ignorado"); return null; }
       const doc = await db.collection("users").doc(uid).collection("datos").doc("main").get();
       return doc.exists ? doc.data() : null;
     }

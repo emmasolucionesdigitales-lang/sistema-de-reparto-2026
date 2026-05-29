@@ -181,7 +181,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         {/* Fila 1: Clientes y Stock (más grandes, más importantes) */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,paddingBottom:4}}>
           {[
-            {ico:"👥",lbl:"Clientes",fn:onGestionClientes,bg:"#185FA5",desc:"Lista · Fiados · Agenda · Excel"},
+            {ico:"👥",lbl:"Clientes",fn:onGestionClientes,bg:"#185FA5",desc:"Lista · Fiados · Agenda"},
             {ico:"📦",lbl:"Stock",fn:onStock,bg:"#1a5e35",desc:"Inventario · Resumen"},
           ].map(({ico,lbl,fn,bg,desc})=>(
             <button key={lbl} onClick={fn} style={{
