@@ -183,7 +183,7 @@ function CargaHistorica({clientes,productos,onGuardar,onVolver,enConfig}) {
 
 function Promocion({prospectos,onSave,onConvertir,onVolver}) {
   const [diaActivo,setDiaActivo] = useState("");
-  const [subVista,setSubVista]   = useState("menu"); // menu | dia | detalle | nuevo | comodato
+  const [subVista,setSubVista]   = useState("menu"); // menu | dia | detalle | nuevo | comodato | importar
   const [selId,setSelId]         = useState(null);
 
   const hoyISO = new Date().toISOString().slice(0,10);
@@ -265,6 +265,27 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
     />
   );
 
+  if(subVista==="importar") return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={()=>setSubVista("menu")}>← Volver</button>
+        <span style={s.headerTitle}>Importar prospectos · Excel</span>
+      </div>
+      <ImportarExcelTab
+        clientes={[]}
+        prospectos={prospectos||[]}
+        modoSoloProspectos={true}
+        onImportar={(_cls, nuevosProspectos)=>{
+          if(nuevosProspectos.length){
+            onSave([...prospectos,...nuevosProspectos]);
+            alert(`✅ ${nuevosProspectos.length} prospecto${nuevosProspectos.length>1?"s":""} importado${nuevosProspectos.length>1?"s":""}`);
+          }
+          setSubVista("menu");
+        }}
+      />
+    </div>
+  );
+
   if(subVista==="dia") {
     const lista = porDia(diaActivo);
     return (
@@ -333,8 +354,12 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Promoción</span>
-        <button style={{...s.btn,padding:"6px 12px",fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
-          onClick={()=>setSubVista("nuevo")}>+ Nuevo</button>
+        <div style={{display:"flex",gap:6}}>
+          <button style={{...s.btn,padding:"6px 10px",fontSize:11,background:"#1a5e35",color:"#4dd9a0",border:"none"}}
+            onClick={()=>setSubVista("importar")}>📥 Excel</button>
+          <button style={{...s.btn,padding:"6px 12px",fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
+            onClick={()=>setSubVista("nuevo")}>+ Nuevo</button>
+        </div>
       </div>
       <div style={{...s.grid3,padding:"10px 14px 8px",gap:6}}>
         <div style={s.metricCard}><div style={s.metricLabel}>En promoción</div><div style={{...s.metricVal,color:"#5daaff"}}>{activos}</div></div>
