@@ -38,25 +38,44 @@
       appId:             "1:162304851374:web:0a60847807c8fe9a7a1c3f"
     };
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    db.enablePersistence().catch(()=>{});
+    window.db = firebase.firestore();
+    window.db.enablePersistence().catch(()=>{});
+    const db = window.db; // alias local para cloudSave/cloudLoad
 
-    // Funciones de Firestore usadas por la app
-    // cloudSave(data, id) — orden correcto: data primero, id segundo
+    // Funciones de Firestore — fallback a "firebase" si no hay código de licencia
     async function cloudSave(data, id) {
-      if(!id || id === "") { console.warn("cloudSave: id vacío — configurá el código en Configuración"); return false; }
+      const safeId = (id && id !== "") ? id : "firebase";
       try {
-        await db.collection("users").doc(id).collection("datos").doc("main").set(data);
+        await db.collection("users").doc(safeId).collection("datos").doc("main").set(data);
         return true;
-      } catch(e) { console.error("cloudSave:", e); return false; }
+      } catch(e) { console.error("cloudSave error:", e); return false; }
     }
     async function cloudLoad(id) {
-      if(!id || id === "") return null;
+      const safeId = (id && id !== "") ? id : "firebase";
       try {
-        const doc = await db.collection("users").doc(id).collection("datos").doc("main").get();
+        const doc = await db.collection("users").doc(safeId).collection("datos").doc("main").get();
         return doc.exists ? doc.data() : null;
-      } catch(e) { console.error("cloudLoad:", e); return null; }
+      } catch(e) { console.error("cloudLoad error:", e); return null; }
     }
+
+    // ── Brevo email ─────────────────────────────────────────────────────
+    window.enviarEmailBrevoRM = async function({to, toName, subject, htmlContent}) {
+      const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": "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"
+        },
+        body: JSON.stringify({
+          sender: { name: "Sistema de Reparto", email: "carabajalponce1980@gmail.com" },
+          to: [{ email: to, name: toName || "" }],
+          subject: subject,
+          htmlContent: htmlContent
+        })
+      });
+      if(!resp.ok) { const t = await resp.text(); throw new Error("Brevo " + resp.status + ": " + t); }
+      return true;
+    };
   </script>
 
   <!-- React + Babel -->
