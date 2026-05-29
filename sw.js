@@ -1,4 +1,4 @@
-const CACHE = 'lc-v52';
+const CACHE = 'lc-v53';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -23,6 +23,20 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+
+  // ── NO interceptar peticiones de Firebase/Google ──────────────────
+  // Si el SW intenta responder a estas URLs falla con "Failed to convert to Response"
+  const url = e.request.url;
+  if (
+    url.includes('googleapis.com') ||
+    url.includes('gstatic.com') ||
+    url.includes('firebaseio.com') ||
+    url.includes('firebase.com') ||
+    url.includes('firestore.googleapis') ||
+    url.includes('securetoken.googleapis')
+  ) return; // dejar que el browser lo maneje directamente
+  // ─────────────────────────────────────────────────────────────────
+
   e.respondWith(
     caches.match(e.request).then(cached => {
       const net = fetch(e.request).then(res => {
@@ -31,7 +45,7 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => cached);
+      }).catch(() => cached || new Response('', { status: 503 }));
       return cached || net;
     })
   );

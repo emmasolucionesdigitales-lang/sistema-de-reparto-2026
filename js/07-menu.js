@@ -553,10 +553,16 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{llenosVuelta.b20} un</span>
             </div>
           </div>
-          <button style={{width:"100%",padding:"16px",borderRadius:10,border:"none",background:"var(--color-background-tertiary)",borderTop:"2px solid #f5b942",color:"#f5b942",fontSize:15,fontWeight:700,cursor:"pointer"}}
-            onClick={confirmarCierre}>
-            ✓ Cerrar día y actualizar stock
-          </button>
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <button style={{flex:1,padding:"14px 8px",borderRadius:10,border:"1.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:13,fontWeight:500,cursor:"pointer"}}
+              onClick={()=>setMostrarCierre(false)}>
+              📋 Ver planilla completa
+            </button>
+            <button style={{flex:1,padding:"14px 8px",borderRadius:10,border:"none",background:"var(--color-background-tertiary)",borderTop:"2px solid #f5b942",color:"#f5b942",fontSize:13,fontWeight:700,cursor:"pointer"}}
+              onClick={confirmarCierre}>
+              ✓ Cerrar día
+            </button>
+          </div>
         </div>
       </div>
     );

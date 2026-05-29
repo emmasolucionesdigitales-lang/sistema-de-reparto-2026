@@ -661,10 +661,24 @@ function App() {
         onNoEstaProspecto={(id)=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
           saveNoVisitas(nv);
+          const todosOrdenados=[
+            ...clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999)),
+            ...(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")
+          ];
+          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).map(v=>v.clienteId)]);
+          const sig=todosOrdenados.find(x=>!visitadosIds.has(x.id)&&x.id!==id);
+          if(sig){ const esProsp=prospectos?.some(p=>p.id===sig.id); if(esProsp){setProspectoId(sig.id);irA("detalleProspecto");}else{setClienteId(sig.id);irA("detalleCliente");} }
         }}
         onNoQuiereProspecto={(id)=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
+          const todosOrdenados=[
+            ...clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999)),
+            ...(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")
+          ];
+          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).map(v=>v.clienteId)]);
+          const sig=todosOrdenados.find(x=>!visitadosIds.has(x.id)&&x.id!==id);
+          if(sig){ const esProsp=prospectos?.some(p=>p.id===sig.id); if(esProsp){setProspectoId(sig.id);irA("detalleProspecto");}else{setClienteId(sig.id);irA("detalleCliente");} }
         }}
         onVerProspecto={(p)=>{setProspectoId(p.id);irA("detalleProspecto");}}
         />}
@@ -731,7 +745,7 @@ function App() {
           const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),...(nv).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
           const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
-          if(siguiente){setClienteId(siguiente.id);irA("detalleCliente");}else irA("clientes");
+          if(siguiente){setClienteId(siguiente.id);irA("venta");}else irA("clientes");
         }}
         onNoQuiere={()=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
@@ -740,7 +754,7 @@ function App() {
           const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
           const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
-          if(siguiente){setClienteId(siguiente.id);irA("detalleCliente");}else irA("clientes");
+          if(siguiente){setClienteId(siguiente.id);irA("venta");}else irA("clientes");
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,sd)=>{
   registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd);
@@ -768,7 +782,7 @@ function App() {
           const noestaPend=clientesDia.filter(c=>nvMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==clienteId);
           const saltadosPend=clientesDia.filter(c=>nvMap[c.id]==="salteado"&&c.id!==clienteId);
           const sig=normalPend[0]||noestaPend[0]||saltadosPend[0];
-          if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
+          if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
         }}
         onVolver={()=>irA("detalleCliente")} />}
       {pantalla==="nuevoCliente"   && <NuevoCliente diaActual={diaActual} onGuardar={(datos)=>{
@@ -803,7 +817,7 @@ function App() {
           visitadoHoy={visitadoHoy}
           onRegistrar={()=>{ setClienteId(prospecto.id); irA("venta"); }}
           onComodato={()=>{}}
-          onConvertir={(p)=>{ const nuevo={...p,id:Date.now(),saldo:0,sifon:0,bidon10:1,bidon20:0}; saveClientes([...clientes,nuevo]); saveProspectos(prospectos.map(x=>x.id===p.id?{...x,estado:"convertido"}:x)); irA("clientes"); }}
+          onConvertir={(p)=>{ const base=p||prospecto; const nuevo={...base,id:Date.now(),saldo:0}; saveClientes([...clientes,nuevo]); saveProspectos(prospectos.map(x=>x.id===base.id?{...x,estado:"convertido"}:x)); irA("clientes"); }}
           onEliminar={()=>{ if(window.confirm("¿Eliminar prospecto?")){ saveProspectos(prospectos.filter(x=>x.id!==prospecto.id)); setProspectoId(null); irA("clientes"); } }}
           onEditar={(cambios)=>{ saveProspectos(prospectos.map(x=>x.id===prospecto.id?{...x,...cambios}:x)); }}
           onActualizarEnvases={(pid,cambios)=>{ saveProspectos(prospectos.map(x=>x.id===pid?{...x,...cambios}:x)); }}

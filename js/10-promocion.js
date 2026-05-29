@@ -598,7 +598,7 @@ function PromoDetalle({prospecto:p,listo,comprasCount,semanasCount,visitadoHoy,o
           <button style={{...s.btnPrimary,marginBottom:10,background:"#0F6E56"}}
             onClick={()=>{if(window.confirm(`¿Convertir a ${p.nombre} en cliente regular de ${p.dia}?
 
-El número de orden en la ruta se asigna después desde Gestión de clientes.`))onConvertir();}}>
+El número de orden en la ruta se asigna después desde Gestión de clientes.`))onConvertir(p);}}>
             ✓ Convertir a cliente regular de {p.dia}
           </button>
         )}

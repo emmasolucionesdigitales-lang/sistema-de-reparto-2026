@@ -398,7 +398,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
           {id:"lista",    ico:"👥", lbl:"Lista"},
           {id:"fiados",   ico:"💰", lbl:"Fiados",  badge:cantFiados},
           {id:"agenda",   ico:"📅", lbl:"Agenda",  badge:cantAgenda},
-          {id:"importar", ico:"📥", lbl:"Excel"},
+
         ].map(({id,ico,lbl,badge})=>(
           <button key={id}
             style={{
@@ -540,7 +540,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
 
       {tab === "fiados" && <FiadosTab clientes={clientes} />}
       {tab === "agenda" && <AgendaTab recordatorios={recordatorios} onConfirmarRecordatorio={onConfirmarRecordatorio} />}
-      {tab === "importar" && <ImportarExcelTab clientes={clientes} prospectos={prospectos||[]} onImportar={onImportar} />}
+
     </div>
 
     {/* Modal foto domicilio */}
