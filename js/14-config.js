@@ -211,24 +211,92 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           </button>
 
           {/* Importar clientes */}
-          {!importando
-            ?<button style={{...s.btn,width:"100%",padding:"11px",fontSize:13}}
-               onClick={()=>setImportando(true)}>
-               📤 Importar clientes desde Excel
-             </button>
-            :<div style={{...s.card,margin:0}}>
-               <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:8}}>Seleccioná el archivo Excel con los clientes:</div>
-               <input type="file" accept=".xlsx" style={{...s.input,marginBottom:8,padding:"6px"}}
-                 onChange={e=>{
-                   if(e.target.files[0]){
-                     importarClientesPlanilla(e.target.files[0], clientes, (nuevos)=>{setClientes(nuevos);syncData({clientes:nuevos});});
-                   }
-                   setImportando(false);
-                 }}
-               />
-               <button style={{...s.btn,width:"100%"}} onClick={()=>setImportando(false)}>Cancelar</button>
-             </div>
-          }
+          <label style={{
+            display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+            width:"100%",padding:"11px",borderRadius:10,border:"0.5px solid var(--color-border-secondary)",
+            background:importandoClientes?"var(--color-background-info)":"var(--color-background-tertiary)",
+            color:importandoClientes?"var(--color-text-info)":"var(--color-text-secondary)",
+            fontSize:13,cursor:importandoClientes?"wait":"pointer",boxSizing:"border-box",
+          }}>
+            {importandoClientes?"⏳ Leyendo archivo...":"📥 Importar clientes desde Excel"}
+            <input type="file" accept=".xlsx,.xls" style={{display:"none"}} disabled={importandoClientes}
+              onChange={e=>{
+                const file=e.target.files[0]; if(!file) return;
+                setImportandoClientes(true);
+                const MAPDIA={lunes:"Lunes",martes:"Martes",miercoles:"Miércoles",jueves:"Jueves",viernes:"Viernes",sabado:"Sábado"};
+                const norm=(s)=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[°\s_\-\.\/]/g,"").trim();
+                const procesarBuffer=(buffer)=>{
+                  try{
+                    const wb=window.XLSX.read(new Uint8Array(buffer),{type:"array"});
+                    const ws=wb.Sheets[wb.SheetNames[0]];
+                    const json=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+                    if(!json||json.length<2){alert("El archivo está vacío.");setImportandoClientes(false);return;}
+                    let hIdx=0;
+                    for(let i=0;i<Math.min(json.length,6);i++){
+                      const r=json[i].map(norm);
+                      if(r.some(c=>c==="nombre"||c==="dia"||c==="barrio"||c==="calle")){hIdx=i;break;}
+                    }
+                    const heads=json[hIdx].map(h=>String(h).trim());
+                    const filas=json.slice(hIdx+1).filter(r=>r.some(c=>String(c).trim()!==""));
+                    const col={};
+                    heads.forEach((h,i)=>{
+                      const hn=norm(h);
+                      if(hn==="nombre"||(hn.includes("nombre")&&!hn.includes("apellido"))) col.nombre=i;
+                      if(hn.includes("apellido")) col.apellido=i;
+                      if(hn==="dia") col.dia=i;
+                      if(hn==="barrio") col.barrio=i;
+                      if(hn.includes("manzana")||hn==="mz") col.manzana=i;
+                      if(hn==="lote"||hn==="lt") col.lote=i;
+                      if(hn==="calle"||hn.includes("direcc")) col.calle=i;
+                      if(hn==="n"||hn==="nro"||hn==="numero") col.nro=i;
+                      if(hn.includes("aclar")||hn.includes("depto")) col.aclaracion=i;
+                      if(hn.includes("telef")||hn.includes("cel")||hn==="telefono") col.telefono=i;
+                      if(hn.includes("sifon")||(hn.includes("soda")&&!hn.includes("bidon"))) col.sifon=i;
+                      if(hn.includes("10")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon10=i;
+                      if(hn.includes("20")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon20=i;
+                      if(hn.includes("dispen")) col.dispenser=i;
+                      if(hn==="orden"||hn==="ord") col.orden=i;
+                    });
+                    const getV=(row,campo)=>col[campo]!==undefined?String(row[col[campo]]||"").trim():"";
+                    let maxId=Math.max(0,...clientes.map(c=>c.id||0));
+                    let count=0;
+                    const nuevos=[...clientes];
+                    filas.forEach(row=>{
+                      const nombre=getV(row,"nombre"); if(!nombre) return;
+                      if(clientes.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())) return;
+                      const apellido=getV(row,"apellido");
+                      const nombreC=apellido?`${nombre} ${apellido}`:nombre;
+                      const rawDia=getV(row,"dia");
+                      const diaKey=norm(rawDia);
+                      const dia=MAPDIA[diaKey]||(DIAS||[]).find(d=>norm(d)===diaKey)||rawDia||"Lunes";
+                      nuevos.push({
+                        id:++maxId,nombre:nombreC,calle:getV(row,"calle"),nro:getV(row,"nro"),
+                        barrio:getV(row,"barrio"),manzana:getV(row,"manzana"),
+                        lote:getV(row,"lote"),aclaracion:getV(row,"aclaracion"),
+                        telefono:getV(row,"telefono"),dia,
+                        sifon:Math.max(0,Number(getV(row,"sifon"))||0),
+                        bidon10:Math.max(0,Number(getV(row,"bidon10"))||0),
+                        bidon20:Math.max(0,Number(getV(row,"bidon20"))||0),
+                        dispenser:Math.max(0,Number(getV(row,"dispenser"))||0),
+                        orden:Number(getV(row,"orden"))||9999,saldo:0,
+                      });
+                      count++;
+                    });
+                    if(count===0){alert("No se encontraron clientes nuevos (los duplicados se omiten).");}
+                    else{setClientes(nuevos);syncData({clientes:nuevos});alert(`✅ ${count} cliente${count!==1?"s":""} importado${count!==1?"s":""}. Los duplicados fueron omitidos.`);}
+                  }catch(err){console.error(err);alert("Error al leer el archivo. Verificá que sea un .xlsx válido.");}
+                  setImportandoClientes(false);
+                };
+                const leer=()=>{const r=new FileReader();r.onload=ev=>procesarBuffer(ev.target.result);r.onerror=()=>{alert("Error al abrir el archivo.");setImportandoClientes(false);};r.readAsArrayBuffer(file);};
+                if(window.XLSX){leer();return;}
+                const sc=document.createElement("script");
+                sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+                sc.onload=leer;sc.onerror=()=>{setImportandoClientes(false);alert("Sin conexión. Intentá de nuevo.");};
+                document.head.appendChild(sc);
+              }}
+            />
+          </label>
+
 
           {/* Forzar sincronización */}
           <button style={{...s.btn,width:"100%",padding:"11px",background:"#EF9F27",color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}

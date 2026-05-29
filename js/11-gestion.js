@@ -114,255 +114,227 @@ function AgendaTab({recordatorios, onConfirmarRecordatorio}) {
 }
 
 // ── Tab: Importar Excel ──────────────────────────────────────────────
-function ImportarExcelTab({clientes, prospectos, onImportar}) {
-  const [paso, setPaso] = React.useState(1);      // 1=subir 2=mapear 3=preview 4=listo
-  const [filas, setFilas] = React.useState(null);
-  const [columnas, setColumnas] = React.useState([]);
-  const [mapping, setMapping] = React.useState({});
+// SIMPLE: seleccionar → auto-detectar → preview → confirmar
+// Sin mapeo manual · Sin async/await (incompatible con Babel in-browser)
+function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}) {
+  const [paso, setPaso]     = React.useState(1); // 1=subir 2=preview 3=listo
+  const [preview, setPreview] = React.useState([]);
   const [errores, setErrores] = React.useState([]);
+  const [cargando, setCargando] = React.useState(false);
   const [importados, setImportados] = React.useState({cl:0,pr:0});
 
-  const CAMPOS = [
-    {id:"nombre",    label:"Nombre *",               required:true},
-    {id:"apellido",  label:"Apellido"},
-    {id:"calle",     label:"Dirección / Calle"},
-    {id:"nro",       label:"Número de puerta"},
-    {id:"barrio",    label:"Barrio"},
-    {id:"telefono",  label:"Teléfono"},
-    {id:"maps",      label:"Ubicación Google Maps"},
-    {id:"dia",       label:"Día de reparto"},
-    {id:"tipo",      label:"Tipo (cliente / prospecto)"},
-    {id:"sifon",     label:"Sifones habituales"},
-    {id:"bidon10",   label:"Bidón 10L habitual"},
-    {id:"bidon20",   label:"Bidón 20L habitual"},
-    {id:"dispenser", label:"Dispensers"},
-  ];
+  const resetear = () => { setPreview([]); setErrores([]); setPaso(1); setImportados({cl:0,pr:0}); };
 
-  const MAPEO_DIA = {
-    "lunes":"Lunes","martes":"Martes","miercoles":"Miércoles","miércoles":"Miércoles",
-    "jueves":"Jueves","viernes":"Viernes","sabado":"Sábado","sábado":"Sábado"
+  const procesarBuffer = (buffer) => {
+    try {
+      const MAPDIA = {lunes:"Lunes",martes:"Martes",miercoles:"Miércoles",jueves:"Jueves",viernes:"Viernes",sabado:"Sábado"};
+      const norm = (s) => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[°\s_\-\.\/]/g,"").trim();
+
+      const wb  = window.XLSX.read(new Uint8Array(buffer), {type:"array"});
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      const json = window.XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+
+      if(!json || json.length < 2) { alert("El archivo está vacío."); setCargando(false); return; }
+
+      // Detectar fila de encabezados (saltar títulos)
+      let headerIdx = 0;
+      for(let i = 0; i < Math.min(json.length, 6); i++) {
+        const r = json[i].map(norm);
+        if(r.some(c => c==="nombre" || c==="dia" || c==="barrio" || c==="calle")) { headerIdx = i; break; }
+      }
+      const headers = json[headerIdx].map(h => String(h).trim());
+      const filas   = json.slice(headerIdx+1).filter(r => r.some(c => String(c).trim() !== ""));
+
+      // Auto-mapeo silencioso
+      const col = {};
+      headers.forEach((h, i) => {
+        const hn = norm(h);
+        if(hn==="nombre" || (hn.includes("nombre") && !hn.includes("apellido"))) col.nombre=i;
+        if(hn.includes("apellido"))                    col.apellido=i;
+        if(hn==="dia")                                 col.dia=i;
+        if(hn==="barrio")                              col.barrio=i;
+        if(hn.includes("manzana")||hn==="mz"||hn==="mza") col.manzana=i;
+        if(hn==="lote"||hn==="lt")                     col.lote=i;
+        if(hn==="calle"||hn.includes("direcc"))        col.calle=i;
+        if(hn==="n"||hn==="nro"||hn==="numero")        col.nro=i;
+        if(hn.includes("aclar")||hn.includes("depto")) col.aclaracion=i;
+        if(hn.includes("telef")||hn.includes("cel")||hn==="telefono") col.telefono=i;
+        if(hn.includes("maps")||hn.includes("ubic")||hn.includes("gps")) col.maps=i;
+        if(hn.includes("sifon")||(hn.includes("soda")&&!hn.includes("bidon"))) col.sifon=i;
+        if(hn.includes("10")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon10=i;
+        if(hn.includes("20")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon20=i;
+        if(hn.includes("dispen"))                      col.dispenser=i;
+        if(hn==="orden"||hn==="ord"||hn==="order")     col.orden=i;
+        if(hn==="tipo"||hn.includes("tipocliente"))    col.tipo=i;
+      });
+
+      const getV = (row, campo) => col[campo]!==undefined ? String(row[col[campo]]||"").trim() : "";
+
+      const errs = [];
+      const resultado = filas.map((row, i) => {
+        const nombre = getV(row,"nombre");
+        if(!nombre){ errs.push(`Fila ${i+headerIdx+2}: sin nombre`); return null; }
+        const apellido = getV(row,"apellido");
+        const nombreC  = apellido ? `${nombre} ${apellido}` : nombre;
+        const rawDia   = getV(row,"dia");
+        const diaKey   = norm(rawDia);
+        const dia      = MAPDIA[diaKey] || (DIAS||[]).find(d=>norm(d)===diaKey) || rawDia || "Lunes";
+        const rawTipo  = modoSoloProspectos ? "prospecto" : norm(getV(row,"tipo"));
+        const tipo     = rawTipo.includes("prosp") ? "prospecto" : "cliente";
+        return {
+          nombre:nombreC, calle:getV(row,"calle"), nro:getV(row,"nro"),
+          barrio:getV(row,"barrio"), manzana:getV(row,"manzana"),
+          lote:getV(row,"lote"), aclaracion:getV(row,"aclaracion"),
+          telefono:getV(row,"telefono"), maps:getV(row,"maps"),
+          dia, tipo,
+          sifon:    Math.max(0,Number(getV(row,"sifon"))||0),
+          bidon10:  Math.max(0,Number(getV(row,"bidon10"))||0),
+          bidon20:  Math.max(0,Number(getV(row,"bidon20"))||0),
+          dispenser:Math.max(0,Number(getV(row,"dispenser"))||0),
+          orden:    Number(getV(row,"orden"))||9999,
+        };
+      }).filter(Boolean);
+
+      setPreview(resultado);
+      setErrores(errs);
+      setPaso(2);
+    } catch(err) {
+      console.error("Excel error:", err);
+      alert("Error al leer el archivo. Verificá que sea un .xlsx válido.");
+    }
+    setCargando(false);
   };
 
   const leerExcel = (file) => {
-    if(!window.XLSX) { alert("La librería Excel no está disponible. Revisá la conexión e intentá de nuevo."); return; }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, {type:"array"});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
-        if(!json || json.length < 2) { alert("El archivo está vacío o no tiene datos."); return; }
-        const headers = json[0].map(h => String(h).trim());
-        const rows = json.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
-        setColumnas(headers);
-        setFilas(rows);
-        // Auto-mapeo inteligente por nombre de columna
-        const autoMap = {};
-        headers.forEach((h, i) => {
-          const hl = h.toLowerCase().replace(/\s+/g,"");
-          if((hl.includes("nombre") && !hl.includes("apellido")) || hl==="nombre") autoMap.nombre = i;
-          if(hl.includes("apellido")) autoMap.apellido = i;
-          if(hl.includes("direcc") || hl==="calle" || hl.includes("domicilio")) autoMap.calle = i;
-          if(hl==="nro" || hl==="numero" || hl==="número") autoMap.nro = i;
-          if(hl.includes("barrio")) autoMap.barrio = i;
-          if(hl.includes("telef") || hl.includes("cel") || hl.includes("whatsapp")) autoMap.telefono = i;
-          if(hl.includes("ubic") || hl.includes("maps") || hl.includes("gps") || hl.includes("link")) autoMap.maps = i;
-          if(hl==="dia" || hl==="día" || hl.includes("diadereparto") || hl.includes("díadereparto")) autoMap.dia = i;
-          if(hl==="tipo" || hl.includes("estado")) autoMap.tipo = i;
-          if(hl.includes("sifon") || hl.includes("sifón") || hl==="soda" || hl.includes("sifones")) autoMap.sifon = i;
-          if(hl.includes("10") || hl.includes("diez") || hl==="b10" || hl==="agua10") autoMap.bidon10 = i;
-          if(hl.includes("20") || hl.includes("veinte") || hl==="b20" || hl==="agua20") autoMap.bidon20 = i;
-          if(hl.includes("dispen")) autoMap.dispenser = i;
-        });
-        setMapping(autoMap);
-        setPaso(2);
-      } catch(err) {
-        alert("Error al leer el archivo. Asegurate de que sea un archivo .xlsx válido.");
-        console.error(err);
-      }
+    setCargando(true);
+    const leer = () => {
+      const reader = new FileReader();
+      reader.onload  = (e) => procesarBuffer(e.target.result);
+      reader.onerror = ()  => { alert("Error al abrir el archivo."); setCargando(false); };
+      reader.readAsArrayBuffer(file);
     };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const getVal = (row, campo) => {
-    const idx = mapping[campo];
-    if(idx === undefined || idx === null || idx === "") return "";
-    return String(row[idx] || "").trim();
-  };
-
-  const procesarFilas = () => {
-    const errs = [];
-    const resultado = (filas||[]).map((row, i) => {
-      const nombre = getVal(row, "nombre");
-      if(!nombre) { errs.push(`Fila ${i+2}: sin nombre — omitida`); return null; }
-      const apellido = getVal(row, "apellido");
-      const nombreCompleto = apellido ? `${nombre} ${apellido}` : nombre;
-      const rawDia = getVal(row, "dia");
-      const diaLower = rawDia.toLowerCase().trim();
-      const dia = MAPEO_DIA[diaLower] || DIAS.find(d => d.toLowerCase() === diaLower) || rawDia || "Lunes";
-      const rawTipo = getVal(row, "tipo").toLowerCase();
-      const tipo = (rawTipo.includes("prosp") || rawTipo.includes("pros")) ? "prospecto" : "cliente";
-      const sifon = Math.max(0, Number(getVal(row, "sifon"))||0);
-      const bidon10 = Math.max(0, Number(getVal(row, "bidon10"))||0);
-      const bidon20 = Math.max(0, Number(getVal(row, "bidon20"))||0);
-      const dispenser = Math.max(0, Number(getVal(row, "dispenser"))||0);
-      return { nombre:nombreCompleto, calle:getVal(row,"calle"), nro:getVal(row,"nro"), barrio:getVal(row,"barrio"), telefono:getVal(row,"telefono"), maps:getVal(row,"maps"), dia, tipo, sifon, bidon10, bidon20, dispenser };
-    }).filter(Boolean);
-    setErrores(errs);
-    return resultado;
+    if(window.XLSX) { leer(); return; }
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    sc.onload = leer;
+    sc.onerror = () => { setCargando(false); alert("Sin conexión para cargar la librería Excel. Intentá de nuevo."); };
+    document.head.appendChild(sc);
   };
 
   const confirmarImport = () => {
-    const procesados = procesarFilas();
     const maxId = Math.max(0, ...(clientes||[]).map(c=>c.id||0), ...(prospectos||[]).map(p=>p.id||0));
     let nextId = maxId + 1;
+    const hoy = new Date().toISOString().slice(0,10);
     const nuevosClientes = [], nuevosProspectos = [];
-    procesados.forEach(p => {
-      const base = { id:nextId++, nombre:p.nombre, calle:p.calle, nro:p.nro, barrio:p.barrio, telefono:p.telefono, maps:p.maps, dia:p.dia, sifon:p.sifon, bidon10:p.bidon10, bidon20:p.bidon20, dispenser:p.dispenser, saldo:0, orden:9999 };
-      if(p.tipo === "prospecto") nuevosProspectos.push({...base, estado:"activo"});
+    preview.forEach(p => {
+      const base = {
+        id:nextId++, nombre:p.nombre, calle:p.calle, nro:p.nro,
+        barrio:p.barrio, manzana:p.manzana, lote:p.lote, aclaracion:p.aclaracion,
+        telefono:p.telefono, maps:p.maps, dia:p.dia,
+        sifon:p.sifon, bidon10:p.bidon10, bidon20:p.bidon20,
+        dispenser:p.dispenser, saldo:0, orden:p.orden,
+      };
+      if(p.tipo==="prospecto") nuevosProspectos.push({...base, estado:"activo", fechaInicio:hoy, visitas:[], listoConvertir:false});
       else nuevosClientes.push(base);
     });
     onImportar(nuevosClientes, nuevosProspectos);
     setImportados({cl:nuevosClientes.length, pr:nuevosProspectos.length});
-    setPaso(4);
+    setPaso(3);
   };
 
-  // ── Paso 4: Éxito ──
-  if(paso === 4) return (
-    <div style={{padding:40, textAlign:"center"}}>
-      <div style={{fontSize:48, marginBottom:16}}>✅</div>
-      <div style={{fontSize:18, fontWeight:600, color:"var(--color-text-primary)", marginBottom:8}}>¡Importación completada!</div>
-      <div style={{fontSize:14, color:"var(--color-text-secondary)", lineHeight:1.8}}>
-        {importados.cl>0 && <div>👥 {importados.cl} cliente{importados.cl>1?"s":""} importado{importados.cl>1?"s":""}</div>}
-        {importados.pr>0 && <div>🚀 {importados.pr} prospecto{importados.pr>1?"s":""} importado{importados.pr>1?"s":""}</div>}
+  // ── Paso 3: Listo ──
+  if(paso===3) return (
+    <div style={{padding:40,textAlign:"center"}}>
+      <div style={{fontSize:48,marginBottom:12}}>✅</div>
+      <div style={{fontSize:18,fontWeight:600,color:"var(--color-text-primary)",marginBottom:8}}>¡Importación completada!</div>
+      <div style={{fontSize:14,color:"var(--color-text-secondary)",lineHeight:2}}>
+        {importados.cl>0&&<div>👥 {importados.cl} cliente{importados.cl!==1?"s":""} importado{importados.cl!==1?"s":""}</div>}
+        {importados.pr>0&&<div>🚀 {importados.pr} prospecto{importados.pr!==1?"s":""} importado{importados.pr!==1?"s":""}</div>}
       </div>
-      <button style={{...s.btnPrimary, width:220, marginTop:24}} onClick={()=>{setFilas(null);setColumnas([]);setMapping({});setErrores([]);setPaso(1);setImportados({cl:0,pr:0});}}>
-        📂 Importar otro archivo
-      </button>
+      <button style={{...s.btnPrimary,width:200,marginTop:20}} onClick={resetear}>📂 Importar otro</button>
     </div>
   );
 
-  // ── Paso 1: Subir archivo ──
-  if(paso === 1) return (
+  // ── Paso 1: Seleccionar archivo ──
+  if(paso===1) return (
     <div style={{padding:"16px 14px"}}>
-      <div style={{...s.card, margin:"0 0 14px", background:"var(--color-background-info)", border:"0.5px solid #5daaff"}}>
-        <div style={{fontSize:13, fontWeight:600, color:"var(--color-text-info)", marginBottom:8}}>📥 Importar desde Excel</div>
-        <div style={{fontSize:12, color:"var(--color-text-secondary)", lineHeight:1.8}}>
-          Tu archivo Excel puede tener estas columnas:<br/>
-          <b>nombre · apellido · dirección · nro · barrio · teléfono · ubicación · día · tipo · soda (sifones) · agua 10L · agua 20L · dispenser</b>
+      <div style={{...s.card,margin:"0 0 14px",background:"var(--color-background-info)",border:"0.5px solid #5daaff"}}>
+        <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:8}}>
+          {modoSoloProspectos?"📥 Importar prospectos desde Excel":"📥 Importar clientes desde Excel"}
         </div>
-        <div style={{marginTop:10, fontSize:12, color:"var(--color-text-secondary)", lineHeight:1.7}}>
-          <b>tipo</b> puede ser <code>cliente</code> o <code>prospecto</code><br/>
-          <b>día</b> puede ser: Lunes, Martes, Miércoles, Jueves, Viernes, Sábado
+        <div style={{fontSize:12,color:"var(--color-text-secondary)",lineHeight:1.9}}>
+          El archivo puede tener columnas:<br/>
+          <b>Nombre · Día · Barrio · Manzana · Lote · Calle · N° · Teléfono · Sifón 1.5L · Bidón 10L · Bidón 20L · Dispenser · Orden{!modoSoloProspectos?" · Tipo":""}</b>
+        </div>
+        <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>
+          Las columnas se detectan automáticamente. No necesitás hacer nada más.
         </div>
       </div>
-      <label style={{...s.btnPrimary, display:"block", textAlign:"center", cursor:"pointer", padding:"16px", borderRadius:12}}>
-        📂 Seleccionar archivo Excel (.xlsx)
-        <input type="file" accept=".xlsx,.xls" style={{display:"none"}}
-          onChange={e=>{if(e.target.files[0]) leerExcel(e.target.files[0]);}} />
+      <label style={{
+        ...s.btnPrimary, display:"flex", alignItems:"center", justifyContent:"center",
+        gap:8, cursor:cargando?"wait":"pointer", opacity:cargando?0.7:1,
+        padding:"16px", borderRadius:12, fontSize:15,
+      }}>
+        {cargando?"⏳ Leyendo archivo...":"📂 Seleccionar archivo Excel (.xlsx)"}
+        <input type="file" accept=".xlsx,.xls" style={{display:"none"}} disabled={cargando}
+          onChange={e=>{ if(e.target.files[0]) leerExcel(e.target.files[0]); }} />
       </label>
     </div>
   );
 
-  // ── Paso 2: Mapear columnas ──
-  if(paso === 2) return (
-    <div style={{padding:"12px 14px"}}>
-      <div style={{fontSize:14, fontWeight:600, color:"var(--color-text-primary)", marginBottom:4}}>
-        Mapeo de columnas
-      </div>
-      <div style={{fontSize:12, color:"var(--color-text-tertiary)", marginBottom:10}}>
-        {(filas||[]).length} filas detectadas en el archivo
-      </div>
-
-      {/* Preview primeras filas */}
-      <div style={{...s.card, margin:"0 0 12px", overflow:"auto", maxHeight:140, padding:"8px 10px"}}>
-        <div style={{fontSize:10, color:"var(--color-text-tertiary)", marginBottom:4}}>Vista previa (primeras 2 filas):</div>
-        <table style={{fontSize:10, borderCollapse:"collapse", whiteSpace:"nowrap"}}>
-          <thead>
-            <tr>{columnas.map((c,i)=><th key={i} style={{padding:"2px 8px",borderBottom:"0.5px solid var(--color-border-tertiary)",color:"var(--color-text-info)",textAlign:"left",fontWeight:600}}>{c}</th>)}</tr>
-          </thead>
-          <tbody>
-            {(filas||[]).slice(0,2).map((row,i)=>(
-              <tr key={i}>{columnas.map((_,j)=><td key={j} style={{padding:"2px 8px",color:"var(--color-text-primary)",maxWidth:100,overflow:"hidden",textOverflow:"ellipsis"}}>{String(row[j]||"")}</td>)}</tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{fontSize:12, fontWeight:500, color:"var(--color-text-secondary)", marginBottom:8}}>¿Qué columna del Excel corresponde a cada campo?</div>
-      {CAMPOS.map(campo => (
-        <div key={campo.id} style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
-          <label style={{fontSize:12, color:campo.required?"var(--color-text-primary)":"var(--color-text-secondary)", minWidth:140, flexShrink:0}}>
-            {campo.label}
-          </label>
-          <select style={{...s.select, flex:1, fontSize:12}} value={mapping[campo.id]??""} onChange={e=>{const v=e.target.value; setMapping(m=>({...m,[campo.id]:v===""?undefined:Number(v)}));}}>
-            <option value="">— no usar —</option>
-            {columnas.map((c,i)=><option key={i} value={i}>{c}</option>)}
-          </select>
-        </div>
-      ))}
-      <div style={{display:"flex", gap:8, marginTop:16}}>
-        <button style={{...s.btn, flex:1}} onClick={()=>setPaso(1)}>← Volver</button>
-        <button style={{...s.btnPrimary, flex:2}} onClick={()=>{procesarFilas(); setPaso(3);}}>Ver preview →</button>
-      </div>
-    </div>
-  );
-
-  // ── Paso 3: Preview / confirmación ──
-  if(paso === 3) {
-    const preview = procesarFilas();
+  // ── Paso 2: Preview simple + confirmar ──
+  if(paso===2) {
     const clPrev = preview.filter(p=>p.tipo==="cliente");
     const prPrev = preview.filter(p=>p.tipo==="prospecto");
     return (
-      <div style={{padding:"12px 14px"}}>
-        {/* Resumen */}
-        <div style={{...s.card, margin:"0 0 10px", background:"var(--color-background-success)", borderLeft:"3px solid var(--color-text-success)"}}>
-          <div style={{fontSize:13, fontWeight:600, color:"var(--color-text-success)"}}>
-            Listos para importar: {clPrev.length} clientes · {prPrev.length} prospectos
+      <div style={{padding:"12px 14px",paddingBottom:40}}>
+        <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-success)",borderLeft:"3px solid var(--color-text-success)"}}>
+          <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>
+            {modoSoloProspectos
+              ?`🚀 ${prPrev.length} prospecto${prPrev.length!==1?"s":""} listos para importar`
+              :`👥 ${clPrev.length} cliente${clPrev.length!==1?"s":""}${prPrev.length>0?` · 🚀 ${prPrev.length} prospectos`:""}`
+            }
           </div>
         </div>
-        {errores.length > 0 && (
-          <div style={{...s.card, margin:"0 0 10px", background:"var(--color-background-warning)", borderLeft:"3px solid var(--color-text-warning)"}}>
-            <div style={{fontSize:12, fontWeight:500, color:"var(--color-text-warning)"}}>⚠ {errores.length} fila{errores.length>1?"s":""} con errores (serán omitidas)</div>
-            {errores.slice(0,3).map((e,i)=><div key={i} style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:3}}>{e}</div>)}
+        {errores.length>0&&(
+          <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-warning)",borderLeft:"3px solid var(--color-text-warning)"}}>
+            <div style={{fontSize:12,color:"var(--color-text-warning)"}}>⚠ {errores.length} fila{errores.length!==1?"s":""} sin nombre (omitidas)</div>
           </div>
         )}
-
-        {/* Lista preview */}
-        <div style={{maxHeight:340, overflow:"auto", marginBottom:12}}>
-          {preview.slice(0,50).map((p,i) => (
-            <div key={i} style={{...s.card, margin:"4px 0", padding:"8px 12px"}}>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start"}}>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex", alignItems:"center", gap:6}}>
-                    <span style={{fontSize:13, fontWeight:500, color:"var(--color-text-primary)"}}>{p.nombre}</span>
-                    <span style={{fontSize:10, padding:"1px 7px", borderRadius:10, fontWeight:600,
-                      background:p.tipo==="prospecto"?"var(--color-background-warning)":"var(--color-background-info)",
-                      color:p.tipo==="prospecto"?"var(--color-text-warning)":"var(--color-text-info)"}}>
-                      {p.tipo}
-                    </span>
+        <div style={{maxHeight:380,overflow:"auto",marginBottom:14}}>
+          {preview.length===0&&<div style={{textAlign:"center",padding:24,color:"var(--color-text-tertiary)",fontSize:13}}>No se encontraron registros válidos.</div>}
+          {preview.slice(0,80).map((p,i)=>(
+            <div key={i} style={{...s.card,margin:"4px 0",padding:"8px 12px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)"}}>{p.nombre}</span>
+                    {!modoSoloProspectos&&p.tipo==="prospecto"&&(
+                      <span style={{fontSize:10,padding:"1px 7px",borderRadius:10,fontWeight:600,background:"var(--color-background-warning)",color:"var(--color-text-warning)"}}>prospecto</span>
+                    )}
                   </div>
-                  <div style={{fontSize:11, color:"var(--color-text-secondary)", marginTop:2}}>
-                    {[p.calle, p.nro, p.barrio].filter(Boolean).join(" · ")}{p.telefono?` · ${p.telefono}`:""}
+                  <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
+                    {[p.calle,p.nro,p.manzana?`Mz ${p.manzana}`:"",p.lote?`L ${p.lote}`:"",p.barrio].filter(Boolean).join(" · ")}
                   </div>
                 </div>
-                <div style={{textAlign:"right", flexShrink:0}}>
-                  <div style={{fontSize:11, color:"var(--color-text-info)"}}>{p.dia}</div>
-                  <div style={{fontSize:10, color:"var(--color-text-tertiary)", marginTop:2}}>
-                    {p.sifon>0?`Sif×${p.sifon} `:""}{p.bidon10>0?`10L×${p.bidon10} `:""}{p.bidon20>0?`20L×${p.bidon20}`:""}{p.dispenser>0?` Disp×${p.dispenser}`:""}
+                <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                  <div style={{fontSize:11,color:"var(--color-text-info)",fontWeight:500}}>{p.dia}</div>
+                  <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>
+                    {[p.sifon>0?`Sif×${p.sifon}`:"",p.bidon10>0?`10L×${p.bidon10}`:"",p.bidon20>0?`20L×${p.bidon20}`:"",p.dispenser>0?`Disp×${p.dispenser}`:""].filter(Boolean).join(" ")}
                   </div>
                 </div>
               </div>
             </div>
           ))}
-          {preview.length > 50 && <div style={{textAlign:"center",fontSize:12,color:"var(--color-text-tertiary)",padding:10}}>... y {preview.length-50} más</div>}
+          {preview.length>80&&<div style={{textAlign:"center",fontSize:12,color:"var(--color-text-tertiary)",padding:10}}>... y {preview.length-80} más</div>}
         </div>
-
-        <div style={{display:"flex", gap:8}}>
-          <button style={{...s.btn, flex:1}} onClick={()=>setPaso(2)}>← Volver</button>
-          <button style={{...s.btnPrimary, flex:2, background:"#1a5e35"}} onClick={confirmarImport}>
-            ✅ Importar {preview.length} registros
+        <div style={{display:"flex",gap:8}}>
+          <button style={{...s.btn,flex:1}} onClick={resetear}>← Volver</button>
+          <button
+            style={{...s.btnPrimary,flex:2,background:preview.length>0?"#1a5e35":"#555",opacity:preview.length===0?0.5:1}}
+            disabled={preview.length===0}
+            onClick={confirmarImport}>
+            ✅ Confirmar e importar {preview.length} registros
           </button>
         </div>
       </div>
@@ -370,6 +342,7 @@ function ImportarExcelTab({clientes, prospectos, onImportar}) {
   }
   return null;
 }
+
 
 // ── GestionClientes (con tabs) ───────────────────────────────────────
 function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onReordenarTodo, onRegistrarVenta, onVerDetalle, ventas, prospectos, recordatorios, onConfirmarRecordatorio, onImportar}) {
