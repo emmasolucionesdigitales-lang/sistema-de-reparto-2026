@@ -428,8 +428,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
     sobrantes[pk]=Math.max(0,llenosCargados[pk]-vendidosDia[pk]);
     vaciosRec[pk]=Math.max(0,vendidosDia[pk]+devueltosDia[pk]-prestadosDia[pk]);
   });
-  const cierreKey = `cierre_${dia}_${fecha}`;
-
   const confirmarCierre = () => {
     localStorage.setItem(cierreKey, "1"); // marcar como confirmado
     const s=JSON.parse(JSON.stringify(stock));
