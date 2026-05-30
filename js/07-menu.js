@@ -409,7 +409,9 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const totalLlenosIngresados=PRODUCTOS_CONFIG.reduce((a,p)=>a+num(datos.productos[p.id]?.llenos),0);
   const planKeyToStockKey = {"soda":"sifon","b10":"bidon10","b20":"bidon20"};
   const PROD_LABEL = {soda:"Sifones",b10:"Bidón 10L",b20:"Bidón 20L"};
-  const [mostrarCierre, setMostrarCierre] = useState(!!(initCierre && !planilla._diaCerrado));
+  const cierreKey = `cierre_${dia}_${fecha}`;
+  const yaConfirmado = !!localStorage.getItem(cierreKey) || !!planilla._diaCerrado;
+  const [mostrarCierre, setMostrarCierre] = useState(!!(initCierre && !yaConfirmado));
   const [realesLlenos, setRealesLlenos] = useState({soda:"",b10:"",b20:""});
   const [realesVacios, setRealesVacios] = useState({soda:"",b10:"",b20:""});
   const yaCerrado = !!planilla._diaCerrado;
@@ -426,7 +428,10 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
     sobrantes[pk]=Math.max(0,llenosCargados[pk]-vendidosDia[pk]);
     vaciosRec[pk]=Math.max(0,vendidosDia[pk]+devueltosDia[pk]-prestadosDia[pk]);
   });
+  const cierreKey = `cierre_${dia}_${fecha}`;
+
   const confirmarCierre = () => {
+    localStorage.setItem(cierreKey, "1"); // marcar como confirmado
     const s=JSON.parse(JSON.stringify(stock));
     if(!s.soderia_vacios) s.soderia_vacios={sifon:0,bidon10:0,bidon20:0};
     const diffs={};
