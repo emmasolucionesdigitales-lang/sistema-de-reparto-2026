@@ -8,13 +8,14 @@ function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
     const lic = getLic();
     // Diagnóstico claro de por qué falla
     if(!window.enviarEmailBrevoRM) {
-      console.error("enviarDiario: window.enviarEmailBrevoRM no está definido");
+      alert("⚠️ Función de email no disponible. Actualizá el archivo index.html.");
       return false;
     }
     if(!lic.email) {
-      alert("⚠️ No hay email configurado.\n\nAndá a Config → tab Datos → \"Email para informes del día\" y guardá tu email.");
+      alert("⚠️ No hay email configurado.\n\nAndá a Config → tab Datos → Email para informes → guardá tu email.");
       return false;
     }
+    console.log("📧 Enviando informe a:", lic.email);
     try {
       const ventasDia=(ventas||[]).filter(v=>v.fechaKey===fecha&&v.dia===dia&&!v._esCobro&&!v._esAjuste);
       const ef=ventasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
@@ -35,7 +36,7 @@ function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
       const html=`<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#f9fafb"><div style="background:#185FA5;border-radius:12px 12px 0 0;padding:20px 24px"><h2 style="color:#fff;margin:0;font-size:18px">📋 Cierre del día · ${dia} ${fecha}</h2><p style="color:#c8dcf0;margin:4px 0 0;font-size:13px">${neg}</p></div><div style="background:#fff;border-radius:0 0 12px 12px;padding:20px 24px"><div style="background:#f0f7ff;border-radius:10px;padding:16px;margin-bottom:20px;text-align:center"><div style="font-size:32px;font-weight:800;color:#185FA5">${fmtP(ef+tr+fi)}</div><div style="color:#666;font-size:13px">${ventasDia.length} entregas</div></div><table style="width:100%;border-collapse:collapse;font-size:14px">${sep("💵 Cobranza")}${fila("Efectivo",fmtP(ef))}${fila("Transferencias (neto)",fmtP(trN),"#185FA5")}${fi>0?fila("Fiado",fmtP(fi),"#f5a623"):""}${sep("📦 Costos")}${fila("Llenado","−"+fmtP(costo),"#e05c5c")}${gastos.length>0?sep("💸 Gastos extras"):""}${gastos.map(g=>fila(g.cat+(g.desc?` · ${g.desc}`:""),"−"+fmtP(g.monto),"#e05c5c")).join("")}${sep("💰 Resultado")}${fila("<b>Plata en mano</b>","<b>"+fmtP(mano)+"</b>",mano>=0?"#0a7c3e":"#e05c5c")}${fila("<b>Ganancia neta</b>","<b>"+fmtP(gan)+"</b>",gan>=0?"#0a7c3e":"#e05c5c")}</table></div><p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Sistema de Reparto · Emma Soluciones Digitales</p></div>`;
       await window.enviarEmailBrevoRM({to:lic.email,toName:neg,subject:`📋 Cierre ${dia} ${fecha} · ${fmtP(ef+tr+fi)} · Mano ${fmtP(mano)}`,htmlContent:html});
       return true;
-    } catch(e){console.error("enviarDiario:",e);return false;}
+    } catch(e){ console.error("enviarDiario:",e); alert("❌ Error Brevo: " + (e.message||e)); return false; }
   };
   const enviarSemanal = async (fecha) => {
     const lic=getLic(); if(!lic.email||!window.enviarEmailBrevoRM) return false;

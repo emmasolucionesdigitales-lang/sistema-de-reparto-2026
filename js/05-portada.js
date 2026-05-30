@@ -323,7 +323,7 @@ function PantallaCodigoAcceso({onCodigo}) {
 
           {mensaje && (
             <p style={{color:estado==="error"?"#f07070":"#4dd9a0",fontSize:13,marginTop:8,textAlign:"center"}}>
-              {estado==="error"?"⚠️ ":estado==="ok"?"✅ "}{mensaje}
+              {estado==="error"?"⚠️ ":estado==="ok"?"✅ ":""}{mensaje}
             </p>
           )}
 

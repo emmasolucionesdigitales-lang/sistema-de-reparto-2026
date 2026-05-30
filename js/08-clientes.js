@@ -194,6 +194,17 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
       {listos.length>0&&<><span style={s.sectionTitle}>Entregado ({listos.length})</span>{listos.map(c=><Card key={c.id} c={c}/>)}</>}
       {sinEntrega.length>0&&<><span style={s.sectionTitle}>Sin entrega ({sinEntrega.length})</span>{sinEntrega.map(c=><Card key={c.id} c={c}/>)}</>}
 
+      {/* Botón al menú cuando terminó el reparto del día */}
+      {pendientesNormales.length===0 && visitados.size>0 && (
+        <div style={{padding:"16px 0 8px",textAlign:"center"}}>
+          <button
+            onClick={onVolver}
+            style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:12,padding:"14px 32px",fontSize:15,fontWeight:600,cursor:"pointer",width:"100%",boxShadow:"0 4px 16px rgba(24,95,165,0.3)"}}>
+            🏁 Reparto completo — Ir al menú →
+          </button>
+        </div>
+      )}
+
       {/* Prospectos del día — al final de la lista */}
       {prospectosDelDia.length>0&&(
         <>

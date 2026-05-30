@@ -809,9 +809,12 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             <button style={{width:"100%",padding:"14px",borderRadius:10,border:"none",background:"#4c1d95",color:"#e9d5ff",fontSize:15,fontWeight:600,cursor:"pointer",marginTop:10,opacity:yaEnviado?0.6:1}}
               onClick={async()=>{
                 if(yaEnviado){alert("El informe del día ya fue enviado a tu email.");return;}
-                const ok = await onCerrarDia();
-                if(ok) alert("✅ Informe enviado por email.");
-                else alert("❌ No se pudo enviar. Verificá tu conexión.");
+                try {
+                  const ok = await onCerrarDia();
+                  if(ok) alert("✅ Informe enviado a tu email.");
+                } catch(err) {
+                  alert("❌ Error al enviar: " + (err.message||err));
+                }
               }}>
               📊 {yaEnviado?"Informe ya enviado":"Cerrar día y enviar informe"}
             </button>
