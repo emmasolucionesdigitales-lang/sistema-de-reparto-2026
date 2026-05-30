@@ -259,29 +259,136 @@ function SetupNube({onSetup}) {
 
 // ── Pantalla de código de acceso (primera vez) ────────────────────
 function PantallaCodigoAcceso({onCodigo}) {
-  const [codigo,  setCodigo]  = React.useState("");
-  const [email,   setEmail]   = React.useState("");
-  const [negocio, setNegocio] = React.useState("");
-  const [error,   setError]   = React.useState("");
-  const [cargando, setCargando] = React.useState(false);
+  const [codigo,   setCodigo]   = React.useState("");
+  const [estado,   setEstado]   = React.useState("idle"); // idle | verificando | error | ok
+  const [mensaje,  setMensaje]  = React.useState("");
 
-  const confirmar = () => {
+  const verificar = async () => {
     const cod = codigo.trim().toUpperCase();
-    if(!cod) { setError("Ingresá tu código de acceso"); return; }
-    if(cod.length < 4) { setError("El código debe tener al menos 4 caracteres"); return; }
-    if(!email.trim() || !email.includes("@")) { setError("Ingresá un email válido para recibir los informes"); return; }
-    setCargando(true);
-    setError("");
+    if(!cod) { setMensaje("Ingresá tu código de acceso"); return; }
+    setEstado("verificando"); setMensaje("");
+
     try {
+      const lic = await window.verificarLicencia(cod);
+      if(!lic) {
+        setEstado("error");
+        setMensaje("Código inválido o inactivo. Verificá con tu administrador.");
+        return;
+      }
+      // Guardar todos los datos del dueño en localStorage
       localStorage.setItem("sr_licencia", JSON.stringify({
-        codigo: cod,
-        email: email.trim(),
-        negocio: negocio.trim() || "Sistema de Reparto",
-        nombre: negocio.trim() || "Sistema de Reparto",
+        codigo:  cod,
+        pin:     String(lic.pin || ""),
+        email:   lic.email    || "",
+        negocio: lic.negocio  || lic.nombre || "Sistema de Reparto",
+        nombre:  lic.nombre   || lic.negocio || "",
+        celular: lic.celular  || "",
       }));
-    } catch {}
-    setTimeout(() => { onCodigo(cod); setCargando(false); }, 600);
+      setEstado("ok");
+      setTimeout(() => onCodigo(cod), 600);
+    } catch(e) {
+      setEstado("error");
+      setMensaje("Error de conexión. Verificá tu internet e intentá de nuevo.");
+    }
   };
+
+  const btnColor = estado === "ok" ? "#4dd9a0" : estado === "verificando" ? "#4a6a85" : "#7b3fc9";
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--color-background-primary,#0f1923)",padding:24}}>
+      <div style={{width:"100%",maxWidth:340}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <img src="icono-192.png" alt="" onError={e=>e.target.remove()}
+            style={{width:72,height:72,borderRadius:18,marginBottom:14}} />
+          <h1 style={{fontSize:22,fontWeight:700,color:"var(--color-text-primary,#e2eaf4)",margin:0}}>
+            Sistema de Reparto
+          </h1>
+          <p style={{fontSize:14,color:"var(--color-text-secondary,#7a9ab8)",marginTop:6}}>
+            Ingresá tu código de activación
+          </p>
+        </div>
+
+        <div style={{background:"var(--color-background-secondary,#1a2b3c)",borderRadius:16,padding:24,border:"0.5px solid rgba(255,255,255,0.08)"}}>
+          <label style={{fontSize:11,color:"var(--color-text-secondary,#7a9ab8)",display:"block",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+            Código de activación
+          </label>
+          <input
+            type="text" placeholder="Ej: SR2026-Q4IS"
+            value={codigo}
+            onChange={e=>{setCodigo(e.target.value.toUpperCase());setEstado("idle");setMensaje("");}}
+            onKeyDown={e=>{ if(e.key==="Enter") verificar(); }}
+            style={{width:"100%",padding:"14px 16px",border:estado==="error"?"1.5px solid #f07070":"1.5px solid rgba(255,255,255,0.12)",borderRadius:10,fontSize:18,fontWeight:700,background:"rgba(255,255,255,0.05)",color:"var(--color-text-primary,#e2eaf4)",outline:"none",boxSizing:"border-box",letterSpacing:"0.1em",textAlign:"center",textTransform:"uppercase"}}
+            autoFocus
+          />
+
+          {mensaje && (
+            <p style={{color:estado==="error"?"#f07070":"#4dd9a0",fontSize:13,marginTop:8,textAlign:"center"}}>
+              {estado==="error"?"⚠️ ":estado==="ok"?"✅ "}{mensaje}
+            </p>
+          )}
+
+          <button
+            onClick={verificar}
+            disabled={estado==="verificando"||estado==="ok"}
+            style={{width:"100%",marginTop:16,padding:"14px",borderRadius:10,border:"none",background:btnColor,color:"#fff",fontSize:15,fontWeight:600,cursor:estado==="verificando"?"wait":"pointer",opacity:estado==="verificando"?0.7:1,transition:"all 0.2s"}}>
+            {estado==="verificando" ? "Verificando..." : estado==="ok" ? "✓ Activado" : "Verificar código →"}
+          </button>
+        </div>
+
+        <p style={{fontSize:12,color:"var(--color-text-tertiary,#4a6a85)",textAlign:"center",marginTop:20,lineHeight:1.6}}>
+          El código lo encontrás en tu panel de Emma Control
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Pantalla PIN (se muestra cada vez que se abre la app) ─────────
+function PantallaPINIndividual({onOk}) {
+  const [pin, setPin]       = React.useState("");
+  const [error, setError]   = React.useState("");
+  const [intentos, setIntentos] = React.useState(0);
+
+  const pinGuardado = (() => {
+    try { return JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin || ""; } catch { return ""; }
+  })();
+  const negocio = (() => {
+    try { return JSON.parse(localStorage.getItem("sr_licencia")||"{}").negocio || ""; } catch { return ""; }
+  })();
+
+  const verificar = (valor) => {
+    if(valor.length < 4) return;
+    if(valor === pinGuardado) {
+      setError("");
+      onOk();
+    } else {
+      const nuevosIntentos = intentos + 1;
+      setIntentos(nuevosIntentos);
+      setError(nuevosIntentos >= 3 ? "PIN incorrecto — ¿Lo olvidaste? Borrá los datos del browser." : "PIN incorrecto");
+      setPin("");
+      // Vibrar si está disponible
+      if(navigator.vibrate) navigator.vibrate([100,50,100]);
+    }
+  };
+
+  const presionar = (d) => {
+    if(pin.length >= 4) return;
+    const nuevo = pin + d;
+    setPin(nuevo);
+    setError("");
+    if(nuevo.length === 4) verificar(nuevo);
+  };
+
+  const borrar = () => { setPin(p=>p.slice(0,-1)); setError(""); };
+
+  const btnStyle = (color) => ({
+    width:72, height:72, borderRadius:"50%", border:"none", cursor:"pointer",
+    fontSize:24, fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center",
+    background: color || "var(--color-background-secondary,#1a2b3c)",
+    color: "var(--color-text-primary,#e2eaf4)",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+    transition: "transform 0.1s",
+  });
 
   return (
     <div style={{
@@ -289,81 +396,53 @@ function PantallaCodigoAcceso({onCodigo}) {
       alignItems:"center", justifyContent:"center",
       background:"var(--color-background-primary,#0f1923)", padding:24,
     }}>
-      <div style={{width:"100%", maxWidth:340}}>
-        {/* Logo */}
-        <div style={{textAlign:"center", marginBottom:32}}>
-          <div style={{
-            width:72, height:72, borderRadius:"50%",
-            background:"#185FA5", display:"flex", alignItems:"center",
-            justifyContent:"center", fontSize:32, margin:"0 auto 16px"
-          }}>💧</div>
-          <h1 style={{fontSize:22, fontWeight:700, color:"var(--color-text-primary,#e2eaf4)", margin:0}}>
-            Sistema de Reparto
-          </h1>
-          <p style={{fontSize:14, color:"var(--color-text-secondary,#7a9ab8)", marginTop:6}}>
-            Ingresá tu código de acceso
-          </p>
-        </div>
-
-        {/* Card */}
-        <div style={{
-          background:"var(--color-background-secondary,#1a2b3c)",
-          borderRadius:16, padding:24,
-          border:"0.5px solid rgba(255,255,255,0.08)",
-        }}>
-          <label style={{fontSize:12, color:"var(--color-text-secondary,#7a9ab8)", display:"block", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.06em"}}>
-            Nombre del negocio
-          </label>
-          <input type="text" placeholder="La Catalina" value={negocio}
-            onChange={e=>{ setNegocio(e.target.value); setError(""); }}
-            style={{width:"100%",padding:"11px 14px",border:"1.5px solid rgba(255,255,255,0.12)",borderRadius:10,fontSize:15,background:"rgba(255,255,255,0.05)",color:"var(--color-text-primary,#e2eaf4)",outline:"none",boxSizing:"border-box",marginBottom:12}} />
-
-          <label style={{fontSize:12, color:"var(--color-text-secondary,#7a9ab8)", display:"block", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.06em"}}>
-            Email para recibir informes *
-          </label>
-          <input type="email" placeholder="tucorreo@gmail.com" value={email}
-            onChange={e=>{ setEmail(e.target.value); setError(""); }}
-            style={{width:"100%",padding:"11px 14px",border:"1.5px solid rgba(255,255,255,0.12)",borderRadius:10,fontSize:15,background:"rgba(255,255,255,0.05)",color:"var(--color-text-primary,#e2eaf4)",outline:"none",boxSizing:"border-box",marginBottom:12}} />
-
-          <label style={{fontSize:12, color:"var(--color-text-secondary,#7a9ab8)", display:"block", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.06em"}}>
-            Código de acceso *
-          </label>
-          <input type="text" placeholder="Ej: AB12CD34" value={codigo}
-            onChange={e=>{ setCodigo(e.target.value.toUpperCase()); setError(""); }}
-            onKeyDown={e=>{ if(e.key==="Enter") confirmar(); }}
-            style={{width:"100%",padding:"14px 16px",border:error?"1.5px solid #f07070":"1.5px solid rgba(255,255,255,0.12)",borderRadius:10,fontSize:18,fontWeight:700,background:"rgba(255,255,255,0.05)",color:"var(--color-text-primary,#e2eaf4)",outline:"none",boxSizing:"border-box",letterSpacing:"0.15em",textAlign:"center",textTransform:"uppercase"}}
-            autoFocus
-          />
-          {error && (
-            <p style={{color:"#f07070", fontSize:13, marginTop:8, textAlign:"center"}}>{error}</p>
-          )}
-
-          <button
-            style={{
-              width:"100%", marginTop:16, padding:"14px",
-              borderRadius:10, border:"none",
-              background: cargando ? "#0d3d70" : "#185FA5",
-              color:"#e2eaf4", fontSize:15, fontWeight:600,
-              cursor: cargando ? "wait" : "pointer",
-              opacity: cargando ? 0.8 : 1,
-              transition:"all 0.2s",
-            }}
-            onClick={confirmar}
-            disabled={cargando}
-          >
-            {cargando ? "Verificando..." : "Ingresar →"}
-          </button>
-        </div>
-
-        <p style={{
-          fontSize:12, color:"var(--color-text-tertiary,#4a6a85)",
-          textAlign:"center", marginTop:20, lineHeight:1.6
-        }}>
-          El código lo encontrás en la app Emma Control<br/>
-          Config → Vincular con App de Reparto
+      {/* Logo e info */}
+      <div style={{textAlign:"center", marginBottom:32}}>
+        <img src="icono-192.png" alt="Logo"
+          style={{width:64, height:64, borderRadius:16, marginBottom:12}}
+          onError={e=>{ e.target.style.display="none"; }}
+        />
+        <h2 style={{fontSize:20, fontWeight:700, color:"var(--color-text-primary,#e2eaf4)", margin:0}}>
+          {negocio || "Sistema de Reparto"}
+        </h2>
+        <p style={{fontSize:13, color:"var(--color-text-secondary,#7a9ab8)", marginTop:4}}>
+          Ingresá tu PIN
         </p>
       </div>
+
+      {/* Indicadores de dígitos */}
+      <div style={{display:"flex", gap:16, marginBottom:32}}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{
+            width:16, height:16, borderRadius:"50%",
+            background: i < pin.length ? "#185FA5" : "rgba(255,255,255,0.15)",
+            transition: "background 0.15s",
+            boxShadow: i < pin.length ? "0 0 8px rgba(24,95,165,0.6)" : "none",
+          }} />
+        ))}
+      </div>
+
+      {error && (
+        <p style={{color:"#f07070", fontSize:13, marginBottom:20, textAlign:"center"}}>{error}</p>
+      )}
+
+      {/* Teclado numérico */}
+      <div style={{display:"grid", gridTemplateColumns:"repeat(3,72px)", gap:12}}>
+        {[1,2,3,4,5,6,7,8,9].map(n=>(
+          <button key={n} style={btnStyle()} onClick={()=>presionar(String(n))}>
+            {n}
+          </button>
+        ))}
+        <div /> {/* espacio vacío */}
+        <button style={btnStyle()} onClick={()=>presionar("0")}>0</button>
+        <button style={{...btnStyle("rgba(240,112,112,0.15)"), color:"#f07070"}} onClick={borrar}>
+          ⌫
+        </button>
+      </div>
+
+      <p style={{fontSize:11, color:"var(--color-text-tertiary,#4a6a85)", marginTop:24, textAlign:"center"}}>
+        Sistema de Reparto · Emma Soluciones Digitales
+      </p>
     </div>
   );
 }
-

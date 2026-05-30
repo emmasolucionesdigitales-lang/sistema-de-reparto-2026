@@ -40,7 +40,32 @@
     firebase.initializeApp(firebaseConfig);
     window.db = firebase.firestore();
     window.db.enablePersistence().catch(()=>{});
-    const db = window.db; // alias local para cloudSave/cloudLoad
+    const db = window.db;
+
+    // Firebase admin (app-control-de-apps) — verifica códigos de licencia
+    firebase.initializeApp({
+      apiKey:            "AIzaSyAFQ4ybqIoVV3rWe1FMjMVUZ-qzLNZbdBk",
+      authDomain:        "app-control-de-apps.firebaseapp.com",
+      projectId:         "app-control-de-apps",
+      storageBucket:     "app-control-de-apps.firebasestorage.app",
+      messagingSenderId: "761424199819",
+      appId:             "1:761424199819:web:513eeaf0e54f4e1401d48e"
+    }, "control");
+    window.dbLicencias = firebase.app("control").firestore();
+
+    // Verifica el código contra la base del admin y devuelve los datos
+    window.verificarLicencia = async function(codigo) {
+      try {
+        const snap = await window.dbLicencias
+          .collection("licencias")
+          .doc(codigo.trim().toUpperCase())
+          .get();
+        if(!snap.exists) return null;
+        const d = snap.data();
+        if(d.estado !== "activo") return null;
+        return d; // incluye: pin, negocio, email, celular, nombre
+      } catch(e) { console.error("verificarLicencia:", e); return null; }
+    };
 
     // Funciones de Firestore — fallback a "firebase" si no hay código de licencia
     async function cloudSave(data, id) {

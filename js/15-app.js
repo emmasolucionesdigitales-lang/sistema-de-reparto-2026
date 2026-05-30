@@ -6,7 +6,15 @@ function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
   const fmtP = (n) => "$" + Math.round(Number(n)||0).toLocaleString("es-AR");
   const enviarDiario = async (fecha, dia) => {
     const lic = getLic();
-    if(!lic.email || !window.enviarEmailBrevoRM) return false;
+    // Diagnóstico claro de por qué falla
+    if(!window.enviarEmailBrevoRM) {
+      console.error("enviarDiario: window.enviarEmailBrevoRM no está definido");
+      return false;
+    }
+    if(!lic.email) {
+      alert("⚠️ No hay email configurado.\n\nAndá a Config → tab Datos → \"Email para informes del día\" y guardá tu email.");
+      return false;
+    }
     try {
       const ventasDia=(ventas||[]).filter(v=>v.fechaKey===fecha&&v.dia===dia&&!v._esCobro&&!v._esAjuste);
       const ef=ventasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
@@ -61,6 +69,9 @@ function App() {
       return devId;
     } catch { return "ind_fallback"; }
   }, []);
+
+  // ── PIN: se pide cada vez que se abre la app ────────────────────
+  const [pinOk, setPinOk] = useState(false);
 
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
@@ -146,8 +157,8 @@ function App() {
   };
   const [planillas, setPlanillas] = useLS("cat_planillas_v1", {});
   // Firebase — credentials embedded in SDK config above
-  const apiKey = "firebase";
-  const binId  = "firebase";
+  const [apiKey, setApiKey] = useLS("cat_apikey", "");
+  const [binId,  setBinId]  = useLS("cat_binid",  "");
   const [syncStatus, setSyncStatus] = useState("idle");
   const [ecToken, setEcToken] = useState(()=>localStorage.getItem('lc_ec_token')||'');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -370,6 +381,9 @@ function App() {
   const cerrarDia = async (fecha, dia) => {
     const key = `sr_informe_${fecha}_${dia}`;
     if(localStorage.getItem(key)) return true;
+    // Mostrar a qué email va a mandar
+    const licPreview = (()=>{ try{return JSON.parse(localStorage.getItem("sr_licencia")||"{}").email||"";}catch{return "";} })();
+    if(licPreview) console.log("Enviando informe a:", licPreview);
     setSyncStatus("saving");
     const ok = await enviarDiario(fecha, dia);
     if(ok) {
@@ -563,8 +577,22 @@ function App() {
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
 
+  // Si no pasó el PIN todavía, mostrarlo
+  const pinGuardado = (()=>{ try{return JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin||"";}catch{return "";} })();
+  if(apiKey && binId && pinGuardado && !pinOk) {
+    return <PantallaPINIndividual onOk={()=>setPinOk(true)} />;
+  }
+
   if (!apiKey || !binId) {
-    return <SetupNube onSetup={(key,id)=>{ setApiKey(key); setBinId(id); setSyncStatus("saved"); }} />;
+    return <PantallaCodigoAcceso onCodigo={(cod)=>{
+      setApiKey(cod);
+      setBinId(cod);
+      // Guardar también en sr_licencia para que negocioId lo encuentre
+      try {
+        const lic = JSON.parse(localStorage.getItem("sr_licencia")||"{}");
+        localStorage.setItem("sr_licencia", JSON.stringify({...lic, codigo:cod}));
+      } catch {}
+    }} />;
   }
 
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
