@@ -796,6 +796,7 @@ function App() {
           if(sig){ const esProsp=prospectos?.some(p=>p.id===sig.id); if(esProsp){setProspectoId(sig.id);irA("detalleProspecto");}else{setClienteId(sig.id);irA("detalleCliente");} }
         }}
         onVerProspecto={(p)=>{setProspectoId(p.id);irA("detalleProspecto");}}
+        onAbrirMapa={()=>irA("mapaClientes")}
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
@@ -962,6 +963,16 @@ function App() {
           if(nuevosClientes.length) saveClientes([...clientes,...nuevosClientes]);
           if(nuevosProspectos.length) saveProspectos([...prospectos,...nuevosProspectos]);
         }} />}
+      {pantalla==="mapaClientes" && <MapaClientes
+        clientes={clientes}
+        dia={diaActual}
+        fecha={fechaActual}
+        ventas={ventas}
+        noVisitas={noVisitas}
+        onSeleccionar={(c)=>{setClienteId(c.id);setDiaActual(c.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("detalleDesdeGestion");}}
+        onActualizar={(nuevosClientes)=>saveClientes(nuevosClientes)}
+        onVolver={()=>irA("menu")}
+      />}
       {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
