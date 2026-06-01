@@ -579,7 +579,7 @@ function App() {
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
 
   // Si no pasó el PIN todavía, mostrarlo
-  const pinGuardado = (()=>{ try{return JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin||"";}catch{return "";} })();
+  const pinGuardado = (()=>{ try{const p=JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin;return p?String(p):"";} catch{return "";} })();
   if(apiKey && binId && pinGuardado && !pinOk) {
     return <PantallaPINIndividual onOk={()=>setPinOk(true)} />;
   }

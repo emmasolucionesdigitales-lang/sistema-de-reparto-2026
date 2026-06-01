@@ -350,7 +350,7 @@ function PantallaPINIndividual({onOk}) {
   const [intentos, setIntentos] = React.useState(0);
 
   const pinGuardado = (() => {
-    try { return JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin || ""; } catch { return ""; }
+    try { const p = JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin; return p ? String(p) : ""; } catch { return ""; }
   })();
   const negocio = (() => {
     try { return JSON.parse(localStorage.getItem("sr_licencia")||"{}").negocio || ""; } catch { return ""; }
