@@ -913,21 +913,68 @@ function App() {
       {pantalla==="detalleProspecto" && prospecto && (()=>{
         const vProsp=ventas.filter(v=>v.clienteId===prospecto.id);
         const noVProsp=(noVisitas||[]).filter(v=>v.clienteId===prospecto.id);
-        const visitadoHoy=!!(noVProsp.find(v=>v.fecha===fechaActual)||vProsp.find(v=>v.fechaKey===fechaActual));
-        const comprasCount=vProsp.filter(v=>!v._esCobro).length;
-        const fechasVisita=[...new Set([...vProsp,...noVProsp].map(x=>x.fechaKey||x.fecha).filter(Boolean))];
+        const ventaHoyProsp=vProsp.find(v=>v.fechaKey===fechaActual&&!v._esCobro&&!v._esAjuste);
+        const visitadoHoy=!!(noVProsp.find(v=>v.fecha===fechaActual)||ventaHoyProsp);
+        // comprasCount = ventas reales registradas (no cobros ni ajustes)
+        const comprasCount=vProsp.filter(v=>!v._esCobro&&!v._esAjuste).length;
+        // semanasCount = días únicos con algún registro
+        const fechasVisita=[...new Set([
+          ...vProsp.map(x=>x.fechaKey).filter(Boolean),
+          ...noVProsp.map(x=>x.fecha).filter(Boolean),
+          ...(prospecto.visitas||[]).map(x=>x.fecha).filter(Boolean)
+        ])];
         const semanasCount=fechasVisita.length;
-        const listo=!!(vProsp.find(v=>v.fechaKey===fechaActual)||noVProsp.find(v=>v.fecha===fechaActual&&v.motivo==="noquiso"));
+        // listo = 4 o más compras reales
+        const listo=comprasCount>=4;
         return <PromoDetalle
           prospecto={prospecto}
+          ventas={vProsp}
+          noVisitas={noVProsp}
+          productos={productos}
           listo={listo}
           comprasCount={comprasCount}
           semanasCount={semanasCount}
           visitadoHoy={visitadoHoy}
-          onRegistrar={()=>{ setClienteId(prospecto.id); irA("venta"); }}
+          ventaHoy={ventaHoyProsp}
+          fecha={fechaActual}
+          onRegistrar={()=>{
+            // Agregar prospecto como cliente temporal si no existe
+            if(!clientes.find(cc=>cc.id===prospecto.id)){
+              saveClientes([...clientes,{...prospecto,saldo:0,_esProspecto:true}]);
+            }
+            setClienteId(prospecto.id);
+            irA("venta");
+          }}
+          onNoEsta={()=>{
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===prospecto.id&&v.dia===diaActual&&v.fecha===fechaActual)),
+              {clienteId:prospecto.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
+            saveNoVisitas(nv);
+          }}
+          onNoQuiere={()=>{
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===prospecto.id&&v.dia===diaActual&&v.fecha===fechaActual)),
+              {clienteId:prospecto.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
+            saveNoVisitas(nv);
+          }}
+          onEliminarVenta={(ventaId)=>{
+            const v=ventas.find(x=>x.id===ventaId); if(!v) return;
+            saveVentas(ventas.filter(x=>x.id!==ventaId));
+          }}
           onComodato={()=>{}}
-          onConvertir={(p)=>{ const base=p||prospecto; const nuevo={...base,id:Date.now(),saldo:0}; saveClientes([...clientes,nuevo]); saveProspectos(prospectos.map(x=>x.id===base.id?{...x,estado:"convertido"}:x)); irA("clientes"); }}
-          onEliminar={()=>{ if(window.confirm("¿Eliminar prospecto?")){ saveProspectos(prospectos.filter(x=>x.id!==prospecto.id)); setProspectoId(null); irA("clientes"); } }}
+          onConvertir={(p)=>{
+            const base=p||prospecto;
+            const nuevo={...base,id:Date.now(),saldo:0,_esProspecto:undefined};
+            saveClientes([...clientes.filter(c=>c.id!==prospecto.id),nuevo]);
+            saveProspectos(prospectos.map(x=>x.id===base.id?{...x,estado:"convertido"}:x));
+            irA("clientes");
+          }}
+          onEliminar={()=>{
+            if(window.confirm("¿Eliminar prospecto?")){
+              saveProspectos(prospectos.filter(x=>x.id!==prospecto.id));
+              saveClientes(clientes.filter(c=>c.id!==prospecto.id));
+              setProspectoId(null);
+              irA("clientes");
+            }
+          }}
           onEditar={(cambios)=>{ saveProspectos(prospectos.map(x=>x.id===prospecto.id?{...x,...cambios}:x)); }}
           onActualizarEnvases={(pid,cambios)=>{ saveProspectos(prospectos.map(x=>x.id===pid?{...x,...cambios}:x)); }}
           onVolver={()=>{setProspectoId(null);irA("clientes");}}

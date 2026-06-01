@@ -533,9 +533,15 @@ function EnvasesProspecto({prospecto:p, onActualizar}) {
 }
 
 
-function PromoDetalle({prospecto:p,listo,comprasCount,semanasCount,visitadoHoy,onRegistrar,onComodato,onConvertir,onEliminar,onVolver,onActualizarEnvases,onEditar}) {
+function PromoDetalle({prospecto:p,ventas,noVisitas,productos,listo,comprasCount,semanasCount,visitadoHoy,ventaHoy,fecha,onRegistrar,onNoEsta,onNoQuiere,onComodato,onConvertir,onEliminar,onVolver,onActualizarEnvases,onEditar,onEliminarVenta}) {
   const [editando,setEditando] = useState(false);
   if(editando) return <EditarProspecto prospecto={p} onGuardar={(datos)=>{onEditar(datos);setEditando(false);}} onVolver={()=>setEditando(false)} />;
+
+  const ventasReales = (ventas||[]).filter(v=>!v._esAjuste);
+  const nvItems = (noVisitas||[]).map(nv=>({...nv,_esNoVisita:true,fechaKey:nv.fecha}));
+  const historial = [...ventasReales,...nvItems].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
+  const totalComprado = ventasReales.filter(v=>!v._esCobro).reduce((a,v)=>a+(v.neto||0),0);
+
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -547,42 +553,56 @@ function PromoDetalle({prospecto:p,listo,comprasCount,semanasCount,visitadoHoy,o
         </div>
       </div>
       <div style={{padding:14}}>
-        <div style={{...s.card,borderLeft:"3px solid #5daaff",marginBottom:10}}>
-          <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>
-            {p.dia} · {p.fechaInicio&&<span style={{color:"var(--color-text-tertiary)"}}>Desde {new Date(p.fechaInicio).toLocaleDateString("es-AR")} · </span>}
-            {p.barrio||""}{p.sector?` Sec ${p.sector}`:""}{p.manzana?` Mz ${p.manzana} L ${p.lote}`:""}
-            {p.calle?` · ${p.calle} ${p.nro||""}`:""}{p.piso?` P${p.piso}`:""}{p.depto?` D${p.depto}`:""}
+
+        {/* Info del prospecto */}
+        <div style={{...s.card,borderLeft:"3px solid #f5b942",marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+            <div style={{width:40,height:40,borderRadius:10,background:"#2e1f06",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:"#f5b942",flexShrink:0}}>P</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)"}}>{p.nombre}</div>
+              <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>
+                {p.dia}{p.barrio?` · ${p.barrio}`:""}
+                {p.sector?` Sec ${p.sector}`:""}{p.manzana?` Mz ${p.manzana} L ${p.lote}`:""}
+                {p.calle?` · ${p.calle} ${p.nro||""}`:""}{p.piso?` P${p.piso}`:""}{p.depto?` D${p.depto}`:""}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              {p.maps&&<a href={p.maps} target="_blank" rel="noreferrer" style={{fontSize:24,textDecoration:"none"}}>📍</a>}
+              {p.telefono&&<a href={`https://wa.me/54${p.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:24,textDecoration:"none"}}>💬</a>}
+            </div>
           </div>
+          {p.fechaInicio&&<div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>En promoción desde {new Date(p.fechaInicio).toLocaleDateString("es-AR")}</div>}
           {p.dni&&<div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>DNI: {p.dni}</div>}
           {p.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:4}}>📝 {p.notas}</div>}
-          <div style={{display:"flex",gap:8,marginTop:8}}>
-            {p.telefono&&<a href={`https://wa.me/54${p.telefono}`} target="_blank" rel="noreferrer" style={{...s.badge("success"),textDecoration:"none"}}>💬 WhatsApp</a>}
-            {p.maps&&<a href={p.maps} target="_blank" rel="noreferrer" style={{...s.badge("info"),textDecoration:"none"}}>📍 Maps</a>}
-          </div>
         </div>
+
+        {/* Métricas */}
         <div style={{...s.grid3,marginBottom:10,gap:6}}>
           <div style={s.metricCard}><div style={s.metricLabel}>Semanas</div><div style={s.metricVal}>{semanasCount}</div></div>
           <div style={{...s.metricCard,background:comprasCount>=4?"#0a2e1f":undefined}}>
             <div style={s.metricLabel}>Compras</div>
             <div style={{...s.metricVal,color:comprasCount>=4?"#4dd9a0":"var(--color-text-primary)"}}>{comprasCount}/4</div>
           </div>
-          <div style={s.metricCard}><div style={s.metricLabel}>Visitas tot.</div><div style={s.metricVal}>{(p.visitas||[]).length}</div></div>
+          <div style={s.metricCard}>
+            <div style={s.metricLabel}>Total</div>
+            <div style={{...s.metricVal,fontSize:14}}>{fmt(totalComprado)}</div>
+          </div>
         </div>
+
+        {/* Barra de progreso */}
         <div style={{...s.card,marginBottom:10}}>
           <div style={{height:10,borderRadius:5,background:"var(--color-background-tertiary)",marginBottom:6}}>
             <div style={{height:10,borderRadius:5,background:listo?"#4dd9a0":"#185FA5",width:`${Math.min(100,comprasCount/4*100)}%`,transition:"width 0.4s"}}/>
           </div>
           {listo
-            ? <div style={{fontSize:13,color:"#4dd9a0",fontWeight:500}}>✓ Completó 4 semanas de compra</div>
-            : <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Faltan {4-comprasCount} compras más</div>}
+            ? <div style={{fontSize:13,color:"#4dd9a0",fontWeight:500}}>✓ Completó 4 semanas — listo para convertir</div>
+            : <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Faltan {Math.max(0,4-comprasCount)} compras más para convertir</div>}
         </div>
-        {/* Envases del prospecto */}
-        <EnvasesProspecto
-          prospecto={p}
-          onActualizar={(cambios)=>{
-            onActualizarEnvases(p.id, cambios);
-          }}
-        />
+
+        {/* Envases */}
+        <EnvasesProspecto prospecto={p} onActualizar={(cambios)=>onActualizarEnvases(p.id,cambios)} />
+
+        {/* Comodato */}
         {p.comodato&&(
           <div style={{...s.card,marginBottom:10,background:"var(--color-background-tertiary)"}}>
             <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:4,fontWeight:500}}>📋 Comodato entregado · {p.comodato.fecha}</div>
@@ -594,47 +614,113 @@ function PromoDetalle({prospecto:p,listo,comprasCount,semanasCount,visitadoHoy,o
             </div>
           </div>
         )}
+
+        {/* Botón convertir */}
         {listo&&(
           <button style={{...s.btnPrimary,marginBottom:10,background:"#0F6E56"}}
-            onClick={()=>{if(window.confirm(`¿Convertir a ${p.nombre} en cliente regular de ${p.dia}?
-
-El número de orden en la ruta se asigna después desde Gestión de clientes.`))onConvertir(p);}}>
+            onClick={()=>{if(window.confirm("¿Convertir a "+p.nombre+" en cliente regular de "+p.dia+"?"))onConvertir(p);}}>
             ✓ Convertir a cliente regular de {p.dia}
           </button>
         )}
-        {!visitadoHoy&&(
-          <>
-            <span style={{...s.sectionTitle,padding:"0 0 8px"}}>Registrar visita de hoy</span>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-              <button style={{background:"#0a2e1f",color:"#4dd9a0",border:"0.5px solid #4dd9a0",borderRadius:8,padding:"12px 4px",fontSize:12,fontWeight:500,cursor:"pointer"}}
-                onClick={()=>onRegistrar("compro")}>✓ Compró</button>
-              <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"12px 4px",fontSize:12,fontWeight:500,cursor:"pointer"}}
-                onClick={()=>onRegistrar("noesta")}>No estaba</button>
-              <button style={{...s.btnDanger,padding:"12px 4px",fontSize:12}}
-                onClick={()=>onRegistrar("noquiso")}>No quiso</button>
+
+        {/* Botones del día — igual que cliente normal */}
+        {ventaHoy
+          ? <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #1D9E75",padding:"10px 14px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:14,fontWeight:500,color:"#4dd9a0"}}>✓ Entrega registrada hoy</span>
+                <span style={s.badge("success")}>{fmt(ventaHoy.neto)}</span>
+              </div>
+              <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:4}}>
+                {(ventaHoy.detalle||[]).map(d=>d.nombre+" ×"+d.cantidad).join(" · ")} · {ventaHoy.pago}
+              </div>
             </div>
-          </>
-        )}
-        {visitadoHoy&&<div style={{...s.badge("info"),display:"inline-block",marginBottom:12,fontSize:12,padding:"6px 12px"}}>✓ Ya visitado hoy</div>}
-        <span style={{...s.sectionTitle,padding:"0 0 8px"}}>Historial</span>
-        {(p.visitas||[]).length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin visitas aún</p>}
-        {[...(p.visitas||[])].reverse().map((v,i)=>(
-          <div key={i} style={{...s.card,margin:"0 0 6px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{v.fecha}</span>
-            <span style={v.resultado==="compro"?s.badge("success"):v.resultado==="noquiso"?s.badge("danger"):s.badge("warning")}>
-              {v.resultado==="compro"?"✓ Compró":v.resultado==="noquiso"?"No quiso":"No estaba"}
-            </span>
+          : <div style={{display:"flex",gap:8,marginBottom:12}}>
+              <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1}}
+                onClick={onNoEsta}>🔄 No está</button>
+              <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1}}
+                onClick={onNoQuiere}>🚫 No quiere</button>
+              <button style={{...s.btnPrimary,padding:"12px 0",fontSize:14,borderRadius:10,flex:2}} onClick={onRegistrar}>
+                📦 Registrar entrega
+              </button>
+            </div>
+        }
+
+        {/* Historial completo */}
+        <details style={{marginTop:4}}>
+          <summary style={{cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:8,padding:"10px 14px",marginBottom:4}}>
+            <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📋 Historial completo</span>
+            <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
+          </summary>
+          <div style={{marginTop:4}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+              {[["🛒","#3b82f6","Venta"],["🚪","#f59e0b","No estaba"],["🙅","#ef4444","No quiso"]].map(([ico,col,lbl])=>(
+                <span key={lbl} style={{fontSize:10,color:col,background:col+"18",border:"0.5px solid "+col+"44",borderRadius:20,padding:"2px 7px",fontWeight:600}}>{ico} {lbl}</span>
+              ))}
+            </div>
+            {historial.length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)",padding:"4px 0"}}>Sin registros aún</p>}
+            {historial.map((item,idx)=>{
+              if(item._esNoVisita){
+                const esNoEsta=item.motivo==="noesta"||item.motivo==="noesta2";
+                return(
+                  <div key={"nv"+idx} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",marginBottom:6,background:esNoEsta?"rgba(245,158,11,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,border:"0.5px solid "+(esNoEsta?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)")}}>
+                    <span style={{fontSize:18}}>{esNoEsta?"🚪":"🙅"}</span>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:esNoEsta?"#f59e0b":"#ef4444"}}>{esNoEsta?"No estaba en casa":"No quiso comprar"}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{item.fechaKey} · {item.dia}</div>
+                    </div>
+                  </div>
+                );
+              }
+              const v=item;
+              if(v._esCobro) return(
+                <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",marginBottom:6,background:"rgba(16,185,129,0.08)",borderRadius:10,border:"0.5px solid rgba(16,185,129,0.3)"}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <span style={{fontSize:18}}>💳</span>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#10b981"}}>Cobro de deuda</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{v.fechaKey} · {v.pago}</div>
+                    </div>
+                  </div>
+                  <span style={{fontSize:15,fontWeight:700,color:"#10b981"}}>+{fmt(v.pagadoNum)}</span>
+                </div>
+              );
+              return(
+                <div key={v.id} style={{marginBottom:6,padding:"10px 12px",background:"rgba(59,130,246,0.06)",borderRadius:10,border:"0.5px solid rgba(59,130,246,0.2)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,alignItems:"center"}}>
+                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <span style={{fontSize:16}}>🛒</span>
+                      <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{v.fechaKey||v.dia}</span>
+                    </div>
+                    <span style={{fontSize:15,fontWeight:700,color:"#3b82f6"}}>{fmt(v.neto)}</span>
+                  </div>
+                  <div style={{fontSize:13,color:"var(--color-text-primary)",marginBottom:2,paddingLeft:22}}>
+                    {(v.detalle||[]).map(d=>d.nombre+" ×"+d.cantidad).join(" · ")}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--color-text-secondary)",paddingLeft:22,marginBottom:4}}>
+                    {v.pago}{v.saldoAplicado>0?" · saldo apl. "+fmt(v.saldoAplicado):""}{v.obs?" · "+v.obs:""}
+                  </div>
+                  {onEliminarVenta&&(
+                    <div style={{display:"flex",justifyContent:"flex-end"}}>
+                      <button style={{fontSize:10,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer"}}
+                        onClick={()=>{if(window.confirm("¿Eliminar esta venta?"))onEliminarVenta(v.id);}}>Eliminar</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        ))}
+        </details>
+
         <div style={{...s.divider,marginTop:16}}/>
         <button style={{...s.btnDanger,width:"100%",padding:"10px"}}
-          onClick={()=>{if(window.confirm(`¿Eliminar a ${p.nombre}?`))onEliminar();}}>
+          onClick={()=>{if(window.confirm("¿Eliminar a "+p.nombre+"?"))onEliminar();}}>
           Eliminar prospecto
         </button>
       </div>
     </div>
   );
 }
+
 
 function PromoNuevo({diaInicial,onGuardar,onVolver}) {
   const [d,setD] = useState({
