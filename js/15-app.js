@@ -1021,8 +1021,25 @@ function App() {
         recordatorios={recordatorios||[]}
         onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
         onImportar={(nuevosClientes, nuevosProspectos)=>{
-          if(nuevosClientes.length) saveClientes([...clientes,...nuevosClientes]);
-          if(nuevosProspectos.length) saveProspectos([...prospectos,...nuevosProspectos]);
+          if(nuevosClientes.length){
+            const merged = [...clientes];
+            let actualizados=0, agregados=0;
+            nuevosClientes.forEach(nc=>{
+              const idx = merged.findIndex(c=>c.nombre.toLowerCase()===nc.nombre.toLowerCase());
+              if(idx>=0){ merged[idx]={...merged[idx],...nc,id:merged[idx].id}; actualizados++; }
+              else{ merged.push(nc); agregados++; }
+            });
+            saveClientes(merged);
+          }
+          if(nuevosProspectos.length){
+            const mergedP = [...(prospectos||[])];
+            nuevosProspectos.forEach(np=>{
+              const idx = mergedP.findIndex(p=>p.nombre.toLowerCase()===np.nombre.toLowerCase());
+              if(idx>=0) mergedP[idx]={...mergedP[idx],...np,id:mergedP[idx].id};
+              else mergedP.push(np);
+            });
+            saveProspectos(mergedP);
+          }
         }} />}
       {pantalla==="mapaClientes" && <MapaClientes
         clientes={clientes}
