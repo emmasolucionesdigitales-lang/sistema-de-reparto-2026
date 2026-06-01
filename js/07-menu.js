@@ -294,8 +294,15 @@ function DetalleTransferencias({ventas, ventasPendTrans}) {
   );
 }
 
-function DetalleVentasDia({ventas, clientes}) {
+function DetalleVentasDia({ventas, clientes, prospectos}) {
   const [abierto, setAbierto] = React.useState(false);
+  const todosMap = React.useMemo(()=>{
+    const m = {};
+    (clientes||[]).forEach(c=>{ m[c.id]={...c, _tipo:"cliente"}; });
+    (prospectos||[]).forEach(p=>{ m[p.id]={...p, _tipo:"prospecto"}; });
+    return m;
+  },[clientes,prospectos]);
+
   return (
     <div style={{margin:"0 0 8px",borderRadius:12,overflow:"hidden",border:"1.5px solid #185FA5",background:"var(--color-background-info)"}}>
       <button
@@ -311,32 +318,54 @@ function DetalleVentasDia({ventas, clientes}) {
       {abierto&&(
         <div style={{borderTop:"0.5px solid var(--color-border-info)",background:"var(--color-background-primary)"}}>
           {ventas.map((v,idx)=>{
-            const pagoBadge={
-              contado:{bg:"var(--color-background-success)",color:"var(--color-text-success)",txt:"Contado"},
-              transferencia:{bg:v.transConfirmada?"var(--color-background-success)":"var(--color-background-warning)",color:v.transConfirmada?"var(--color-text-success)":"#f5b942",txt:v.transConfirmada?"Transfer. ✅":"Transfer. 🔴"},
-              fiado:{bg:"var(--color-background-warning)",color:"var(--color-text-warning)",txt:"Fiado"},
-            }[v.pago]||{bg:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",txt:v.pago};
+            const persona = todosMap[v.clienteId];
+            const esProspecto = persona?._tipo==="prospecto";
+            const esCobro = v._esCobro;
+            const esMixto = v.pago==="mixto";
+            const esOtroDia = persona && persona.dia && !esProspecto && persona.dia !== (ventas[0]?.dia);
+            const pagoBadge = esCobro
+              ? {bg:"var(--color-background-success)",color:"var(--color-text-success)",txt:"Cobro deuda"}
+              : esMixto
+              ? {bg:"rgba(93,170,255,0.15)",color:"#5daaff",txt:"Mixto"}
+              : {
+                  contado:{bg:"var(--color-background-success)",color:"var(--color-text-success)",txt:"Contado"},
+                  transferencia:{bg:v.transConfirmada?"var(--color-background-success)":"var(--color-background-warning)",color:v.transConfirmada?"var(--color-text-success)":"#f5b942",txt:v.transConfirmada?"Transfer. ✅":"Transfer. 🔴"},
+                  fiado:{bg:"var(--color-background-warning)",color:"var(--color-text-warning)",txt:"Fiado"},
+                }[v.pago]||{bg:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",txt:v.pago};
+
             return (
               <div key={v.id} style={{padding:"10px 16px",borderBottom:idx<ventas.length-1?"0.5px solid var(--color-border-tertiary)":"none"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
-                  <div style={{flex:1}}>
-                    <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{v.cliente}</span>
-                    <span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:pagoBadge.bg,color:pagoBadge.color,fontWeight:600}}>{pagoBadge.txt}</span>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                  <div style={{flex:1,display:"flex",flexWrap:"wrap",gap:4,alignItems:"center"}}>
+                    <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{v.cliente||persona?.nombre||"Cliente"}</span>
+                    {esProspecto&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"rgba(245,185,66,0.2)",color:"#f5b942",fontWeight:600}}>Prospecto</span>}
+                    {persona?.dia&&<span style={{fontSize:10,color:"var(--color-text-tertiary)"}}>· {persona.dia}</span>}
+                    <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:pagoBadge.bg,color:pagoBadge.color,fontWeight:600}}>{pagoBadge.txt}</span>
                   </div>
                   <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(v.neto||0)}</span>
                 </div>
-                {(v.detalle||[]).map((d,di)=>(
+                {/* Detalle de productos */}
+                {(v.detalle||[]).filter(d=>d.nombre!=="Cobro de deuda").map((d,di)=>(
                   <div key={di} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 8px"}}>
                     <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{d.nombre} × {d.cantidad}</span>
                     <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{fmt(d.total)}</span>
                   </div>
                 ))}
+                {/* Desglose mixto */}
+                {esMixto&&(v.montoEfec>0||v.montoTrans>0)&&(
+                  <div style={{display:"flex",gap:10,padding:"3px 0 0 8px",marginTop:2,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                    {v.montoEfec>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Efectivo: {fmt(v.montoEfec)}</span>}
+                    {v.montoTrans>0&&<span style={{fontSize:11,color:"#5daaff"}}>Transfer.: {fmt(v.montoTrans)} {v.transConfirmada?"✅":"🔴"}</span>}
+                  </div>
+                )}
+                {/* Saldo aplicado / pagó de más */}
                 {(v.saldoAplicado>0||((v.pagadoNum||0)-(v.neto||0))>0)&&(
                   <div style={{display:"flex",gap:10,padding:"3px 0 0 8px",marginTop:2,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
                     {v.saldoAplicado>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Saldo aplicado: −{fmt(v.saldoAplicado)}</span>}
                     {((v.pagadoNum||0)-(v.neto||0))>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Pagó de más: +{fmt((v.pagadoNum||0)-(v.neto||0))}</span>}
                   </div>
                 )}
+                {v.obs&&!v.obs.startsWith("[Mixto")&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",paddingLeft:8,marginTop:2}}>📝 {v.obs}</div>}
               </div>
             );
           })}
@@ -346,10 +375,15 @@ function DetalleVentasDia({ventas, clientes}) {
   );
 }
 
-function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,onCerrarDia,initCierre}) {
+function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,onCerrarDia,initCierre}) {
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
-  const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId));
-  const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&(!v.dia||v.dia===dia)&&v.fechaKey===fecha);
+  // Todas las ventas registradas con fechaKey === fecha (sin importar el día del cliente)
+  const todasFecha = ventas.filter(v=>v.fechaKey===fecha);
+  // Propias del día = clientes cuyo día es este
+  const ventasPropias  = todasFecha.filter(v=>clientesDia.has(v.clienteId));
+  // Extras = cualquier venta de ese fecha que NO sea de un cliente del día
+  //   incluye: prospectos, clientes de otros días, cobros de deuda de cualquier día
+  const ventasExtraDia = todasFecha.filter(v=>!clientesDia.has(v.clienteId));
   const CAJON_SODA = 6;
   const getProdCosto = (nombre) => { const p=(productos||[]).find(x=>x.nombre===nombre); return p?(p.costo||0):0; };
   const costSifon  = getProdCosto("Sifón 1.5L") || 133.33;
@@ -702,7 +736,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
         <div style={s.divider} />
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Resumen del día</span>
         {todasVentasDia.length>0
-          ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} />
+          ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} prospectos={prospectos} />
           : <div style={{...s.card,margin:"0 0 8px",padding:"12px 16px",background:"var(--color-background-tertiary)"}}>
               <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>📋 Sin ventas registradas para este día</span>
             </div>
