@@ -744,7 +744,7 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);}} onVolver={()=>irA("menu")} onCerrarDia={()=>cerrarDia(fechaActual,diaActual)} initCierre={initCierre} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} prospectos={prospectos||[]} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);}} onVolver={()=>irA("menu")} onCerrarDia={()=>cerrarDia(fechaActual,diaActual)} initCierre={initCierre} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{
@@ -851,59 +851,54 @@ function App() {
           onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual}
         progressData={(()=>{
-          const clientesDia=clientes.filter(c=>c.dia===diaActual);
-          const ventasHoy=ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste);
-          const noVHoy=(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual);
-          const visitadosIds=new Set([...ventasHoy.map(v=>v.clienteId),...noVHoy.map(v=>v.clienteId)]);
-          const montoHoy=ventasHoy.reduce((a,v)=>a+(v.neto||0),0);
-          const sifs=ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Sifón 1.5L").reduce((b,d)=>b+d.cantidad,0),0);
-          const b10=ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 10L").reduce((b,d)=>b+d.cantidad,0),0);
-          const b20=ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 20L").reduce((b,d)=>b+d.cantidad,0),0);
-          const planillaHoy=planillas[`${diaActual}_${fechaActual}`]||{};
-          return {visitados:visitadosIds.size,total:clientesDia.length,montoHoy,stock:{"Sif":Math.max(0,(Number(planillaHoy.productos?.soda?.llenos)||0)-sifs),"10L":Math.max(0,(Number(planillaHoy.productos?.b10?.llenos)||0)-b10),"20L":Math.max(0,(Number(planillaHoy.productos?.b20?.llenos)||0)-b20)}};
+          const clientesDia = clientes.filter(c=>c.dia===diaActual);
+          const prospDelDia = (prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo");
+          const totalDia    = clientesDia.length + prospDelDia.length;
+          const ventasHoy   = ventas.filter(v=>v.fechaKey===fechaActual&&!v._esCobro&&!v._esAjuste&&
+            (clientesDia.some(c=>c.id===v.clienteId)||prospDelDia.some(p=>p.id===v.clienteId)));
+          const noVHoy      = (noVisitas||[]).filter(v=>v.fecha===fechaActual&&
+            (clientesDia.some(c=>c.id===v.clienteId)||prospDelDia.some(p=>p.id===v.clienteId)));
+          const visitadosIds= new Set([...ventasHoy.map(v=>v.clienteId),...noVHoy.map(v=>v.clienteId)]);
+          const montoHoy    = ventasHoy.reduce((a,v)=>a+(v.neto||0),0);
+          const sifs = ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Sifón 1.5L").reduce((b,d)=>b+d.cantidad,0),0);
+          const b10  = ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 10L").reduce((b,d)=>b+d.cantidad,0),0);
+          const b20  = ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 20L").reduce((b,d)=>b+d.cantidad,0),0);
+          const planillaHoy = planillas[`${diaActual}_${fechaActual}`]||{};
+          return {visitados:visitadosIds.size, total:totalDia, montoHoy,
+            stock:{"Sif":Math.max(0,(Number(planillaHoy.productos?.soda?.llenos)||0)-sifs),
+                   "10L":Math.max(0,(Number(planillaHoy.productos?.b10?.llenos)||0)-b10),
+                   "20L":Math.max(0,(Number(planillaHoy.productos?.b20?.llenos)||0)-b20)}};
         })()}
         onNoEsta={()=>{
           const prev=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
           const motivo=prev?.motivo==="noesta"?"noesta2":"noesta";
-          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),
+            {clienteId,dia:diaActual,fecha:fechaActual,motivo}];
           saveNoVisitas(nv);
-          const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),...(nv).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
-          visitadosIds.add(clienteId);
           irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onNoQuiere={()=>{
-          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),
+            {clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
           irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,sd)=>{
-  registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd);
-  const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-  const visitadosIds = new Set([
-    ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),
-    ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta"||v.motivo==="salteado")).map(v=>v.clienteId)
-  ]);
-  visitadosIds.add(clienteId);
-  irAlSiguiente(getSiguienteDelDia(noVisitas, clienteId));
-}}
+          registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd);
+          // Usar noVisitas actual (sin cambios) — la venta ya marca al cliente como visitado
+          irAlSiguiente(getSiguienteDelDia(noVisitas, clienteId));
+        }}
         onSaltar={()=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),
             {clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado"}];
           saveNoVisitas(nv);
-          const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const nvMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{nvMap[v.clienteId]=v.motivo;});
-          const terminados=new Set([
-            ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),
-            ...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2")).map(v=>v.clienteId)
-          ]);
-          const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&nvMap[c.id]!=="noesta"&&nvMap[c.id]!=="salteado"&&c.id!==clienteId);
-          const noestaPend=clientesDia.filter(c=>nvMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==clienteId);
-          const saltadosPend=clientesDia.filter(c=>nvMap[c.id]==="salteado"&&c.id!==clienteId);
-          const sig=normalPend[0]||noestaPend[0]||saltadosPend[0];
           irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
-        onVolver={()=>irA("detalleCliente")} />}
+        onVolver={()=>{
+          const esProsp = (prospectos||[]).some(p=>p.id===clienteId);
+          if(esProsp){ setProspectoId(clienteId); irA("detalleProspecto"); }
+          else irA("detalleCliente");
+        }} />}
       {pantalla==="nuevoCliente"   && <NuevoCliente diaActual={diaActual} onGuardar={(datos)=>{
           const orden=datos.orden;
           let base=clientes;
@@ -1103,4 +1098,3 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
