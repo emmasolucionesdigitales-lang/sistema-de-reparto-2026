@@ -421,6 +421,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
           {id:"lista",    ico:"👥", lbl:"Lista"},
           {id:"fiados",   ico:"💰", lbl:"Fiados",  badge:cantFiados},
           {id:"agenda",   ico:"📅", lbl:"Agenda",  badge:cantAgenda},
+          {id:"mapa",     ico:"🗺", lbl:"Mapa"},
 
         ].map(({id,ico,lbl,badge})=>(
           <button key={id}
@@ -563,6 +564,18 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
 
       {tab === "fiados" && <FiadosTab clientes={clientes} />}
       {tab === "agenda" && <AgendaTab recordatorios={recordatorios} onConfirmarRecordatorio={onConfirmarRecordatorio} />}
+      {tab === "mapa" && (
+        <MapaClientes
+          clientes={clientes}
+          dia="todos"
+          fecha=""
+          ventas={[]}
+          noVisitas={[]}
+          onSeleccionar={(c)=>{ onVerDetalle&&onVerDetalle(c); }}
+          onActualizar={(lista)=>{ onReordenarTodo&&onReordenarTodo(lista); }}
+          onVolver={()=>setTab("lista")}
+        />
+      )}
 
     </div>
 
