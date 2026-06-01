@@ -188,13 +188,9 @@ function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}
 
       const getV = (row, campo) => col[campo]!==undefined ? String(row[col[campo]]||"").trim() : "";
 
-      // Debug: mostrar en consola qué detectó
-      console.log("=== IMPORTADOR DEBUG ===");
-      console.log("Header en fila:", headerIdx+1);
-      console.log("Col mapeadas:", col);
-      console.log("Filas válidas:", filas.length);
-      if(filas[0]) console.log("Primera fila nombre:", getV(filas[0],"nombre"), "| dia:", getV(filas[0],"dia"));
-      console.log("========================");
+      // Debug
+      console.log("IMPORTADOR: header fila", headerIdx+1, "| cols", JSON.stringify(col), "| filas", filas.length);
+      if(filas.length>0) console.log("IMPORTADOR: primera fila nombre=", getV(filas[0],"nombre"), "dia=", getV(filas[0],"dia"));
 
       const errs = [];
       const resultado = filas.map((row, i) => {
