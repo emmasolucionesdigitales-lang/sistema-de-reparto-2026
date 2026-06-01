@@ -607,9 +607,13 @@ function App() {
     return <PantallaActivacion onActivado={()=>setPinOk(false)} />;
   }
 
-  // 3. Activado pero no pasó el PIN → pedir PIN
+  // 3. Activado pero no pasó el PIN → pedir PIN y resetear pantalla
   if (pinGuardado && !pinOk) {
-    return <PantallaPINIndividual onOk={()=>setPinOk(true)} />;
+    // Resetear hash para que al entrar arranque desde portada
+    if(window.location.hash && window.location.hash !== "#portada") {
+      window.history.replaceState(null,"","#portada");
+    }
+    return <PantallaPINIndividual onOk={()=>{ setPantalla("portada"); setPinOk(true); }} />;
   }
 
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
@@ -851,19 +855,24 @@ function App() {
           onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual}
         progressData={(()=>{
-          const clientesDia = clientes.filter(c=>c.dia===diaActual);
-          const prospDelDia = (prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo");
-          const totalDia    = clientesDia.length + prospDelDia.length;
-          const ventasHoy   = ventas.filter(v=>v.fechaKey===fechaActual&&!v._esCobro&&!v._esAjuste&&
-            (clientesDia.some(c=>c.id===v.clienteId)||prospDelDia.some(p=>p.id===v.clienteId)));
-          const noVHoy      = (noVisitas||[]).filter(v=>v.fecha===fechaActual&&
-            (clientesDia.some(c=>c.id===v.clienteId)||prospDelDia.some(p=>p.id===v.clienteId)));
-          const visitadosIds= new Set([...ventasHoy.map(v=>v.clienteId),...noVHoy.map(v=>v.clienteId)]);
-          const montoHoy    = ventasHoy.reduce((a,v)=>a+(v.neto||0),0);
+          const clientesDia  = clientes.filter(c=>c.dia===diaActual&&!c._esProspecto);
+          const prospDelDia  = [
+            ...(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo"),
+            ...clientes.filter(c=>c.dia===diaActual&&c._esProspecto)
+          ];
+          // IDs de todos los del día
+          const idsClientes  = new Set(clientesDia.map(c=>c.id));
+          const idsProsp     = new Set(prospDelDia.map(p=>p.id));
+          const idsTodos     = new Set([...idsClientes,...idsProsp]);
+          const totalDia     = idsClientes.size + idsProsp.size;
+          const ventasHoy    = ventas.filter(v=>v.fechaKey===fechaActual&&!v._esCobro&&!v._esAjuste&&idsTodos.has(v.clienteId));
+          const noVHoy       = (noVisitas||[]).filter(v=>v.fecha===fechaActual&&idsTodos.has(v.clienteId));
+          const visitadosIds = new Set([...ventasHoy.map(v=>v.clienteId),...noVHoy.map(v=>v.clienteId)]);
+          const montoHoy     = ventasHoy.reduce((a,v)=>a+(v.neto||0),0);
           const sifs = ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Sifón 1.5L").reduce((b,d)=>b+d.cantidad,0),0);
           const b10  = ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 10L").reduce((b,d)=>b+d.cantidad,0),0);
           const b20  = ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 20L").reduce((b,d)=>b+d.cantidad,0),0);
-          const planillaHoy = planillas[`${diaActual}_${fechaActual}`]||{};
+          const planillaHoy  = planillas[`${diaActual}_${fechaActual}`]||{};
           return {visitados:visitadosIds.size, total:totalDia, montoHoy,
             stock:{"Sif":Math.max(0,(Number(planillaHoy.productos?.soda?.llenos)||0)-sifs),
                    "10L":Math.max(0,(Number(planillaHoy.productos?.b10?.llenos)||0)-b10),
@@ -1098,3 +1107,4 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
