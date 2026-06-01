@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onAbrirMapa}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onAbrirMapa,onPlanilla}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -245,9 +245,9 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
       {pendientesNormales.length===0 && visitados.size>0 && (
         <div style={{padding:"20px 14px 8px"}}>
           <button
-            onClick={onVolver}
-            style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:12,padding:"16px",fontSize:15,fontWeight:600,cursor:"pointer",width:"100%",boxShadow:"0 4px 16px rgba(24,95,165,0.3)"}}>
-            🏁 Reparto completo — Ir al menú →
+            onClick={onPlanilla||onVolver}
+            style={{background:"#0F6E56",color:"#e2eaf4",border:"none",borderRadius:12,padding:"16px",fontSize:15,fontWeight:600,cursor:"pointer",width:"100%",boxShadow:"0 4px 16px rgba(15,110,86,0.4)"}}>
+            ✅ Reparto completo — Ver planilla del día →
           </button>
         </div>
       )}

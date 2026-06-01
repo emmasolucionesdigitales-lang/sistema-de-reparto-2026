@@ -11,10 +11,16 @@ function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
       alert("⚠️ Función de email no disponible. Actualizá el archivo index.html.");
       return false;
     }
-    if(!lic.email) {
+    // Buscar email: primero en config, luego en la licencia (activación)
+    const emailConfig = (()=>{ try{ return localStorage.getItem("lc_email_informes")||""; }catch{ return ""; } })();
+    const emailLic = lic.email || "";
+    const emailFinal = emailConfig || emailLic;
+    if(!emailFinal) {
       alert("⚠️ No hay email configurado.\n\nAndá a Config → tab Datos → Email para informes → guardá tu email.");
       return false;
     }
+    // Usar el email encontrado
+    Object.assign(lic, {email: emailFinal});
     console.log("📧 Enviando informe a:", lic.email);
     try {
       const ventasDia=(ventas||[]).filter(v=>v.fechaKey===fecha&&v.dia===dia&&!v._esCobro&&!v._esAjuste);
@@ -425,11 +431,13 @@ function App() {
   const irAlSiguiente = (sig) => {
     if(!sig) { irA("clientes"); return; }
     if(sig.esProspecto) {
+      // Agregar prospecto como cliente temporal si no existe todavía
       if(!clientes.find(cc=>cc.id===sig.item.id)) {
         saveClientes([...clientes,{...sig.item,saldo:0,_esProspecto:true}]);
       }
+      setProspectoId(sig.item.id);
       setClienteId(sig.item.id);
-      irA("venta");
+      irA("venta"); // directo a registrar entrega, sin pasar por detalleProspecto
     } else {
       setClienteId(sig.item.id);
       irA("venta");
@@ -798,6 +806,7 @@ function App() {
         }}
         onVerProspecto={(p)=>{setProspectoId(p.id);irA("detalleProspecto");}}
         onAbrirMapa={()=>irA("mapaClientes")}
+        onPlanilla={()=>irA("planilla")}
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
