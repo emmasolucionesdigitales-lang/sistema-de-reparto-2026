@@ -578,17 +578,15 @@ function App() {
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
 
-  // Si no pasó el PIN todavía, mostrarlo
+  // Leer estado de licencia
   const pinGuardado = (()=>{ try{const p=JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin;return p?String(p):"";} catch{return "";} })();
-  if(apiKey && binId && pinGuardado && !pinOk) {
-    return <PantallaPINIndividual onOk={()=>setPinOk(true)} />;
-  }
+  const licActivada = (()=>{ try{return JSON.parse(localStorage.getItem("sr_licencia")||"{}").activado===true;}catch{return false;} })();
 
+  // 1. Sin código → pedir código
   if (!apiKey || !binId) {
     return <PantallaCodigoAcceso onCodigo={(cod)=>{
       setApiKey(cod);
       setBinId(cod);
-      // Guardar también en sr_licencia para que negocioId lo encuentre
       try {
         const lic = JSON.parse(localStorage.getItem("sr_licencia")||"{}");
         localStorage.setItem("sr_licencia", JSON.stringify({...lic, codigo:cod}));
@@ -596,12 +594,21 @@ function App() {
     }} />;
   }
 
+  // 2. Tiene código pero no activó → pantalla de activación
+  if (!licActivada) {
+    return <PantallaActivacion onActivado={()=>setPinOk(false)} />;
+  }
+
+  // 3. Activado pero no pasó el PIN → pedir PIN
+  if (pinGuardado && !pinOk) {
+    return <PantallaPINIndividual onOk={()=>setPinOk(true)} />;
+  }
+
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
     const c = cliente;
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
     if(opcionSaldo!=="cobro_deuda") {
-      const mapa = {sifon:"Sifón 1.5L", bidon10:"Bidón 10L", bidon20:"Bidón 20L"};
       detalle.forEach(d=>{
         const asignado = d.nombre==="Sifón 1.5L"?(c.sifon||0):d.nombre==="Bidón 10L"?(c.bidon10||0):d.nombre==="Bidón 20L"?(c.bidon20||0):0;
         const extra = d.cantidad - asignado;
@@ -610,42 +617,41 @@ function App() {
     }
     const envPrestFinal = [...(envPrest||[]).filter(e=>e.prod&&e.cant), ...envAutoDetect.filter(e=>!(envPrest||[]).some(ep=>ep.prod===e.prod))];
 
-    // Pago mixto: guardamos pago real según opción
-    const pagoReal = opcionSaldo==="mixto_ef"?"contado":opcionSaldo==="mixto_tr"?"transferencia":pago;
-    const obsExtra = montoTrans2>0?` [Mixto: ef $${montoPagado} + tr $${montoTrans2}]`:"";
+    // Pago mixto: UNA sola venta con ambos montos guardados
+    const esMixto = opcionSaldo==="mixto_ef" || opcionSaldo==="mixto_tr";
+    let montoEfec = 0, montoTrans = 0, pagoReal = pago;
 
-    const calc = calcVenta(detalle, pagoReal, montoPagado, saldoAplicado, productos);
+    if(esMixto) {
+      if(opcionSaldo==="mixto_ef") {
+        montoEfec = Number(montoPagado)||0;
+        montoTrans = Number(montoTrans2)||0;
+      } else {
+        montoTrans = Number(montoPagado)||0;
+        montoEfec = Number(montoTrans2)||0;
+      }
+      pagoReal = "mixto";
+    }
+
+    const montoTotal = esMixto ? montoEfec + montoTrans : undefined;
+    const obsExtra = esMixto ? ` [Mixto: ef $${montoEfec} + tr $${montoTrans}]` : "";
+    const calc = calcVenta(detalle, esMixto?"contado":pago, esMixto?String(montoTotal):montoPagado, saldoAplicado, productos);
+
     const nuevaVenta = {
       id:Date.now(), clienteId:c.id, cliente:c.nombre,
       dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
-      detalle, pago:pagoReal, obs:(obs||"")+obsExtra, saldoAplicado:saldoAplicado||0,
+      detalle, pago:pagoReal,
+      obs:(obs||"")+obsExtra,
+      saldoAplicado:saldoAplicado||0,
       envPrest:envPrestFinal,
-      envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc,
-      montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
+      envDev:(envDev||[]).filter(e=>e.prod&&e.cant),
+      ...calc,
+      // Campos extras del mixto — para mostrar confirmación de transferencia
+      montoEfec: esMixto ? montoEfec : 0,
+      montoTrans: esMixto ? montoTrans : 0,
     };
 
-    // Si es pago mixto, también guardamos la parte de transferencia como venta separada
-    let nuevasVentas = [...ventas, nuevaVenta];
-    let saldoExtra = calc.saldoDelta;
-    if(montoTrans2>0 && opcionSaldo==="mixto_ef") {
-      // Registrar transferencia como venta separada vinculada
-      const nTr = nuevaVenta.neto; // mismo neto para no duplicar
-      const ventaTr = {
-        id:Date.now()+2, clienteId:c.id, cliente:c.nombre,
-        dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
-        detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
-        pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
-        neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
-        pagadoNum:montoTrans2, saldoDelta:montoTrans2, // suma al saldo del cliente
-        envPrest:[], envDev:[],
-      };
-      nuevasVentas = [...nuevasVentas, ventaTr];
-      saldoExtra += montoTrans2; // la transferencia abona al saldo
-    }
-
-    saveVentas(nuevasVentas);
-    const nuevosClientes = clientes.map(c2=>c2.id===c.id?{...c2,saldo:c.saldo+saldoExtra}:c2);
-    saveClientes(nuevosClientes);
+    saveVentas([...ventas, nuevaVenta]);
+    saveClientes(clientes.map(c2=>c2.id===c.id?{...c2,saldo:c.saldo+calc.saldoDelta}:c2));
   };
 
 
@@ -679,25 +685,20 @@ function App() {
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
     const vV = ventas.find(v=>v.id===ventaId); if(!vV) return;
     const c  = clientes.find(x=>x.id===vV.clienteId);
-    const pagoReal = pago==="mixto"?"contado":pago;
-    const calc = calcVenta(detalle, pagoReal, montoPagado, saldoAplicado, productos);
-    // Remove old transfer venta if existed (from previous mixto edit)
+    const esMixto = pago==="mixto";
+    const pagoReal = esMixto ? "mixto" : pago;
+    const montoParaCalc = esMixto
+      ? String((Number(montoPagado)||0)+(Number(montoTrans2)||0))
+      : montoPagado;
+    const calc = calcVenta(detalle, esMixto?"contado":pago, montoParaCalc, saldoAplicado, productos);
+    // Eliminar la vieja venta separada de transferencia si existía (versión anterior)
     let nev = ventas.filter(v=>!(v.obs==="[Parte transfer. de pago mixto]"&&v.clienteId===vV.clienteId&&v.fechaKey===vV.fechaKey));
-    nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs,saldoAplicado:saldoAplicado||0,...calc}:v);
-    let saldoExtra = c ? (c.saldo - vV.saldoDelta + calc.saldoDelta) : 0;
-    // If mixto, add transfer venta
-    if(pago==="mixto"&&montoTrans2>0){
-      const ventaTr = {
-        id:Date.now()+2, clienteId:vV.clienteId, cliente:vV.cliente,
-        dia:vV.dia, fechaKey:vV.fechaKey, fecha:vV.fecha,
-        detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
-        pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
-        neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
-        pagadoNum:montoTrans2, saldoDelta:montoTrans2, envPrest:[], envDev:[],
-      };
-      nev = [...nev, ventaTr];
-      saldoExtra += montoTrans2;
-    }
+    nev = nev.map(v=>v.id===ventaId?{
+      ...vV, detalle, pago:pagoReal, obs, saldoAplicado:saldoAplicado||0, ...calc,
+      montoEfec: esMixto ? Number(montoPagado)||0 : 0,
+      montoTrans: esMixto ? Number(montoTrans2)||0 : 0,
+    }:v);
+    const saldoExtra = c ? (c.saldo - vV.saldoDelta + calc.saldoDelta) : 0;
     saveVentas(nev);
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
   };

@@ -343,6 +343,191 @@ function PantallaCodigoAcceso({onCodigo}) {
   );
 }
 
+// ── Pantalla de Activación (primera vez, después del código) ─────────
+function PantallaActivacion({onActivado}) {
+  const lic = (()=>{ try{ return JSON.parse(localStorage.getItem("sr_licencia")||"{}"); }catch{ return {}; } })();
+
+  const [negocio,  setNegocio]  = React.useState(lic.negocio||"");
+  const [email,    setEmail]    = React.useState(lic.email||"");
+  const [pin,      setPin]      = React.useState("");
+  const [pinConf,  setPinConf]  = React.useState("");
+  const [tyc,      setTyc]      = React.useState(false);
+  const [verPin,   setVerPin]   = React.useState(false);
+  const [verPinC,  setVerPinC]  = React.useState(false);
+  const [estado,   setEstado]   = React.useState("idle"); // idle | verificando | error | ok
+  const [error,    setError]    = React.useState("");
+
+  const activar = async () => {
+    setError("");
+    // Validaciones
+    if(!negocio.trim())           { setError("Ingresá el nombre de tu empresa."); return; }
+    if(!email.trim())             { setError("Ingresá tu email."); return; }
+    if(pin.length < 4)            { setError("El PIN debe tener al menos 4 dígitos."); return; }
+    if(pin !== pinConf)           { setError("Los PINs no coinciden."); return; }
+    if(!tyc)                      { setError("Debés aceptar los Términos y Condiciones."); return; }
+
+    // Verificar que email y negocio coincidan con la licencia
+    const emailNorm  = email.trim().toLowerCase();
+    const licEmail   = (lic.email||"").trim().toLowerCase();
+    const licNegocio = (lic.negocio||lic.nombre||"").trim().toLowerCase();
+    const negNorm    = negocio.trim().toLowerCase();
+
+    if(licEmail && emailNorm !== licEmail) {
+      setError("El email no coincide con el registrado en tu licencia.");
+      return;
+    }
+    // Verificar PIN contra el asignado
+    if(String(lic.pin) !== pin) {
+      setError("El PIN no coincide con el asignado en tu licencia.");
+      return;
+    }
+
+    setEstado("verificando");
+    try {
+      // Marcar como activado en localStorage
+      const licActualizada = {
+        ...lic,
+        negocio:  negocio.trim(),
+        email:    email.trim(),
+        pin:      pin,
+        activado: true,
+        fechaActivacion: new Date().toISOString(),
+      };
+      localStorage.setItem("sr_licencia", JSON.stringify(licActualizada));
+      setEstado("ok");
+      setTimeout(()=>onActivado(), 700);
+    } catch(e) {
+      setEstado("error");
+      setError("Error al guardar. Intentá de nuevo.");
+    }
+  };
+
+  const inp = {
+    width:"100%", padding:"12px 14px",
+    border:"1px solid rgba(255,255,255,0.12)", borderRadius:10,
+    fontSize:14, background:"rgba(255,255,255,0.05)",
+    color:"var(--color-text-primary,#e2eaf4)", outline:"none",
+    boxSizing:"border-box",
+  };
+  const lbl = {
+    fontSize:11, color:"var(--color-text-secondary,#7a9ab8)",
+    display:"block", marginBottom:6,
+    textTransform:"uppercase", letterSpacing:"0.06em",
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--color-background-primary,#0f1923)",padding:24,overflowY:"auto"}}>
+      <div style={{width:"100%",maxWidth:360}}>
+
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <img src="icono-192.png" alt="" onError={e=>e.target.remove()}
+            style={{width:64,height:64,borderRadius:16,marginBottom:12}} />
+          <h1 style={{fontSize:20,fontWeight:700,color:"var(--color-text-primary,#e2eaf4)",margin:0}}>
+            Activación de cuenta
+          </h1>
+          <p style={{fontSize:13,color:"var(--color-text-secondary,#7a9ab8)",marginTop:6,lineHeight:1.5}}>
+            Completá tus datos para activar el sistema.<br/>
+            <span style={{color:"#5daaff",fontWeight:500}}>Código: {lic.codigo||""}</span>
+          </p>
+        </div>
+
+        <div style={{background:"var(--color-background-secondary,#1a2b3c)",borderRadius:16,padding:24,border:"0.5px solid rgba(255,255,255,0.08)",display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* Nombre empresa */}
+          <div>
+            <label style={lbl}>Nombre de tu empresa *</label>
+            <input style={inp} placeholder="Ej: Distribuidora La Catalina"
+              value={negocio} onChange={e=>setNegocio(e.target.value)} />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label style={lbl}>Email registrado *</label>
+            <input style={inp} type="email" placeholder="tumail@ejemplo.com"
+              value={email} onChange={e=>setEmail(e.target.value)} />
+            <div style={{fontSize:11,color:"var(--color-text-tertiary,#4a6a85)",marginTop:4}}>
+              Debe coincidir con el email que registraste al contratar.
+            </div>
+          </div>
+
+          {/* PIN */}
+          <div>
+            <label style={lbl}>PIN asignado (4+ dígitos) *</label>
+            <div style={{position:"relative"}}>
+              <input style={{...inp,letterSpacing:"0.15em",paddingRight:42}}
+                type={verPin?"text":"password"} inputMode="numeric"
+                placeholder="••••" maxLength={8}
+                value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))} />
+              <button onClick={()=>setVerPin(!verPin)}
+                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--color-text-tertiary,#4a6a85)"}}>
+                {verPin?"🙈":"👁"}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirmar PIN */}
+          <div>
+            <label style={lbl}>Confirmá tu PIN *</label>
+            <div style={{position:"relative"}}>
+              <input style={{...inp,letterSpacing:"0.15em",paddingRight:42,
+                borderColor:pinConf&&pin!==pinConf?"#f07070":pinConf&&pin===pinConf?"#4dd9a0":"rgba(255,255,255,0.12)"}}
+                type={verPinC?"text":"password"} inputMode="numeric"
+                placeholder="••••" maxLength={8}
+                value={pinConf} onChange={e=>setPinConf(e.target.value.replace(/\D/g,""))} />
+              <button onClick={()=>setVerPinC(!verPinC)}
+                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--color-text-tertiary,#4a6a85)"}}>
+                {verPinC?"🙈":"👁"}
+              </button>
+            </div>
+            {pinConf&&pin!==pinConf&&<div style={{fontSize:11,color:"#f07070",marginTop:4}}>Los PINs no coinciden</div>}
+            {pinConf&&pin===pinConf&&pin.length>=4&&<div style={{fontSize:11,color:"#4dd9a0",marginTop:4}}>✓ PINs coinciden</div>}
+          </div>
+
+          {/* Términos y condiciones */}
+          <div style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:12,border:"0.5px solid rgba(255,255,255,0.08)"}}>
+            <div style={{fontSize:11,color:"var(--color-text-secondary,#7a9ab8)",marginBottom:10,lineHeight:1.6,maxHeight:100,overflowY:"auto"}}>
+              <strong style={{color:"var(--color-text-primary,#e2eaf4)"}}>Términos y Condiciones de uso</strong><br/>
+              Al activar esta cuenta aceptás que: (1) El sistema es de uso exclusivo para gestión de reparto. (2) Los datos ingresados son responsabilidad del usuario. (3) La suscripción es mensual y se renueva automáticamente. (4) Emma Soluciones Digitales no se responsabiliza por pérdida de datos por falta de conectividad. (5) El PIN es personal e intransferible.
+            </div>
+            <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
+              <input type="checkbox" checked={tyc} onChange={e=>setTyc(e.target.checked)}
+                style={{width:18,height:18,cursor:"pointer",accentColor:"#185FA5",flexShrink:0}} />
+              <span style={{fontSize:13,color:"var(--color-text-primary,#e2eaf4)"}}>
+                Acepto los Términos y Condiciones
+              </span>
+            </label>
+          </div>
+
+          {/* Error */}
+          {error&&(
+            <div style={{background:"rgba(240,112,112,0.1)",border:"0.5px solid #f07070",borderRadius:8,padding:"10px 12px",fontSize:13,color:"#f07070"}}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Botón activar */}
+          <button onClick={activar}
+            disabled={estado==="verificando"||estado==="ok"}
+            style={{width:"100%",padding:"14px",borderRadius:10,border:"none",
+              background:estado==="ok"?"#4dd9a0":estado==="verificando"?"#4a6a85":"#185FA5",
+              color:estado==="ok"?"#0a2e1f":"#fff",
+              fontSize:15,fontWeight:600,cursor:estado==="verificando"?"wait":"pointer",
+              opacity:estado==="verificando"?0.7:1,transition:"all 0.2s"}}>
+            {estado==="verificando"?"Verificando..."
+              :estado==="ok"?"✓ ¡Cuenta activada!"
+              :"Activar cuenta →"}
+          </button>
+        </div>
+
+        <p style={{fontSize:11,color:"var(--color-text-tertiary,#4a6a85)",textAlign:"center",marginTop:16,lineHeight:1.6}}>
+          Sistema de Reparto · Emma Soluciones Digitales
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Pantalla PIN (se muestra cada vez que se abre la app) ─────────
 function PantallaPINIndividual({onOk}) {
   const [pin, setPin]       = React.useState("");

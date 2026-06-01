@@ -232,39 +232,30 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                     const json=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
                     if(!json||json.length<2){alert("El archivo está vacío.");setImportandoClientes(false);return;}
                     let hIdx=0;
-                    for(let i=0;i<Math.min(json.length,8);i++){
+                    for(let i=0;i<Math.min(json.length,6);i++){
                       const r=json[i].map(norm);
-                      const esH=r.some(c=>c==="nombre"||c==="dia"||c==="barrio"||c==="calle"||c.includes("nombreyapellido")||c.includes("diadereparto")||c.includes("norden"));
-                      if(esH){hIdx=i;break;}
+                      if(r.some(c=>c==="nombre"||c==="dia"||c==="barrio"||c==="calle")){hIdx=i;break;}
                     }
                     const heads=json[hIdx].map(h=>String(h).trim());
-                    const filas=json.slice(hIdx+1).filter(r=>{
-                      const p=String(r[0]||"").trim();
-                      if(!p) return false;
-                      if(p.startsWith("▼")||p.startsWith("→")||p.startsWith("//")) return false;
-                      return true;
-                    });
+                    const filas=json.slice(hIdx+1).filter(r=>r.some(c=>String(c).trim()!==""));
                     const col={};
                     heads.forEach((h,i)=>{
                       const hn=norm(h);
-                      if(hn==="nombre"||(hn.includes("nombre")&&!hn.includes("apellido"))||(hn.includes("nombre")&&hn.includes("apellido"))) col.nombre=i;
-                      if(hn==="dia"||hn.includes("diadereparto")||hn.includes("diareparto")) col.dia=i;
+                      if(hn==="nombre"||(hn.includes("nombre")&&!hn.includes("apellido"))) col.nombre=i;
+                      if(hn.includes("apellido")) col.apellido=i;
+                      if(hn==="dia") col.dia=i;
                       if(hn==="barrio") col.barrio=i;
-                      if(hn.includes("manzana")||hn==="mz"||hn==="mza") col.manzana=i;
+                      if(hn.includes("manzana")||hn==="mz") col.manzana=i;
                       if(hn==="lote"||hn==="lt") col.lote=i;
-                      if(hn==="sector"&&!hn.includes("mapa")) col.sector=i;
                       if(hn==="calle"||hn.includes("direcc")) col.calle=i;
                       if(hn==="n"||hn==="nro"||hn==="numero") col.nro=i;
-                      if(hn.includes("aclar")||hn.includes("depto")||hn.includes("aclaracion")) col.aclaracion=i;
+                      if(hn.includes("aclar")||hn.includes("depto")) col.aclaracion=i;
                       if(hn.includes("telef")||hn.includes("cel")||hn==="telefono") col.telefono=i;
-                      if(hn.includes("maps")||hn.includes("ubic")||hn.includes("gps")||hn.includes("google")) col.maps=i;
                       if(hn.includes("sifon")||(hn.includes("soda")&&!hn.includes("bidon"))) col.sifon=i;
                       if(hn.includes("10")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon10=i;
                       if(hn.includes("20")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon20=i;
                       if(hn.includes("dispen")) col.dispenser=i;
-                      if(hn==="orden"||hn==="ord"||hn==="order"||hn.includes("norden")||hn.includes("ordenenruta")||hn.includes("ordenruta")) col.orden=i;
-                      if(hn.includes("saldo")) col.saldo=i;
-                      if(hn.includes("nota")||hn.includes("observ")) col.notas=i;
+                      if(hn==="orden"||hn==="ord") col.orden=i;
                     });
                     const getV=(row,campo)=>col[campo]!==undefined?String(row[col[campo]]||"").trim():"";
                     let maxId=Math.max(0,...clientes.map(c=>c.id||0));
@@ -273,21 +264,21 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                     filas.forEach(row=>{
                       const nombre=getV(row,"nombre"); if(!nombre) return;
                       if(clientes.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())) return;
+                      const apellido=getV(row,"apellido");
+                      const nombreC=apellido?`${nombre} ${apellido}`:nombre;
                       const rawDia=getV(row,"dia");
                       const diaKey=norm(rawDia);
                       const dia=MAPDIA[diaKey]||(DIAS||[]).find(d=>norm(d)===diaKey)||rawDia||"Lunes";
                       nuevos.push({
-                        id:++maxId, nombre, calle:getV(row,"calle"), nro:getV(row,"nro"),
-                        barrio:getV(row,"barrio"), manzana:getV(row,"manzana"),
-                        lote:getV(row,"lote"), sector:getV(row,"sector"),
-                        aclaracion:getV(row,"aclaracion"), notas:getV(row,"notas"),
-                        telefono:getV(row,"telefono"), maps:getV(row,"maps"), dia,
+                        id:++maxId,nombre:nombreC,calle:getV(row,"calle"),nro:getV(row,"nro"),
+                        barrio:getV(row,"barrio"),manzana:getV(row,"manzana"),
+                        lote:getV(row,"lote"),aclaracion:getV(row,"aclaracion"),
+                        telefono:getV(row,"telefono"),dia,
                         sifon:Math.max(0,Number(getV(row,"sifon"))||0),
                         bidon10:Math.max(0,Number(getV(row,"bidon10"))||0),
                         bidon20:Math.max(0,Number(getV(row,"bidon20"))||0),
                         dispenser:Math.max(0,Number(getV(row,"dispenser"))||0),
-                        saldo:Number(getV(row,"saldo"))||0,
-                        orden:Number(getV(row,"orden"))||9999,
+                        orden:Number(getV(row,"orden"))||9999,saldo:0,
                       });
                       count++;
                     });
@@ -424,3 +415,4 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
     </div>
   );
 }
+

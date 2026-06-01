@@ -89,14 +89,16 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
               {(recordatorios||[]).some(r=>r.clienteId===c.id&&!r.confirmado)&&(
                 <span style={{fontSize:13,flexShrink:0}} title="Recordatorio pendiente">🔔</span>
               )}
-              {(()=>{const vt=ventas.find(v=>v.clienteId===c.id&&v.fechaKey===fecha&&v.pago==="transferencia");
+              {(()=>{
+                const vt=ventas.find(v=>v.clienteId===c.id&&v.fechaKey===fecha&&(v.pago==="transferencia"||(v.pago==="mixto"&&(v.montoTrans||0)>0)));
                 if(!vt) return null;
+                const montoMostrar = vt.pago==="mixto" ? (v=>v.montoTrans)(vt) : (vt.pagadoNum||vt.neto||0);
                 return (
-                  <button style={{background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6,background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)"}}
+                  <button style={{background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6}}
                     onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(c.id,vt.id);}}
                     title={vt.transConfirmada?"Transfer. confirmada — tocá para desmarcar":"Tocá para confirmar transferencia"}>
                     <span style={{fontSize:15}}>{vt.transConfirmada?"🟢":"🔴"}</span>
-                    {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
+                    {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(montoMostrar)}</span>}
                   </button>
                 );
               })()}
