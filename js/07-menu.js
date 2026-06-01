@@ -857,6 +857,26 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
             </button>
           );
         })()}
+        {/* Botón enviar email siempre disponible */}
+        {onCerrarDia&&ventas.length>0&&(()=>{
+          const yaEnviado = !!localStorage.getItem(`sr_informe_${fecha}_${dia}`);
+          return (
+            <button style={{width:"100%",padding:"12px",borderRadius:10,border:"0.5px solid #4c1d95",background:"transparent",color:"#a78bfa",fontSize:13,fontWeight:500,cursor:"pointer",marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
+              onClick={async()=>{
+                try {
+                  const ok = await onCerrarDia();
+                  if(ok){
+                    alert("✅ Informe enviado a tu email.");
+                    localStorage.setItem(`sr_informe_${fecha}_${dia}`,"1");
+                  }
+                } catch(err) {
+                  alert("❌ Error al enviar: " + (err.message||err));
+                }
+              }}>
+              📧 {yaEnviado?"Reenviar informe por email":"Enviar informe por email"}
+            </button>
+          );
+        })()}
         {yaCerrado && (
           <div style={{textAlign:"center",padding:"12px",borderRadius:10,background:"rgba(29,158,117,0.15)",color:"#4dd9a0",fontSize:13,fontWeight:500,marginTop:10}}>
             ✅ Día cerrado · Stock actualizado
