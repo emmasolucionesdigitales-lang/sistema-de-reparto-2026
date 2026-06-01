@@ -535,12 +535,14 @@ function EnvasesProspecto({prospecto:p, onActualizar}) {
 
 function PromoDetalle({prospecto:p,ventas,noVisitas,productos,listo,comprasCount,semanasCount,visitadoHoy,ventaHoy,fecha,onRegistrar,onNoEsta,onNoQuiere,onComodato,onConvertir,onEliminar,onVolver,onActualizarEnvases,onEditar,onEliminarVenta}) {
   const [editando,setEditando] = useState(false);
-  if(editando) return <EditarProspecto prospecto={p} onGuardar={(datos)=>{onEditar(datos);setEditando(false);}} onVolver={()=>setEditando(false)} />;
 
+  // Todos los cálculos ANTES de cualquier return condicional (regla de hooks)
   const ventasReales = (ventas||[]).filter(v=>!v._esAjuste);
   const nvItems = (noVisitas||[]).map(nv=>({...nv,_esNoVisita:true,fechaKey:nv.fecha}));
   const historial = [...ventasReales,...nvItems].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
   const totalComprado = ventasReales.filter(v=>!v._esCobro).reduce((a,v)=>a+(v.neto||0),0);
+
+  if(editando) return <EditarProspecto prospecto={p} onGuardar={(datos)=>{onEditar(datos);setEditando(false);}} onVolver={()=>setEditando(false)} />;
 
   return (
     <div style={s.screen}>
@@ -851,5 +853,3 @@ function PromoComodato({prospecto:p,onGuardar,onVolver}) {
     </div>
   );
 }
-
-
