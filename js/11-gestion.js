@@ -138,33 +138,51 @@ function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}
 
       // Detectar fila de encabezados (saltar títulos)
       let headerIdx = 0;
-      for(let i = 0; i < Math.min(json.length, 6); i++) {
+      for(let i = 0; i < Math.min(json.length, 8); i++) {
         const r = json[i].map(norm);
-        if(r.some(c => c==="nombre" || c==="dia" || c==="barrio" || c==="calle")) { headerIdx = i; break; }
+        const esHeader = r.some(c =>
+          c==="nombre" || c==="dia" || c==="barrio" || c==="calle" ||
+          c.includes("nombreyapellido") || c.includes("diadereparto") ||
+          c.includes("diareparto") || c.includes("norden")
+        );
+        if(esHeader) { headerIdx = i; break; }
       }
       const headers = json[headerIdx].map(h => String(h).trim());
-      const filas   = json.slice(headerIdx+1).filter(r => r.some(c => String(c).trim() !== ""));
+      const filas   = json.slice(headerIdx+1).filter(r => {
+        const primera = String(r[0]||"").trim();
+        // Saltar filas de instrucciones, vacías, o sin nombre en col 0
+        if(!primera) return false;
+        if(primera.startsWith("▼")||primera.startsWith("→")||primera.startsWith("//")) return false;
+        return true;
+      });
 
       // Auto-mapeo silencioso
       const col = {};
       headers.forEach((h, i) => {
         const hn = norm(h);
-        if(hn==="nombre" || (hn.includes("nombre") && !hn.includes("apellido"))) col.nombre=i;
-        if(hn.includes("apellido"))                    col.apellido=i;
-        if(hn==="dia")                                 col.dia=i;
+        // Nombre — "Nombre y Apellido *", "nombre", "nombre y apellido"
+        if(hn==="nombre"||(hn.includes("nombre")&&!hn.includes("apellido"))||(hn.includes("nombre")&&hn.includes("apellido"))) col.nombre=i;
+        // Día — "Día de Reparto *", "dia"
+        if(hn==="dia"||hn.includes("diadereparto")||hn.includes("diareparto")) col.dia=i;
         if(hn==="barrio")                              col.barrio=i;
         if(hn.includes("manzana")||hn==="mz"||hn==="mza") col.manzana=i;
         if(hn==="lote"||hn==="lt")                     col.lote=i;
+        if(hn==="sector"&&!hn.includes("mapa"))        col.sector=i;
         if(hn==="calle"||hn.includes("direcc"))        col.calle=i;
         if(hn==="n"||hn==="nro"||hn==="numero")        col.nro=i;
-        if(hn.includes("aclar")||hn.includes("depto")) col.aclaracion=i;
+        if(hn.includes("aclar")||hn.includes("depto")||hn.includes("aclaracion")) col.aclaracion=i;
         if(hn.includes("telef")||hn.includes("cel")||hn==="telefono") col.telefono=i;
-        if(hn.includes("maps")||hn.includes("ubic")||hn.includes("gps")) col.maps=i;
+        if(hn.includes("maps")||hn.includes("ubic")||hn.includes("gps")||hn.includes("google")) col.maps=i;
         if(hn.includes("sifon")||(hn.includes("soda")&&!hn.includes("bidon"))) col.sifon=i;
         if(hn.includes("10")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon10=i;
         if(hn.includes("20")&&(hn.includes("bidon")||hn.includes("agua")||hn.includes("bid"))) col.bidon20=i;
         if(hn.includes("dispen"))                      col.dispenser=i;
-        if(hn==="orden"||hn==="ord"||hn==="order")     col.orden=i;
+        // Orden — "N° Orden *", "Orden en ruta (num.)", "orden"
+        if(hn==="orden"||hn==="ord"||hn==="order"||hn.includes("norden")||hn.includes("ordenenruta")||hn.includes("ordenruta")) col.orden=i;
+        // Saldo — "Saldo Inicial ($) + a favor / - debe"
+        if(hn.includes("saldo"))                       col.saldo=i;
+        // Notas — "Notas rápidas"
+        if(hn.includes("nota")||hn.includes("observ")) col.notas=i;
         if(hn==="tipo"||hn.includes("tipocliente"))    col.tipo=i;
       });
 
@@ -184,13 +202,16 @@ function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}
         return {
           nombre:nombreC, calle:getV(row,"calle"), nro:getV(row,"nro"),
           barrio:getV(row,"barrio"), manzana:getV(row,"manzana"),
-          lote:getV(row,"lote"), aclaracion:getV(row,"aclaracion"),
+          lote:getV(row,"lote"), sector:getV(row,"sector"),
+          aclaracion:getV(row,"aclaracion"),
+          notas:getV(row,"notas"),
           telefono:getV(row,"telefono"), maps:getV(row,"maps"),
           dia, tipo,
           sifon:    Math.max(0,Number(getV(row,"sifon"))||0),
           bidon10:  Math.max(0,Number(getV(row,"bidon10"))||0),
           bidon20:  Math.max(0,Number(getV(row,"bidon20"))||0),
           dispenser:Math.max(0,Number(getV(row,"dispenser"))||0),
+          saldo:    Number(getV(row,"saldo"))||0,
           orden:    Number(getV(row,"orden"))||9999,
         };
       }).filter(Boolean);
@@ -229,10 +250,12 @@ function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}
     preview.forEach(p => {
       const base = {
         id:nextId++, nombre:p.nombre, calle:p.calle, nro:p.nro,
-        barrio:p.barrio, manzana:p.manzana, lote:p.lote, aclaracion:p.aclaracion,
+        barrio:p.barrio, manzana:p.manzana, lote:p.lote,
+        sector:p.sector, aclaracion:p.aclaracion,
+        notas:p.notas,
         telefono:p.telefono, maps:p.maps, dia:p.dia,
         sifon:p.sifon, bidon10:p.bidon10, bidon20:p.bidon20,
-        dispenser:p.dispenser, saldo:0, orden:p.orden,
+        dispenser:p.dispenser, saldo:p.saldo||0, orden:p.orden,
       };
       if(p.tipo==="prospecto") nuevosProspectos.push({...base, estado:"activo", fechaInicio:hoy, visitas:[], listoConvertir:false});
       else nuevosClientes.push(base);
