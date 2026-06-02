@@ -300,8 +300,13 @@ function DetalleVentasDia({ventas, clientes, prospectos}) {
   const [abierto, setAbierto] = React.useState(false);
   const todosMap = React.useMemo(()=>{
     const m = {};
-    (clientes||[]).forEach(c=>{ m[c.id]={...c, _tipo:"cliente"}; });
+    // Primero prospectos, luego clientes — clientes sobreescriben (tienen prioridad)
     (prospectos||[]).forEach(p=>{ m[p.id]={...p, _tipo:"prospecto"}; });
+    (clientes||[]).forEach(c=>{ 
+      // Si ya existía como prospecto y ahora es cliente temporal (_esProspecto), mantener tipo prospecto
+      if(c._esProspecto) m[c.id]={...c, _tipo:"prospecto"};
+      else m[c.id]={...c, _tipo:"cliente"};
+    });
     return m;
   },[clientes,prospectos]);
 

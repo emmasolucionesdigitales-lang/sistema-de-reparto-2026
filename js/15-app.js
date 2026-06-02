@@ -614,7 +614,11 @@ function App() {
 
   // 2. Tiene código pero no activó → pantalla de activación
   if (!licActivada) {
-    return <PantallaActivacion onActivado={()=>setPinOk(false)} />;
+    return <PantallaActivacion onActivado={()=>{
+      // Forzar re-render completo recargando la página
+      window.location.hash = "portada";
+      window.location.reload();
+    }} />;
   }
 
   // 3. Activado pero no pasó el PIN → pedir PIN y resetear pantalla
@@ -749,6 +753,7 @@ function App() {
   irA("planilla");
 }}
           noVisitas={noVisitas||[]}
+          prospectos={prospectos||[]}
           onFiados={()=>irA("fiadosPendientes")} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
@@ -790,8 +795,14 @@ function App() {
         prospectos={(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")}
         recordatorios={recordatorios}
         onVentaProspecto={(p)=>{
-          if(!clientes.find(c=>c.id===p.id)){
-            saveClientes([...clientes,{...p,saldo:0,_esProspecto:true}]);
+          // Agregar prospecto como cliente temporal al estado Y al localStorage directamente
+          // para que esté disponible cuando se renderice NuevaVenta
+          const yaExiste = clientes.find(c=>c.id===p.id);
+          if(!yaExiste){
+            const nuevo = {...p, saldo:0, _esProspecto:true};
+            const nuevosClientes = [...clientes, nuevo];
+            setClientes(nuevosClientes);
+            try { localStorage.setItem("cat_clientes_v3", JSON.stringify(nuevosClientes)); } catch{}
           }
           setClienteId(p.id);
           irA("venta");
@@ -799,28 +810,19 @@ function App() {
         onNoEstaProspecto={(id)=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
           saveNoVisitas(nv);
-          const todosOrdenados=[
-            ...clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999)),
-            ...(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")
-          ];
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).map(v=>v.clienteId)]);
-          const sig=todosOrdenados.find(x=>!visitadosIds.has(x.id)&&x.id!==id);
-          if(sig){ const esProsp=prospectos?.some(p=>p.id===sig.id); if(esProsp){setProspectoId(sig.id);irA("detalleProspecto");}else{setClienteId(sig.id);irA("detalleCliente");} }
+          // Quedarse en la lista de clientes — no navegar
         }}
         onNoQuiereProspecto={(id)=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
-          const todosOrdenados=[
-            ...clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999)),
-            ...(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")
-          ];
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).map(v=>v.clienteId)]);
-          const sig=todosOrdenados.find(x=>!visitadosIds.has(x.id)&&x.id!==id);
-          if(sig){ const esProsp=prospectos?.some(p=>p.id===sig.id); if(esProsp){setProspectoId(sig.id);irA("detalleProspecto");}else{setClienteId(sig.id);irA("detalleCliente");} }
+          // Quedarse en la lista de clientes — no navegar
         }}
         onVerProspecto={(p)=>{setProspectoId(p.id);irA("detalleProspecto");}}
         onAbrirMapa={()=>irA("mapaClientes")}
-        onPlanilla={()=>irA("planilla")}
+        onPlanilla={()=>{
+          setInitCierre(true);
+          irA("planilla");
+        }}
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
