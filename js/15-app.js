@@ -231,9 +231,9 @@ function App() {
     setSyncStatus("loading");
     cloudLoad(negocioId).then(function(data) {
       if(!data) { setSyncStatus("idle"); setCargandoNube(false); return; }
-      if (data.clientes?.length)   { setClientes(data.clientes); try{localStorage.setItem("cat_clientes_v3",JSON.stringify(data.clientes));}catch{} }
-      if (data.ventas?.length)     { setVentasRaw(data.ventas);  try{localStorage.setItem("cat_ventas_v3",JSON.stringify(data.ventas));}catch{} }
-      if (data.planillas)          { setPlanillas(data.planillas); try{localStorage.setItem("cat_planillas_v1",JSON.stringify(data.planillas));}catch{} }
+      if (data.clientes?.length)   { setClientes(data.clientes);    try{localStorage.setItem("cat_clientes_v3",JSON.stringify(data.clientes));}catch{} }
+      if (data.ventas?.length)     { setVentasRaw(data.ventas);     try{localStorage.setItem("cat_ventas_v3",JSON.stringify(data.ventas));}catch{} }
+      if (data.planillas)          { setPlanillas(data.planillas);  try{localStorage.setItem("cat_planillas_v1",JSON.stringify(data.planillas));}catch{} }
       if (data.stock) {
         const ds = data.stock;
         const normStock = ds.soderia ? ds : {
@@ -245,11 +245,11 @@ function App() {
         try { localStorage.setItem("cat_stock_v4", JSON.stringify(normStock)); } catch {}
       }
       if (data.productos?.length)     { setProductos(data.productos);    try{localStorage.setItem("cat_productos_v3",JSON.stringify(data.productos));}catch{} }
-      if (data.noVisitas?.length)     { setNoVisitas(data.noVisitas);     try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(data.noVisitas));}catch{} }
-      if (data.prospectos?.length)    { setProspectos(data.prospectos);   try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(data.prospectos));}catch{} }
+      if (data.noVisitas?.length)     { setNoVisitas(data.noVisitas);    try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(data.noVisitas));}catch{} }
+      if (data.prospectos?.length)    { setProspectos(data.prospectos);  try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(data.prospectos));}catch{} }
       if (data.recordatorios?.length) { setRecordatorios(data.recordatorios); try{localStorage.setItem("cat_recordatorios_v1",JSON.stringify(data.recordatorios));}catch{} }
-      if (data.mantVeh?.length)       localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
-      if (data.histPrecios?.length)   localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
+      if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
+      if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
@@ -615,7 +615,6 @@ function App() {
   // 2. Tiene código pero no activó → pantalla de activación
   if (!licActivada) {
     return <PantallaActivacion onActivado={()=>{
-      // Forzar re-render completo recargando la página
       window.location.hash = "portada";
       window.location.reload();
     }} />;
@@ -623,7 +622,6 @@ function App() {
 
   // 3. Activado pero no pasó el PIN → pedir PIN y resetear pantalla
   if (pinGuardado && !pinOk) {
-    // Resetear hash para que al entrar arranque desde portada
     if(window.location.hash && window.location.hash !== "#portada") {
       window.history.replaceState(null,"","#portada");
     }
@@ -795,8 +793,6 @@ function App() {
         prospectos={(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")}
         recordatorios={recordatorios}
         onVentaProspecto={(p)=>{
-          // Agregar prospecto como cliente temporal al estado Y al localStorage directamente
-          // para que esté disponible cuando se renderice NuevaVenta
           const yaExiste = clientes.find(c=>c.id===p.id);
           if(!yaExiste){
             const nuevo = {...p, saldo:0, _esProspecto:true};
@@ -810,19 +806,14 @@ function App() {
         onNoEstaProspecto={(id)=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
           saveNoVisitas(nv);
-          // Quedarse en la lista de clientes — no navegar
         }}
         onNoQuiereProspecto={(id)=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
-          // Quedarse en la lista de clientes — no navegar
         }}
         onVerProspecto={(p)=>{setProspectoId(p.id);irA("detalleProspecto");}}
         onAbrirMapa={()=>irA("mapaClientes")}
-        onPlanilla={()=>{
-          setInitCierre(true);
-          irA("planilla");
-        }}
+        onPlanilla={()=>{ setInitCierre(true); irA("planilla"); }}
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{

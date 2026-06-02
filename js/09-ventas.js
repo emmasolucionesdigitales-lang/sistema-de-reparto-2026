@@ -477,12 +477,10 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         <button style={{...s.btnPrimary,marginBottom:10,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
           if(pago==="mixto"){
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
-            const totalPagado=ef+tr;
-            // Calcular el total real a cobrar según opción de deuda
             const totalReal = opcionSaldo==="todo"
               ? Math.round(Math.abs(cliente.saldo)+aPagar)
               : aPagar;
-            const saldoDelta=totalPagado-totalReal;
+            const saldoDelta=(ef+tr)-totalReal;
             onGuardar(detalle,"contado",String(ef),saldoApl,envPrest,envDev,obs,"mixto_ef",tr,saldoDelta);
           } else {
             const montoFinal = opcionSaldo==="todo"&&!monto

@@ -83,7 +83,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
                   ?<span style={{fontSize:12,color:"var(--color-text-danger)"}}>⚠ {deudas.length} cliente{deudas.length>1?"s":""} {deudas.length>1?"deben":"debe"} {fmt(totalDeuda)}</span>
                   :<span style={{fontSize:12,color:"var(--color-text-success)"}}>✓ Sin deudas</span>
                 }
-                <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{totalClientes} cliente{totalClientes!==1?"s":""}</span>
+                <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{totalDia} cliente{totalDia!==1?"s":""}{totalProspectos>0?` (${totalProspectos} prosp.)`:""}</span>
               </div>
             </div>
             <span style={{color:"var(--color-text-tertiary)",fontSize:18,marginLeft:10}}>→</span>
@@ -300,10 +300,8 @@ function DetalleVentasDia({ventas, clientes, prospectos}) {
   const [abierto, setAbierto] = React.useState(false);
   const todosMap = React.useMemo(()=>{
     const m = {};
-    // Primero prospectos, luego clientes — clientes sobreescriben (tienen prioridad)
     (prospectos||[]).forEach(p=>{ m[p.id]={...p, _tipo:"prospecto"}; });
-    (clientes||[]).forEach(c=>{ 
-      // Si ya existía como prospecto y ahora es cliente temporal (_esProspecto), mantener tipo prospecto
+    (clientes||[]).forEach(c=>{
       if(c._esProspecto) m[c.id]={...c, _tipo:"prospecto"};
       else m[c.id]={...c, _tipo:"cliente"};
     });
