@@ -2,7 +2,7 @@
 // ◆  07-menu.js — MenuDias · DiaPrincipal · PlanillaDelDia · InicioReparto
 // ════════════════════════════════════════════════════════════════════
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados,prospectos}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados,prospectos,onDormidos}) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   const hoyDiaNombre = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][new Date().getDay()];
   const hoyFechaKey = (()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;})();
@@ -204,6 +204,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           {[
             {ico:"🚀",lbl:"Promoción",fn:onPromocion},
             {ico:"⚙️",lbl:"Config",fn:()=>onConfig&&onConfig("precios")},
+            {ico:"😴",lbl:"Dormidos",fn:onDormidos},
           ].map(({ico,lbl,fn})=>(
             <button key={lbl} onClick={fn} style={{
               display:"flex",flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,
@@ -498,6 +499,8 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
     };
     const vaciosVuelta={
       soda: realesVacios.soda!==""?Number(realesVacios.soda):Math.floor(vaciosRec.soda/CAJON_SODA),
+      b10:  realesVacios.b10!==""?Number(realesVacios.b10):vaciosRec.b10,
+      b20:  realesVacios.b20!==""?Number(realesVacios.b20):vaciosRec.b20,
     };
     return (
       <div style={s.screen}>
@@ -550,8 +553,10 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
             </div>
             {[
               ["Soda\n(vacíos)","soda","vacios"],
-              ["10L\n(sobrante)","b10","llenos"],
-              ["20L\n(sobrante)","b20","llenos"],
+              ["10L\n(sobrante lleno)","b10","llenos"],
+              ["10L\n(vacíos)","b10","vacios"],
+              ["20L\n(sobrante lleno)","b20","llenos"],
+              ["20L\n(vacíos)","b20","vacios"],
             ].map(([label,pk,tipo])=>{
               const calcVal=tipo==="vacios"
                 ?(pk==="soda"?Math.floor(vaciosRec[pk]/CAJON_SODA):vaciosRec[pk])
@@ -561,7 +566,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
               const realVal=stateObj[pk]!==""?Number(stateObj[pk]):calcVal;
               const diff=realVal-calcVal;
               return (
-                <div key={pk} style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,marginTop:6}}>
+                <div key={pk+"_"+tipo} style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,marginTop:6}}>
                   <div style={{display:"grid",gridTemplateColumns:"1.5fr 1fr 1fr",gap:8,alignItems:"center"}}>
                     <span style={{fontSize:12,color:"var(--color-text-primary)",whiteSpace:"pre-line"}}>{label}</span>
                     <div style={{textAlign:"center",fontSize:24,fontWeight:500,color:"#5daaff"}}>{calcVal}</div>
@@ -587,12 +592,20 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
               <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{vaciosVuelta.soda} caj</span>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid rgba(77,217,160,0.2)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 10L</span>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 10L · llenos sobrantes</span>
               <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{llenosVuelta.b10} un</span>
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0"}}>
-              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 20L</span>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid rgba(77,217,160,0.2)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 10L · vacíos</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{vaciosVuelta.b10} un</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid rgba(77,217,160,0.2)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 20L · llenos sobrantes</span>
               <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{llenosVuelta.b20} un</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0"}}>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 20L · vacíos</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{vaciosVuelta.b20} un</span>
             </div>
           </div>
           <div style={{display:"flex",gap:8,marginTop:4}}>

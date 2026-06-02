@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onAbrirMapa,onPlanilla}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onAbrirMapa,onPlanilla,onEliminarProspecto,onDormidos}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -220,6 +220,8 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
                 <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
                   {p.maps&&<a href={p.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
                   {p.telefono&&<a href={`https://wa.me/54${p.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
+                  {onEliminarProspecto&&<button style={{fontSize:11,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",padding:2}}
+                    onClick={e=>{e.stopPropagation();onEliminarProspecto(p.id);}}>🗑</button>}
                 </div>
               </div>
               {!visitadosProspectos.has(p.id)&&(
@@ -771,6 +773,69 @@ function FiadosPendientes({clientes,onCobrar,onVolver}) {
               💰 Cobrar deuda
             </button>
           )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar}) {
+  const [semanas,setSemanas]=React.useState(2);
+  const hoy=new Date();
+  const ultima={};
+  (ventas||[]).forEach(v=>{
+    if(v._esCobro||v._esAjuste||v._esAjusteEnvases||v._esMixtoTrans) return;
+    const fk=v.fechaKey; if(!fk) return;
+    if(!ultima[v.clienteId]||fk>ultima[v.clienteId]) ultima[v.clienteId]=fk;
+  });
+  const diasDesde=(fk)=>{ if(!fk) return Infinity; const d=new Date(fk+"T12:00:00"); return Math.floor((hoy-d)/86400000); };
+  const lista=(clientes||[])
+    .map(c=>{ const fk=ultima[c.id]; return {...c, ultimaFecha:fk, dias:diasDesde(fk)}; })
+    .filter(c=>c.dias>=semanas*7)
+    .sort((a,b)=>b.dias-a.dias);
+  const textoTiempo=(c)=>{
+    if(c.dias===Infinity) return "Sin compras registradas";
+    const sem=Math.floor(c.dias/7);
+    return `Hace ${sem} semana${sem!==1?"s":""}`+(c.ultimaFecha?` · últ. ${c.ultimaFecha}`:"");
+  };
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <div style={{flex:1}}>
+          <div style={s.headerTitle}>😴 Clientes dormidos</div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{lista.length} cliente{lista.length!==1?"s":""} sin comprar hace {semanas}+ semanas</div>
+        </div>
+      </div>
+      <div style={{padding:"10px 14px 4px",display:"flex",gap:6,alignItems:"center"}}>
+        <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Sin comprar hace:</span>
+        {[2,3,4,8].map(n=>(
+          <button key={n} onClick={()=>setSemanas(n)}
+            style={{padding:"5px 10px",fontSize:12,borderRadius:8,cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",
+              background:semanas===n?"#185FA5":"var(--color-background-tertiary)",color:semanas===n?"#e2eaf4":"var(--color-text-secondary)",fontWeight:semanas===n?600:400}}>
+            {n}+ sem
+          </button>
+        ))}
+      </div>
+      {lista.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--color-text-success)",fontSize:15}}>✅ ¡Ningún cliente dormido con ese filtro!</div>}
+      {lista.map(c=>(
+        <div key={c.id} style={{...s.card,margin:"6px 14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+            <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>onSeleccionar&&onSeleccionar(c)}>
+              <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
+              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>
+                {c.dia}{c.barrio?" · "+c.barrio:""}{c.calle?` · ${c.calle} ${c.nro||""}`:c.manzana?` · Mz ${c.manzana} L ${c.lote}`:""}
+              </div>
+              <div style={{fontSize:12,fontWeight:600,color:c.dias>=28?"var(--color-text-danger)":"var(--color-text-warning)",marginTop:4}}>
+                ⏳ {textoTiempo(c)}
+              </div>
+              {c.saldo<0&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:3}}>Debe {fmt(Math.abs(c.saldo))}</div>}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
+              {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="WhatsApp">💬</a>}
+              {c.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
+            </div>
+          </div>
         </div>
       ))}
     </div>

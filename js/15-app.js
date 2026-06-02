@@ -261,6 +261,46 @@ function App() {
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos});
   React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto}; });
 
+  // Hooks globales: respaldo COMPLETO descargable + restaurar
+  React.useEffect(()=>{
+    window._descargarRespaldo = () => {
+      const mantVeh = (()=>{ try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
+      const histPrecios = (()=>{ try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
+      const data = { ...estadoRef.current, mantVeh, histPrecios,
+        _respaldo:true, _app:"sistema-de-reparto", _fecha:new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const f = new Date().toLocaleDateString("es-AR").replace(/\//g,"-");
+      a.href = url; a.download = `respaldo-completo_reparto_${f}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    };
+    window._restaurarRespaldo = (data) => {
+      if(!data || typeof data!=="object") { alert("El archivo no es un respaldo válido."); return false; }
+      try {
+        if(data.clientes!==undefined){ setClientes(data.clientes||[]); try{localStorage.setItem("cat_clientes_v3",JSON.stringify(data.clientes||[]));}catch{} }
+        if(data.ventas!==undefined){ setVentasRaw(data.ventas||[]); try{localStorage.setItem("cat_ventas_v3",JSON.stringify(data.ventas||[]));}catch{} }
+        if(data.planillas!==undefined){ setPlanillas(data.planillas||{}); try{localStorage.setItem("cat_planillas_v1",JSON.stringify(data.planillas||{}));}catch{} }
+        if(data.stock){
+          const ds=data.stock;
+          const ns = ds.soderia ? ds : {soderia:{sifon:ds.sifon||0,bidon10:ds.bidon10||0,bidon20:ds.bidon20||0},casa:{sifon:0,bidon10:0,bidon20:0},camion:{sifon:0,bidon10:0,bidon20:0}};
+          setStock(ns); try{localStorage.setItem("cat_stock_v4",JSON.stringify(ns));}catch{}
+        }
+        if(data.productos!==undefined){ setProductos(data.productos||[]); try{localStorage.setItem("cat_productos_v3",JSON.stringify(data.productos||[]));}catch{} }
+        if(data.noVisitas!==undefined){ setNoVisitas(data.noVisitas||[]); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(data.noVisitas||[]));}catch{} }
+        if(data.prospectos!==undefined){ setProspectos(data.prospectos||[]); try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(data.prospectos||[]));}catch{} }
+        if(data.recordatorios!==undefined){ setRecordatorios(data.recordatorios||[]); try{localStorage.setItem("cat_recordatorios_v1",JSON.stringify(data.recordatorios||[]));}catch{} }
+        if(data.mantVeh!==undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh||[]));
+        if(data.histPrecios!==undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios||[]));
+        if(data.zonasReparto!==undefined) setZonasReparto(data.zonasReparto||{});
+        try { cloudSave({ ...estadoRef.current, ...data }, window._negocioId); } catch {}
+        return true;
+      } catch(e){ alert("Error al restaurar: "+e.message); return false; }
+    };
+    return ()=>{ delete window._descargarRespaldo; delete window._restaurarRespaldo; };
+  }, []);
+
   // Auto backup DIARIO a localStorage
   React.useEffect(()=>{
     const ultimoBackup = localStorage.getItem("lc_ultimo_backup");
@@ -752,7 +792,8 @@ function App() {
 }}
           noVisitas={noVisitas||[]}
           prospectos={prospectos||[]}
-          onFiados={()=>irA("fiadosPendientes")} />}
+          onFiados={()=>irA("fiadosPendientes")}
+          onDormidos={()=>irA("clientesDormidos")} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
           ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia")}
@@ -812,9 +853,11 @@ function App() {
           saveNoVisitas(nv);
         }}
         onVerProspecto={(p)=>{setProspectoId(p.id);irA("detalleProspecto");}}
+        onEliminarProspecto={(id)=>{if(window.confirm("¿Eliminar este prospecto?"))saveProspectos((prospectos||[]).filter(x=>x.id!==id));}}
         onAbrirMapa={()=>irA("mapaClientes")}
         onPlanilla={()=>{ setInitCierre(true); irA("planilla"); }}
         />}
+      {pantalla==="clientesDormidos" && <ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("menu")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
             const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
