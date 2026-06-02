@@ -317,6 +317,9 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
   const saldoDisp=cliente.saldo>0?cliente.saldo:0;
   const saldoApl=(usarSaldo&&pago!=="fiado")?Math.min(saldoDisp,neto):0;
   const aPagar=neto-saldoApl;
+  // Total real a cobrar según opción de deuda (para pago mixto y otros)
+  const deudaPendiente = cliente.saldo<0 ? Math.abs(cliente.saldo) : 0;
+  const totalACobrar = opcionSaldo==="todo" ? Math.round(deudaPendiente+aPagar) : aPagar;
   const ER=({list,setList,i})=>(
     <div style={{...s.row,marginBottom:6}}>
       <select style={{...s.select,flex:2}} value={list[i].prod} onChange={e=>{const n=[...list];n[i].prod=e.target.value;setList(n);}}>
@@ -392,7 +395,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
                 <input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>{
                   const ef = e.target.value;
                   setMontoEfec(ef);
-                  const resto = aPagar - Number(ef||0);
+                  const resto = totalACobrar - Number(ef||0);
                   setMontoTrans(resto > 0 ? String(Math.round(resto)) : "0");
                 }} />
               </div>
@@ -403,9 +406,9 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             </div>
             {Number(montoEfec||0)+Number(montoTrans||0)>0&&(
               <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>
-                Total pagado: {fmt(Number(montoEfec||0)+Number(montoTrans||0))} de {fmt(aPagar)}
-                {(Number(montoEfec||0)+Number(montoTrans||0))<aPagar&&
-                  <span style={{color:"var(--color-text-warning)"}}> · Queda {fmt(aPagar-Number(montoEfec||0)-Number(montoTrans||0))} de saldo</span>}
+                Total pagado: {fmt(Number(montoEfec||0)+Number(montoTrans||0))} de {fmt(totalACobrar)}
+                {(Number(montoEfec||0)+Number(montoTrans||0))<totalACobrar&&
+                  <span style={{color:"var(--color-text-warning)"}}> · Queda {fmt(totalACobrar-Number(montoEfec||0)-Number(montoTrans||0))} de saldo</span>}
               </div>
             )}
             {Number(montoTrans||0)>0&&(
