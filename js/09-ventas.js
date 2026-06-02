@@ -479,8 +479,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
             const totalPagado=ef+tr;
             const saldoDelta=totalPagado-aPagar;
-            if(ef>0) onGuardar(detalle,"contado",String(ef),saldoApl,envPrest,envDev,obs,"mixto_ef",tr,saldoDelta);
-            else if(tr>0) onGuardar(detalle,"transferencia",String(tr),saldoApl,envPrest,envDev,obs,"mixto_tr",ef,saldoDelta);
+            onGuardar(detalle,"contado",String(ef),saldoApl,envPrest,envDev,obs,"mixto_ef",tr,saldoDelta);
           } else {
             const montoFinal = opcionSaldo==="todo"&&!monto
               ? String(Math.round(Math.abs(cliente.saldo)+aPagar))

@@ -79,6 +79,7 @@ function App() {
 
   // ── PIN: se pide cada vez que se abre la app ────────────────────
   const [pinOk, setPinOk] = useState(false);
+  const [cargandoNube, setCargandoNube] = useState(true);
 
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
@@ -226,14 +227,13 @@ function App() {
   // Al iniciar, si hay credenciales guardadas, cargar datos de la nube
   const { useEffect } = React;
   useEffect(() => {
-    if (!apiKey || !binId) return;
-    setSyncStatus("saving");
+    if (!apiKey || !binId) { setCargandoNube(false); return; }
     setSyncStatus("loading");
     cloudLoad(negocioId).then(function(data) {
-      if(!data) { setSyncStatus("idle"); return; }
-      if (data.clientes?.length)   setClientes(data.clientes);
-      if (data.ventas?.length)     setVentasRaw(data.ventas);
-      if (data.planillas)          setPlanillas(data.planillas);
+      if(!data) { setSyncStatus("idle"); setCargandoNube(false); return; }
+      if (data.clientes?.length)   { setClientes(data.clientes); try{localStorage.setItem("cat_clientes_v3",JSON.stringify(data.clientes));}catch{} }
+      if (data.ventas?.length)     { setVentasRaw(data.ventas);  try{localStorage.setItem("cat_ventas_v3",JSON.stringify(data.ventas));}catch{} }
+      if (data.planillas)          { setPlanillas(data.planillas); try{localStorage.setItem("cat_planillas_v1",JSON.stringify(data.planillas));}catch{} }
       if (data.stock) {
         const ds = data.stock;
         const normStock = ds.soderia ? ds : {
@@ -242,23 +242,19 @@ function App() {
           camion: {sifon:0,bidon10:0,bidon20:0},
         };
         setStock(normStock);
-        // Firebase gana: actualizar localStorage con el dato de la nube
         try { localStorage.setItem("cat_stock_v4", JSON.stringify(normStock)); } catch {}
       }
-      if (data.productos?.length)  { setProductos(data.productos); try { localStorage.setItem("cat_productos_v3", JSON.stringify(data.productos)); } catch {} }
-      if (data.noVisitas?.length)  { setNoVisitas(data.noVisitas); try { localStorage.setItem("cat_novisitas_v1", JSON.stringify(data.noVisitas)); } catch {} }
-      if (data.prospectos?.length) { setProspectos(data.prospectos); try { localStorage.setItem("cat_prospectos_v1", JSON.stringify(data.prospectos)); } catch {} }
-      if (data.recordatorios?.length) { setRecordatorios(data.recordatorios); try { localStorage.setItem("cat_recordatorios_v1", JSON.stringify(data.recordatorios)); } catch {} }
-      if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
-      if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
+      if (data.productos?.length)     { setProductos(data.productos);    try{localStorage.setItem("cat_productos_v3",JSON.stringify(data.productos));}catch{} }
+      if (data.noVisitas?.length)     { setNoVisitas(data.noVisitas);     try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(data.noVisitas));}catch{} }
+      if (data.prospectos?.length)    { setProspectos(data.prospectos);   try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(data.prospectos));}catch{} }
+      if (data.recordatorios?.length) { setRecordatorios(data.recordatorios); try{localStorage.setItem("cat_recordatorios_v1",JSON.stringify(data.recordatorios));}catch{} }
+      if (data.mantVeh?.length)       localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
+      if (data.histPrecios?.length)   localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
-      // También actualizar clientes y ventas en localStorage
-      if (data.clientes?.length) try { localStorage.setItem("cat_clientes_v3", JSON.stringify(data.clientes)); } catch {}
-      if (data.ventas?.length)   try { localStorage.setItem("cat_ventas_v3", JSON.stringify(data.ventas)); } catch {}
-      if (data.planillas)        try { localStorage.setItem("cat_planillas_v1", JSON.stringify(data.planillas)); } catch {}
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
-    });
+      setCargandoNube(false);
+    }).catch(()=>{ setSyncStatus("idle"); setCargandoNube(false); });
   }, []);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
@@ -589,6 +585,20 @@ function App() {
   // Leer estado de licencia
   const pinGuardado = (()=>{ try{const p=JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin;return p?String(p):"";} catch{return "";} })();
   const licActivada = (()=>{ try{return JSON.parse(localStorage.getItem("sr_licencia")||"{}").activado===true;}catch{return false;} })();
+
+  // 0. Cargando datos desde Firebase
+  if (cargandoNube && (apiKey || binId)) {
+    return (
+      <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--color-background-primary,#0f1923)",gap:16}}>
+        <img src="icono-192.png" alt="" onError={e=>e.target.style.display="none"} style={{width:56,height:56,borderRadius:14,opacity:0.8}} />
+        <div style={{fontSize:14,color:"var(--color-text-secondary,#7a9ab8)"}}>Cargando datos…</div>
+        <div style={{width:180,height:4,borderRadius:2,background:"rgba(255,255,255,0.08)",overflow:"hidden",position:"relative"}}>
+          <div style={{position:"absolute",height:"100%",background:"#185FA5",borderRadius:2,width:"50%",animation:"lc_slide 1.2s ease-in-out infinite alternate"}} />
+        </div>
+        <style>{`@keyframes lc_slide{from{left:-50%}to{left:100%}}`}</style>
+      </div>
+    );
+  }
 
   // 1. Sin código → pedir código
   if (!apiKey || !binId) {
