@@ -18,7 +18,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
   const noVMapProspectos = {};
   (noVisitas||[]).filter(v=>v.fecha===fecha).forEach(v=>{noVMapProspectos[v.clienteId]=v.motivo;});
   const ventasProspectos = new Set(
-    ventas.filter(v=>prospectosDelDia.some(p=>p.id===v.clienteId)).map(v=>v.clienteId)
+    ventas.filter(v=>v.fechaKey===fecha&&prospectosDelDia.some(p=>p.id===v.clienteId)&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId)
   );
   const visitadosProspectos = new Set([
     ...ventasProspectos,
