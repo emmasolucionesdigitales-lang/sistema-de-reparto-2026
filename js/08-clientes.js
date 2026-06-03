@@ -232,6 +232,19 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
                     <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"#2e1f06",color:"#f5b942",fontWeight:600,flexShrink:0}}>Prospecto</span>
+                    {(()=>{
+                      const vt=ventas.find(v=>v.clienteId===p.id&&v.fechaKey===fecha&&(v.pago==="transferencia"||(v.pago==="mixto"&&(v.montoTrans||0)>0)));
+                      if(!vt) return null;
+                      const montoMostrar = vt.pago==="mixto" ? (vt.montoTrans||0) : (vt.pagadoNum||vt.neto||0);
+                      return (
+                        <button style={{background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6}}
+                          onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(p.id,vt.id);}}
+                          title={vt.transConfirmada?"Transfer. confirmada — tocá para desmarcar":"Tocá para confirmar transferencia"}>
+                          <span style={{fontSize:15}}>{vt.transConfirmada?"🟢":"🔴"}</span>
+                          {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(montoMostrar)}</span>}
+                        </button>
+                      );
+                    })()}
                   </div>
                   <div style={{fontSize:17,color:"var(--color-text-secondary)",marginTop:2}}>
                     {p.calle?`${p.calle} ${p.nro||""}`:p.manzana?`Mz ${p.manzana} L ${p.lote}`:""}{p.barrio?` · ${p.barrio}`:""}
