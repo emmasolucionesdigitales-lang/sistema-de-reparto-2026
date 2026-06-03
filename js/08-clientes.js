@@ -2,6 +2,30 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
+// Barra de pestañas del hub de Clientes (Todos · Prospectos · Fiados · Dormidos · Mapa)
+function ClientesTabs({activo, onIr}) {
+  const tabs = [
+    ["todos","👥","Todos","gestionClientes"],
+    ["prospectos","🚀","Prospectos","promocion"],
+    ["fiados","💰","Fiados","fiadosPendientes"],
+    ["dormidos","😴","Dormidos","clientesDormidos"],
+    ["mapa","🗺","Mapa","mapaClientes"],
+  ];
+  return (
+    <div style={{display:"flex",gap:4,overflowX:"auto",padding:"8px 10px",borderBottom:"0.5px solid var(--color-border-tertiary)",background:"var(--color-background-secondary)"}}>
+      {tabs.map(([id,ico,lbl,pant])=>(
+        <button key={id} onClick={()=>activo!==id&&onIr&&onIr(pant)}
+          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 10px",borderRadius:9,cursor:"pointer",flexShrink:0,
+            border:"none",background:activo===id?"var(--color-background-tertiary)":"transparent",
+            borderBottom:activo===id?"2px solid var(--color-accent)":"2px solid transparent"}}>
+          <span style={{fontSize:16}}>{ico}</span>
+          <span style={{fontSize:10,fontWeight:activo===id?600:400,color:activo===id?"var(--color-text-primary)":"var(--color-text-tertiary)"}}>{lbl}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onAbrirMapa,onPlanilla,onEliminarProspecto,onDormidos}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
@@ -201,13 +225,16 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
         <>
           <span style={{...s.sectionTitle,color:"#f5b942"}}>🚀 Prospectos en promoción ({prospectosDelDia.length})</span>
           {prospectosDelDia.map(p=>(
-            <div key={p.id} style={{...s.card,borderLeft:"3px solid #f5b942",opacity:visitadosProspectos.has(p.id)?0.7:1}}>
+            <div key={p.id} style={{...s.card,border:"2px solid #f5b942",opacity:visitadosProspectos.has(p.id)?0.7:1}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                <div style={{width:34,height:34,borderRadius:8,background:"#2e1f06",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"#f5b942",flexShrink:0}}>P</div>
+                <div style={{width:34,height:34,borderRadius:8,background:"#2e1f06",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"#f5b942",flexShrink:0}}>🚀</div>
                 <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>onVerProspecto&&onVerProspecto(p)}>
-                  <div style={{fontWeight:500,fontSize:14,color:"var(--color-text-primary)"}}>{p.nombre} <span style={{fontSize:10,color:"var(--color-text-tertiary)"}}>→ ver perfil</span></div>
-                  <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
-                    {p.barrio}{p.calle?` · ${p.calle} ${p.nro||""}`:p.manzana?` · Mz ${p.manzana} L ${p.lote}`:""}
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                    <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"#2e1f06",color:"#f5b942",fontWeight:600,flexShrink:0}}>Prospecto</span>
+                  </div>
+                  <div style={{fontSize:17,color:"var(--color-text-secondary)",marginTop:2}}>
+                    {p.calle?`${p.calle} ${p.nro||""}`:p.manzana?`Mz ${p.manzana} L ${p.lote}`:""}{p.barrio?` · ${p.barrio}`:""}
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>
                     {p.sifon>0&&<span style={s.tag}>Sifón×{p.sifon}</span>}

@@ -2,7 +2,7 @@
 // ◆  06-stock.js — StockGeneral · ConfirmacionesDia
 // ════════════════════════════════════════════════════════════════════
 
-function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolver,onAjustarEnvases}) {
+function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolver,onAjustarEnvases,onResumen}) {
   const CAJON = 6;
   const [tab, setTab] = React.useState("stock");
   const [guardado, setGuardado] = React.useState(false);
@@ -169,7 +169,8 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
     <div style={s.screen}>
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>📦 Stock</span>
+        <span style={{...s.headerTitle,flex:1}}>📦 Stock</span>
+        {onResumen&&<button style={{...s.btn,fontSize:12,padding:"5px 12px"}} onClick={onResumen}>📊 Resumen</button>}
       </div>
 
       {/* ── Tabs ─────────────────────────────────────────────────── */}

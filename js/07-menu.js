@@ -123,7 +123,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
               <span style={{fontSize:10,color:"var(--color-text-tertiary)",cursor:"pointer",textDecoration:"underline"}} onClick={e=>{e.stopPropagation();setEditandoZona(d);}}>editar zona</span>
             </div>
           )}
-          {idx===dias.length-1&&stock&&(
+          {false&&idx===dias.length-1&&stock&&(
             (()=>{
               const CAJON=6;
               const sCaj=Math.floor((stock.soderia?.sifon||0)/CAJON);
@@ -177,6 +177,21 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           </React.Fragment>);
         })}
 
+        {/* Accesos rápidos (donde estaba la barra de stock) */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,padding:"4px 0 8px"}}>
+          {[
+            {ico:"🛒",lbl:"Venta extra",fn:onGestionClientes},
+            {ico:"📅",lbl:"Agenda",fn:onAgenda},
+            {ico:"🔔",lbl:"Recordar",fn:onAgenda},
+            {ico:"🔄",lbl:"Transfer.",fn:onVerConfirmaciones},
+          ].map(({ico,lbl,fn})=>(
+            <button key={lbl} onClick={fn} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 4px",borderRadius:11,cursor:"pointer",border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)"}}>
+              <span style={{fontSize:19}}>{ico}</span>
+              <span style={{fontSize:9,fontWeight:500,color:"var(--color-text-tertiary)"}}>{lbl}</span>
+            </button>
+          ))}
+        </div>
+
         {/* ── MENÚ INFERIOR SIMPLIFICADO ── */}
         <div style={s.divider} />
 
@@ -199,12 +214,10 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           ))}
         </div>
 
-        {/* Fila 2: Promoción y Config (secundarios, más chicos) */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,paddingBottom:8}}>
+        {/* Fila 2: Config */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10,paddingBottom:8}}>
           {[
-            {ico:"🚀",lbl:"Promoción",fn:onPromocion},
             {ico:"⚙️",lbl:"Config",fn:()=>onConfig&&onConfig("precios")},
-            {ico:"😴",lbl:"Dormidos",fn:onDormidos},
           ].map(({ico,lbl,fn})=>(
             <button key={lbl} onClick={fn} style={{
               display:"flex",flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,
