@@ -368,7 +368,7 @@ function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}
 
 
 // ── GestionClientes (con tabs) ───────────────────────────────────────
-function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onReordenarTodo, onRegistrarVenta, onVerDetalle, ventas, prospectos, recordatorios, onConfirmarRecordatorio, onImportar}) {
+function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onReordenarTodo, onRegistrarVenta, onVerDetalle, ventas, prospectos, recordatorios, onConfirmarRecordatorio, onImportar, onIr}) {
   const [tab, setTab] = React.useState("lista"); // lista | fiados | agenda | importar
   const [fotoClienteId, setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
@@ -419,11 +419,13 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
       <div style={{display:"flex", borderBottom:"0.5px solid var(--color-border-tertiary)", background:"var(--color-background-secondary)", overflowX:"auto"}}>
         {[
           {id:"lista",    ico:"👥", lbl:"Lista"},
+          {id:"prospectos",ico:"🚀",lbl:"Prospectos", nav:"promocion"},
           {id:"fiados",   ico:"💰", lbl:"Fiados",  badge:cantFiados},
+          {id:"dormidos", ico:"😴", lbl:"Dormidos", nav:"clientesDormidos"},
           {id:"agenda",   ico:"📅", lbl:"Agenda",  badge:cantAgenda},
           {id:"mapa",     ico:"🗺", lbl:"Mapa"},
 
-        ].map(({id,ico,lbl,badge})=>(
+        ].map(({id,ico,lbl,badge,nav})=>(
           <button key={id}
             style={{
               flex:1, padding:"10px 6px", border:"none", cursor:"pointer",
@@ -432,7 +434,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
               color:tab===id?"var(--color-text-info)":"var(--color-text-tertiary)",
               position:"relative",
             }}
-            onClick={()=>setTab(id)}>
+            onClick={()=>nav?(onIr&&onIr(nav)):setTab(id)}>
             <span style={{fontSize:18}}>{ico}</span>
             <span style={{fontSize:10, fontWeight:tab===id?600:400}}>{lbl}</span>
             {badge>0&&<span style={{position:"absolute",top:6,right:8,background:"var(--color-text-danger)",color:"#fff",borderRadius:10,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{badge}</span>}

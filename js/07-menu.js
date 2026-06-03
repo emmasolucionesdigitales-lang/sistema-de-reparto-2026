@@ -178,12 +178,11 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         })}
 
         {/* Accesos rápidos (donde estaba la barra de stock) */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,padding:"4px 0 8px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,padding:"4px 0 8px"}}>
           {[
-            {ico:"🛒",lbl:"Venta extra",fn:onGestionClientes},
-            {ico:"📅",lbl:"Agenda",fn:onAgenda},
-            {ico:"🔔",lbl:"Recordar",fn:onAgenda},
-            {ico:"🔄",lbl:"Transfer.",fn:onVerConfirmaciones},
+            {ico:"🛒",lbl:"Venta extra",fn:()=>onGestionClientes&&onGestionClientes()},
+            {ico:"📅",lbl:"Agenda",fn:()=>onAgenda&&onAgenda()},
+            {ico:"🔄",lbl:"Transfer.",fn:()=>onVerConfirmaciones&&onVerConfirmaciones()},
           ].map(({ico,lbl,fn})=>(
             <button key={lbl} onClick={fn} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 4px",borderRadius:11,cursor:"pointer",border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)"}}>
               <span style={{fontSize:19}}>{ico}</span>
