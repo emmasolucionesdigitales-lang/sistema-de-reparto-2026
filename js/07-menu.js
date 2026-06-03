@@ -327,6 +327,11 @@ function DetalleVentasDia({ventas, clientes, prospectos}) {
             const persona = todosMap[v.clienteId];
             const esProspecto = persona?._tipo==="prospecto";
             const esCobro = v._esCobro;
+            const dir = persona?((persona.calle?`${persona.calle} ${persona.nro||""}`:persona.manzana?`Mz ${persona.manzana} L ${persona.lote}`:"")+(persona.barrio?` · ${persona.barrio}`:"")):"";
+            const deudaPagada=Math.max(0,(v.pagadoNum||0)-(v.neto||0));
+            const fmtEnv=(arr)=>(arr||[]).filter(e=>e.prod&&Number(e.cant)>0).map(e=>`${e.cant} ${e.prod}`).join(", ");
+            const prestStr=fmtEnv(v.envPrest);
+            const devStr=fmtEnv(v.envDev);
             const esMixto = v.pago==="mixto";
             const esOtroDia = persona && persona.dia && !esProspecto && persona.dia !== (ventas[0]?.dia);
             const pagoBadge = esCobro
@@ -350,6 +355,7 @@ function DetalleVentasDia({ventas, clientes, prospectos}) {
                   </div>
                   <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(v.neto||0)}</span>
                 </div>
+                {dir&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",padding:"0 0 3px 0"}}>📍 {dir}</div>}
                 {/* Detalle de productos */}
                 {(v.detalle||[]).filter(d=>d.nombre!=="Cobro de deuda").map((d,di)=>(
                   <div key={di} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 8px"}}>
@@ -364,11 +370,13 @@ function DetalleVentasDia({ventas, clientes, prospectos}) {
                     {v.montoTrans>0&&<span style={{fontSize:11,color:"#5daaff"}}>Transfer.: {fmt(v.montoTrans)} {v.transConfirmada?"✅":"🔴"}</span>}
                   </div>
                 )}
-                {/* Saldo aplicado / pagó de más */}
-                {(v.saldoAplicado>0||((v.pagadoNum||0)-(v.neto||0))>0)&&(
-                  <div style={{display:"flex",gap:10,padding:"3px 0 0 8px",marginTop:2,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-                    {v.saldoAplicado>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Saldo aplicado: −{fmt(v.saldoAplicado)}</span>}
-                    {((v.pagadoNum||0)-(v.neto||0))>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Pagó de más: +{fmt((v.pagadoNum||0)-(v.neto||0))}</span>}
+                {/* Saldo aplicado / pagó deuda / envases */}
+                {(v.saldoAplicado>0||deudaPagada>0||prestStr||devStr)&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:2,padding:"3px 0 0 8px",marginTop:2,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                    {v.saldoAplicado>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Saldo a favor aplicado: −{fmt(v.saldoAplicado)}</span>}
+                    {deudaPagada>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>💵 Pagó deuda: +{fmt(deudaPagada)}</span>}
+                    {prestStr&&<span style={{fontSize:11,color:"#f5b942"}}>📦 Prestó: {prestStr}</span>}
+                    {devStr&&<span style={{fontSize:11,color:"var(--color-text-info)"}}>↩️ Devolvió: {devStr}</span>}
                   </div>
                 )}
                 {v.obs&&!v.obs.startsWith("[Mixto")&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",paddingLeft:8,marginTop:2}}>📝 {v.obs}</div>}

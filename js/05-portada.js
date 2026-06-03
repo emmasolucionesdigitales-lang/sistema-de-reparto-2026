@@ -349,11 +349,8 @@ function PantallaActivacion({onActivado}) {
 
   const [negocio,  setNegocio]  = React.useState(lic.negocio||"");
   const [email,    setEmail]    = React.useState(lic.email||"");
-  const [pin,      setPin]      = React.useState("");
-  const [pinConf,  setPinConf]  = React.useState("");
+  const pinAsignado = String(lic.pin || "");
   const [tyc,      setTyc]      = React.useState(false);
-  const [verPin,   setVerPin]   = React.useState(false);
-  const [verPinC,  setVerPinC]  = React.useState(false);
   const [estado,   setEstado]   = React.useState("idle"); // idle | verificando | error | ok
   const [error,    setError]    = React.useState("");
 
@@ -362,23 +359,19 @@ function PantallaActivacion({onActivado}) {
     // Validaciones
     if(!negocio.trim())           { setError("Ingresá el nombre de tu empresa."); return; }
     if(!email.trim())             { setError("Ingresá tu email."); return; }
-    if(pin.length < 4)            { setError("El PIN debe tener al menos 4 dígitos."); return; }
-    if(pin !== pinConf)           { setError("Los PINs no coinciden."); return; }
     if(!tyc)                      { setError("Debés aceptar los Términos y Condiciones."); return; }
 
-    // Verificar que email y negocio coincidan con la licencia
+    // Verificar que el email coincida con la licencia
     const emailNorm  = email.trim().toLowerCase();
     const licEmail   = (lic.email||"").trim().toLowerCase();
-    const licNegocio = (lic.negocio||lic.nombre||"").trim().toLowerCase();
-    const negNorm    = negocio.trim().toLowerCase();
 
     if(licEmail && emailNorm !== licEmail) {
       setError("El email no coincide con el registrado en tu licencia.");
       return;
     }
-    // Verificar PIN contra el asignado
-    if(String(lic.pin) !== pin) {
-      setError("El PIN no coincide con el asignado en tu licencia.");
+    // El PIN lo asigna el administrador (viene en la licencia)
+    if(!pinAsignado) {
+      setError("Tu licencia no tiene un PIN asignado. Contactá al administrador.");
       return;
     }
 
@@ -389,7 +382,7 @@ function PantallaActivacion({onActivado}) {
         ...lic,
         negocio:  negocio.trim(),
         email:    email.trim(),
-        pin:      pin,
+        pin:      pinAsignado,
         activado: true,
         fechaActivacion: new Date().toISOString(),
       };
@@ -451,37 +444,15 @@ function PantallaActivacion({onActivado}) {
             </div>
           </div>
 
-          {/* PIN */}
+          {/* PIN asignado — no se elige, lo asigna el administrador */}
           <div>
-            <label style={lbl}>PIN asignado (4+ dígitos) *</label>
-            <div style={{position:"relative"}}>
-              <input style={{...inp,letterSpacing:"0.15em",paddingRight:42}}
-                type={verPin?"text":"password"} inputMode="numeric"
-                placeholder="••••" maxLength={8}
-                value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))} />
-              <button onClick={()=>setVerPin(!verPin)}
-                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--color-text-tertiary,#4a6a85)"}}>
-                {verPin?"🙈":"👁"}
-              </button>
+            <label style={lbl}>Tu PIN asignado</label>
+            <div style={{...inp,letterSpacing:"0.3em",fontSize:22,textAlign:"center",fontWeight:700,color:"#5daaff",background:"rgba(24,95,165,0.12)",borderColor:"#185FA5"}}>
+              {pinAsignado || "—"}
             </div>
-          </div>
-
-          {/* Confirmar PIN */}
-          <div>
-            <label style={lbl}>Confirmá tu PIN *</label>
-            <div style={{position:"relative"}}>
-              <input style={{...inp,letterSpacing:"0.15em",paddingRight:42,
-                borderColor:pinConf&&pin!==pinConf?"#f07070":pinConf&&pin===pinConf?"#4dd9a0":"rgba(255,255,255,0.12)"}}
-                type={verPinC?"text":"password"} inputMode="numeric"
-                placeholder="••••" maxLength={8}
-                value={pinConf} onChange={e=>setPinConf(e.target.value.replace(/\D/g,""))} />
-              <button onClick={()=>setVerPinC(!verPinC)}
-                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--color-text-tertiary,#4a6a85)"}}>
-                {verPinC?"🙈":"👁"}
-              </button>
+            <div style={{fontSize:11,color:"var(--color-text-tertiary,#4a6a85)",marginTop:4}}>
+              Este PIN te lo asignó el administrador. Anotalo: lo vas a usar cada vez que abras la app.
             </div>
-            {pinConf&&pin!==pinConf&&<div style={{fontSize:11,color:"#f07070",marginTop:4}}>Los PINs no coinciden</div>}
-            {pinConf&&pin===pinConf&&pin.length>=4&&<div style={{fontSize:11,color:"#4dd9a0",marginTop:4}}>✓ PINs coinciden</div>}
           </div>
 
           {/* Términos y condiciones */}
