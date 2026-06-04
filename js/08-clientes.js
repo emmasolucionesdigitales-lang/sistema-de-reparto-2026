@@ -6,7 +6,6 @@
 function ClientesTabs({activo, onIr}) {
   const tabs = [
     ["todos","👥","Todos","gestionClientes"],
-    ["prospectos","🚀","Prospectos","promocion"],
     ["fiados","💰","Fiados","fiadosPendientes"],
     ["dormidos","😴","Dormidos","clientesDormidos"],
     ["mapa","🗺","Mapa","mapaClientes"],
@@ -148,7 +147,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
-            {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>📍</a>}
+            {(c.maps||(c.lat&&c.lng))     && <a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>📍</a>}
             {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>💬</a>}
             <span style={{fontSize:20,cursor:"pointer",lineHeight:1}} title="Foto domicilio" onClick={e=>{e.stopPropagation();setFotoOpen(true);}}>📷</span>
           </div>
@@ -220,69 +219,6 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
       {listos.length>0&&<><span style={s.sectionTitle}>Entregado ({listos.length})</span>{listos.map(c=><Card key={c.id} c={c}/>)}</>}
       {sinEntrega.length>0&&<><span style={s.sectionTitle}>Sin entrega ({sinEntrega.length})</span>{sinEntrega.map(c=><Card key={c.id} c={c}/>)}</>}
 
-      {/* Prospectos del día — al final de la lista */}
-      {prospectosDelDia.length>0&&(
-        <>
-          <span style={{...s.sectionTitle,color:"#f5b942"}}>🚀 Prospectos en promoción ({prospectosDelDia.length})</span>
-          {prospectosDelDia.map(p=>(
-            <div key={p.id} style={{...s.card,border:"2px solid #f5b942",opacity:visitadosProspectos.has(p.id)?0.7:1}}>
-              <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                <div style={{width:34,height:34,borderRadius:8,background:"#2e1f06",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"#f5b942",flexShrink:0}}>🚀</div>
-                <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>onVerProspecto&&onVerProspecto(p)}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
-                    <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"#2e1f06",color:"#f5b942",fontWeight:600,flexShrink:0}}>Prospecto</span>
-                    {(()=>{
-                      const vt=ventas.find(v=>v.clienteId===p.id&&v.fechaKey===fecha&&(v.pago==="transferencia"||(v.pago==="mixto"&&(v.montoTrans||0)>0)));
-                      if(!vt) return null;
-                      const montoMostrar = vt.pago==="mixto" ? (vt.montoTrans||0) : (vt.pagadoNum||vt.neto||0);
-                      return (
-                        <button style={{background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6}}
-                          onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(p.id,vt.id);}}
-                          title={vt.transConfirmada?"Transfer. confirmada — tocá para desmarcar":"Tocá para confirmar transferencia"}>
-                          <span style={{fontSize:15}}>{vt.transConfirmada?"🟢":"🔴"}</span>
-                          {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(montoMostrar)}</span>}
-                        </button>
-                      );
-                    })()}
-                  </div>
-                  <div style={{fontSize:17,color:"var(--color-text-secondary)",marginTop:2}}>
-                    {p.calle?`${p.calle} ${p.nro||""}`:p.manzana?`Mz ${p.manzana} L ${p.lote}`:""}{p.barrio?` · ${p.barrio}`:""}
-                  </div>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>
-                    {p.sifon>0&&<span style={s.tag}>Sifón×{p.sifon}</span>}
-                    {p.bidon10>0&&<span style={s.tag}>10L×{p.bidon10}</span>}
-                    {p.bidon20>0&&<span style={s.tag}>20L×{p.bidon20}</span>}
-                    {p.dispenser>0&&<span style={{...s.tag,color:"#5daaff"}}>Disp×{p.dispenser}</span>}
-                    {ventasProspectos.has(p.id)&&<span style={s.badge("success")}>✓ Registrado</span>}
-                  </div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
-                  {p.maps&&<a href={p.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
-                  {p.telefono&&<a href={`https://wa.me/54${p.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
-                  {onEliminarProspecto&&<button style={{fontSize:11,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",padding:2}}
-                    onClick={e=>{e.stopPropagation();onEliminarProspecto(p.id);}}>🗑</button>}
-                </div>
-              </div>
-              {!visitadosProspectos.has(p.id)&&(
-                <div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}}>
-                  <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
-                    onClick={()=>onNoEstaProspecto&&onNoEstaProspecto(p.id)}>No estaba</button>
-                  <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
-                    onClick={()=>onNoQuiereProspecto&&onNoQuiereProspecto(p.id)}>No quiere</button>
-                  <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:500}}
-                    onClick={()=>onVentaProspecto&&onVentaProspecto(p)}>Registrar entrega →</button>
-                </div>
-              )}
-              {visitadosProspectos.has(p.id)&&noVMapProspectos[p.id]==="noquiso"&&(
-                <div style={{marginTop:6,textAlign:"right"}}>
-                  <span style={s.badge("danger")}>🙅 No quiso</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </>
-      )}
       {/* Botón al menú cuando terminó todo el reparto del día */}
       {pendientesNormales.length===0 && visitados.size>0 && (
         <div style={{padding:"20px 14px 8px"}}>
@@ -414,7 +350,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
               {cliente.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:3}}>📝 {cliente.notas}</div>}
             </div>
             <div style={{display:"flex",gap:10,alignItems:"center"}}>
-              {cliente.maps     && <a href={cliente.maps} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>📍</a>}
+              {(cliente.maps||(cliente.lat&&cliente.lng))     && <a href={cliente.maps||`https://www.google.com/maps?q=${cliente.lat},${cliente.lng}`} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>📍</a>}
               {cliente.telefono && <a href={`https://wa.me/54${cliente.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>💬</a>}
 
             </div>
@@ -873,7 +809,7 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar}) {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
               {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="WhatsApp">💬</a>}
-              {c.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
+              {(c.maps||(c.lat&&c.lng))&&<a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
             </div>
           </div>
         </div>

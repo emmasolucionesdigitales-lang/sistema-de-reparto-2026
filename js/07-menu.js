@@ -64,7 +64,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           const totalDeuda = deudas.reduce((a,c)=>a+Math.abs(c.saldo),0);
           const totalClientes = (clientes||[]).filter(c=>c.dia===d&&!c._esProspecto).length;
           const totalProspectos = (prospectos||[]).filter(p=>p.dia===d&&p.estado==="activo").length;
-          const totalDia = totalClientes + totalProspectos;
+          const totalDia = totalClientes;
           const zona = (zonasReparto||{})[d]||"";
           return (<React.Fragment key={d}>
           <div style={{display:"flex",gap:6,alignItems:"stretch"}}>
@@ -83,7 +83,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
                   ?<span style={{fontSize:12,color:"var(--color-text-danger)"}}>⚠ {deudas.length} cliente{deudas.length>1?"s":""} {deudas.length>1?"deben":"debe"} {fmt(totalDeuda)}</span>
                   :<span style={{fontSize:12,color:"var(--color-text-success)"}}>✓ Sin deudas</span>
                 }
-                <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{totalDia} cliente{totalDia!==1?"s":""}{totalProspectos>0?` (${totalProspectos} prosp.)`:""}</span>
+                <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{totalDia} cliente{totalDia!==1?"s":""}</span>
               </div>
             </div>
             <span style={{color:"var(--color-text-tertiary)",fontSize:18,marginLeft:10}}>→</span>
