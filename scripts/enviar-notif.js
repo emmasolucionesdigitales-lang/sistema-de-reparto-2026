@@ -12,10 +12,30 @@ const VAPID_PRIVATE = process.env.VAPID_PRIVATE;            // viene del secreto
 // Ventana de tolerancia hacia atrás (por si GitHub Actions se demora unos minutos)
 const VENTANA_MIN = 20;
 
+// ── Chequeos claros de configuración ──
+if(!process.env.VAPID_PRIVATE){
+  console.error('❌ FALTA el secreto VAPID_PRIVATE en GitHub (Settings → Secrets → Actions).');
+  process.exit(1);
+}
+if(!process.env.FIREBASE_SA){
+  console.error('❌ FALTA el secreto FIREBASE_SA en GitHub (Settings → Secrets → Actions).');
+  process.exit(1);
+}
+let sa;
+try { sa = JSON.parse(process.env.FIREBASE_SA); }
+catch(e){
+  console.error('❌ FIREBASE_SA no es un JSON válido. Pegá el CONTENIDO COMPLETO del archivo .json de la cuenta de servicio (desde la primera { hasta la última }).');
+  process.exit(1);
+}
+if(!sa.project_id || !sa.private_key || !sa.client_email){
+  console.error('❌ El JSON de FIREBASE_SA no parece una cuenta de servicio (le faltan project_id / private_key / client_email).');
+  process.exit(1);
+}
+console.log('Config OK. Proyecto:', sa.project_id);
+
 webpush.setVapidDetails('mailto:carabajalponce1980@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
 
 // ── Conexión a Firebase con la cuenta de servicio (secreto de GitHub) ──
-const sa = JSON.parse(process.env.FIREBASE_SA);
 admin.initializeApp({ credential: admin.credential.cert(sa) });
 const db = admin.firestore();
 
