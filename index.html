@@ -135,5 +135,60 @@
     if(root) root.render(<App />);
     else ReactDOM.render(<App />, rootEl);
   </script>
+  <!-- ════ Notificaciones push ════ -->
+  <script>
+  (function(){
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    }
+    if(!('PushManager' in window) || !('Notification' in window)) return;
+
+    var VAPID_PUB_KEY = 'BFXBrNy6Xca3ejWylkF-sZ9_pZQzZNMjDbInqlsPzn1oF3F8EDnDOBLqt8fEZs-g_-HJCIJRZ3-dd0yiQECcHpk';
+    function urlB64ToUint8(b){
+      var p = '='.repeat((4 - b.length % 4) % 4);
+      var s = (b + p).replace(/-/g,'+').replace(/_/g,'/');
+      var r = atob(s); var o = new Uint8Array(r.length);
+      for(var i=0;i<r.length;i++) o[i]=r.charCodeAt(i); return o;
+    }
+    function idActual(){ return window._negocioId || 'firebase'; }
+    async function guardarSub(sub){
+      if(!window.db) return;
+      var id = idActual();
+      await window.db.collection('users').doc(id).collection('datos').doc('push_sub')
+        .set({ sub: JSON.stringify(sub), id: id, ts: Date.now() });
+    }
+    async function activarNotif(){
+      var p = await Notification.requestPermission();
+      if(p !== 'granted'){ alert('Para recibir avisos tenés que permitir las notificaciones.'); return false; }
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64ToUint8(VAPID_PUB_KEY) });
+      await guardarSub(sub);
+      return true;
+    }
+    async function desactivarNotif(){
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      if(sub) await sub.unsubscribe();
+      if(window.db){ try{ await window.db.collection('users').doc(idActual()).collection('datos').doc('push_sub').delete(); }catch(e){} }
+    }
+    async function estadoNotif(){
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      return !!sub;
+    }
+    window.addEventListener('load', async function(){
+      var reg = await navigator.serviceWorker.ready.catch(function(){ return null; });
+      if(!reg) return;
+      var btn = document.createElement('button');
+      btn.id = 'btn-push-notif';
+      btn.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:9999;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.5);background:#1a2b3c;color:#fff;';
+      var upd = async function(){ var a = await estadoNotif(); btn.textContent = a?'🔔':'🔕'; btn.title = a?'Desactivar avisos':'Activar avisos'; btn.style.opacity = a?'1':'0.55'; };
+      btn.onclick = async function(){ var a = await estadoNotif(); if(a){ await desactivarNotif(); } else { await activarNotif(); } await upd(); };
+      document.body.appendChild(btn);
+      await upd();
+    });
+  })();
+  </script>
 </body>
 </html>
