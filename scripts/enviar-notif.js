@@ -1,132 +1,102 @@
-// ── App Reparto Individual · Enviador de notificaciones push ─────────────
-// Corre desde GitHub Actions según el horario.
-// Lee la suscripción de Firestore y envía el push correspondiente.
+// enviar-notificaciones.js  —  Sistema de Reparto (INDIVIDUAL)
+// Recorre los recordatorios de cada usuario y envía un push cuando llega la hora.
+// Se ejecuta solo, desde GitHub Actions, cada pocos minutos.
 
-const webpush = require('web-push');
 const admin   = require('firebase-admin');
+const webpush = require('web-push');
 
-// ── Inicializar Firebase Admin ────────────────────────────────────────────
-const sa = JSON.parse(Buffer.from(process.env.FIREBASE_SA, 'base64').toString('utf8'));
+// ── Claves VAPID (la pública es la misma que está en el index.html) ──
+const VAPID_PUBLIC  = 'BFXBrNy6Xca3ejWylkF-sZ9_pZQzZNMjDbInqlsPzn1oF3F8EDnDOBLqt8fEZs-g_-HJCIJRZ3-dd0yiQECcHpk';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE;            // viene del secreto de GitHub
+
+// Ventana de tolerancia hacia atrás (por si GitHub Actions se demora unos minutos)
+const VENTANA_MIN = 20;
+
+webpush.setVapidDetails('mailto:carabajalponce1980@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
+
+// ── Conexión a Firebase con la cuenta de servicio (secreto de GitHub) ──
+const sa = JSON.parse(process.env.FIREBASE_SA);
 admin.initializeApp({ credential: admin.credential.cert(sa) });
 const db = admin.firestore();
 
-// ── Configurar VAPID ─────────────────────────────────────────────────────
-webpush.setVapidDetails(
-  `mailto:${process.env.VAPID_EMAIL}`,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
-
-// ── Hora Argentina (UTC-3) ────────────────────────────────────────────────
-function horaArg() {
-  return new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCHours();
+// "Ahora" en horario de Argentina (UTC-3)
+function ahoraArg(){
+  const now = new Date();
+  return new Date(now.getTime() - 3 * 60 * 60 * 1000);
 }
-function fechaArgHoy() {
-  return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
+function fechaStr(d){ return d.toISOString().slice(0, 10); }      // YYYY-MM-DD
+function minutosDelDia(d){ return d.getUTCHours() * 60 + d.getUTCMinutes(); }
 
-// ── Enviar push ───────────────────────────────────────────────────────────
-async function enviar(sub, payload) {
-  try {
-    await webpush.sendNotification(sub, JSON.stringify(payload));
-    console.log('✅ Enviada:', payload.title);
-  } catch (err) {
-    console.error('❌ Error:', err.statusCode, err.message);
-    if (err.statusCode === 410 || err.statusCode === 404) {
-      await db.collection('lc2').doc('push_sub').delete();
-      console.log('⚠ Suscripción expirada, borrada.');
-    }
-  }
-}
+async function main(){
+  const arg      = ahoraArg();
+  const hoy      = fechaStr(arg);
+  const ahoraMin = minutosDelDia(arg);
+  console.log('Hora Argentina:', hoy, String(Math.floor(ahoraMin/60)).padStart(2,'0') + ':' + String(ahoraMin%60).padStart(2,'0'));
 
-// ── Leer suscripción ─────────────────────────────────────────────────────
-async function getSub() {
-  const doc = await db.collection('lc2').doc('push_sub').get();
-  if (!doc.exists) { console.log('Sin suscripción registrada.'); return null; }
-  try { return JSON.parse(doc.data().sub); } catch { return null; }
-}
+  const usuarios = await db.collection('users').get();
+  let enviados = 0;
 
-// ── Transferencias pendientes ─────────────────────────────────────────────
-async function checkTransferencias(sub) {
-  const hoy = fechaArgHoy();
-  let pendientes = 0;
-  try {
-    const meta = await db.collection('lc2').doc('ventas_meta').get();
-    if (!meta.exists) return;
-    const n = meta.data().n || 0;
-    for (let i = 0; i < n; i++) {
-      const doc = await db.collection('lc2').doc(`vt_${i}`).get();
-      if (!doc.exists) continue;
-      (doc.data().d || []).forEach(v => {
-        if (v.fechaKey === hoy && v.pago === 'transferencia' && !v.transConfirmada) pendientes++;
-      });
-    }
-  } catch (e) { console.error('Error ventas:', e.message); return; }
-  if (pendientes > 0) {
-    await enviar(sub, {
-      title: '💳 Transferencias sin confirmar',
-      body: `Tenés ${pendientes} transferencia${pendientes > 1 ? 's' : ''} pendiente${pendientes > 1 ? 's' : ''} de hoy.`,
-      tag: 'trans-pendientes',
-      requireInteraction: true,
-    });
-  } else {
-    console.log('Sin transferencias pendientes.');
-  }
-}
+  for (const userDoc of usuarios.docs){
+    const id       = userDoc.id;
+    const datosRef = db.collection('users').doc(id).collection('datos');
 
-// ── Mantenimiento de vehículo ─────────────────────────────────────────────
-async function checkMantenimiento(sub) {
-  try {
-    const doc = await db.collection('lc2').doc('config').get();
-    if (!doc.exists) return;
-    const mantVeh = doc.data().mantVeh || [];
-    const hoy = new Date(fechaArgHoy() + 'T12:00:00');
-    for (const m of mantVeh) {
-      if (!m.proximaFechaISO) continue;
-      const prox = new Date(m.proximaFechaISO + 'T12:00:00');
-      const dias = Math.round((prox - hoy) / (1000 * 60 * 60 * 24));
-      if ([0, 1, 2, 3].includes(dias)) {
-        const labels = { aceite:'Cambio de aceite', preventivo:'Mantenimiento preventivo', embrague:'Cambio de embrague', reparacion:'Reparación', otro:'Mantenimiento' };
-        const tipo = labels[m.tipo] || m.tipo || 'Mantenimiento';
-        const cuando = dias === 0 ? 'HOY' : `en ${dias} día${dias > 1 ? 's' : ''}`;
-        await enviar(sub, {
-          title: '🔧 Vencimiento de mantenimiento',
-          body: `${tipo} vence ${cuando}${m.descripcion ? ' — ' + m.descripcion : ''}.`,
-          tag: `mant-${m.proximaFechaISO}`,
-          requireInteraction: false,
-        });
+    // 1) suscripción del dispositivo
+    const subSnap = await datosRef.doc('push_sub').get();
+    if(!subSnap.exists) continue;
+    let sub;
+    try { sub = JSON.parse(subSnap.data().sub); } catch { continue; }
+
+    // 2) datos (recordatorios + clientes)
+    const mainSnap = await datosRef.doc('main').get();
+    if(!mainSnap.exists) continue;
+    const data          = mainSnap.data();
+    const recordatorios = data.recordatorios || [];
+    const clientes      = data.clientes || [];
+    if(!recordatorios.length) continue;
+
+    // 3) log de lo ya enviado (para no repetir)
+    const logSnap = await datosRef.doc('push_log').get();
+    const log     = logSnap.exists ? (logSnap.data().enviados || {}) : {};
+    let cambioLog = false;
+
+    for (const r of recordatorios){
+      if(r.confirmado) continue;
+      if(r.fecha !== hoy) continue;
+      if(!r.hora) continue;
+
+      const [h, m]  = r.hora.split(':').map(Number);
+      const recMin  = h * 60 + m;
+      if(recMin > ahoraMin) continue;                 // todavía no es la hora
+      if(ahoraMin - recMin > VENTANA_MIN) continue;   // ya pasó hace rato
+
+      const clave = r.id + '_' + r.fecha;
+      if(log[clave]) continue;                        // ya enviado
+
+      const cli    = clientes.find(c => c.id === r.clienteId);
+      const nombre = (cli && cli.nombre) || r.clienteNombre || '';
+      const cuerpo = (nombre ? nombre + ' — ' : '') + (r.motivo || 'Tenés un recordatorio');
+
+      try {
+        await webpush.sendNotification(sub, JSON.stringify({
+          title: '🔔 Recordatorio', body: cuerpo, tag: clave, requireInteraction: true
+        }));
+        log[clave] = Date.now();
+        cambioLog  = true;
+        enviados++;
+        console.log('✓ Enviado a', id, '-', cuerpo);
+      } catch(e){
+        console.log('✗ Error enviando a', id, ':', e.statusCode || e.message);
+        // suscripción vencida → borrarla
+        if(e.statusCode === 410 || e.statusCode === 404){
+          await datosRef.doc('push_sub').delete().catch(()=>{});
+        }
       }
     }
-  } catch (e) { console.error('Error mantenimiento:', e.message); }
-}
 
-// ── Main ─────────────────────────────────────────────────────────────────
-async function main() {
-  const hora = horaArg();
-  console.log(`Hora Argentina: ${hora}:00`);
-  const sub = await getSub();
-  if (!sub) return;
+    if(cambioLog) await datosRef.doc('push_log').set({ enviados: log }, { merge: true });
+  }
 
-  if (hora === 7)  await checkMantenimiento(sub);
-  if (hora === 13) await checkTransferencias(sub);
-  if (hora === 18) {
-    await enviar(sub, {
-      title: '🚚 Reparto — 18:00 hs',
-      body: '¿Ya revisaste todas las entregas del día?',
-      tag: 'cierre-18',
-      requireInteraction: false,
-    });
-  }
-  if (hora === 19) await checkTransferencias(sub);
-  if (hora === 20) {
-    await enviar(sub, {
-      title: '⏰ Son las 20:00 hs',
-      body: 'Hora de cerrar la planilla. Los pendientes quedarán como no visitados.',
-      tag: 'cierre-20',
-      requireInteraction: true,
-    });
-  }
-  process.exit(0);
+  console.log('Listo. Notificaciones enviadas:', enviados);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
