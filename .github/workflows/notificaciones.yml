@@ -17,4 +17,4 @@ jobs:
       - run: node scripts/enviar-notif.js
         env:
           FIREBASE_SA:   ${{ secrets.FIREBASE_SA }}
-          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE_KEY }}
