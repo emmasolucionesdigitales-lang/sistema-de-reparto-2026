@@ -349,6 +349,40 @@ function App() {
     });
   };
 
+  // ── NOTIFICACIONES PUSH ───────────────────────────────────────────
+  React.useEffect(()=>{
+    if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    const VAPID_PUBLIC = 'BFXBrNy6Xca3ejWylkF-sZ9_pZQzZNMjDbInqlsPzn1oF3F8EDnDOBLqt8fEZs-g_-HJCIJRZ3-dd0yiQECcHpk';
+    const _vapidToUint8 = (b64) => {
+      const p = (b64 + '===').slice(0, b64.length + (4 - b64.length % 4) % 4);
+      const raw = window.atob(p.replace(/-/g,'+').replace(/_/g,'/'));
+      return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+    };
+    const deviceId = (()=>{ let d=localStorage.getItem('sr_device_id'); if(!d){ d='dev_'+Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem('sr_device_id',d);} return d; })();
+
+    async function suscribir(){
+      try {
+        const sw = await navigator.serviceWorker.ready;
+        let sub = await sw.pushManager.getSubscription();
+        if(!sub) sub = await sw.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:_vapidToUint8(VAPID_PUBLIC) });
+        const subStr = JSON.stringify(sub.toJSON());
+        if(localStorage.getItem('sr_push_saved')===subStr) return; // ya guardada, sin cambios
+        const actuales = (estadoRef.current && estadoRef.current.pushSubs) || {};
+        syncData({ pushSubs: { ...actuales, [deviceId]: { sub: subStr, ts: Date.now() } } });
+        localStorage.setItem('sr_push_saved', subStr);
+        console.log('✅ Suscripción push guardada');
+      } catch(e){ console.log('Push sub:', e.message); }
+    }
+    const pedir = async () => {
+      try {
+        if(Notification.permission==="default") await Notification.requestPermission();
+        if(Notification.permission==="granted") await suscribir();
+      } catch(e){}
+    };
+    const t = setTimeout(pedir, 3500); // esperar a que cargue y haya negocioId
+    return ()=>clearTimeout(t);
+  },[]);
+
   // ── MODO OFFLINE ──────────────────────────────────────────────────
   React.useEffect(()=>{
     const goOnline = () => {
