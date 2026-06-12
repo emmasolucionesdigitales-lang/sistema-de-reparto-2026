@@ -4,11 +4,12 @@
 
 function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detalle,pago,monto,saldoApl,obs,montoTrans2)
   const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{m[p.nombre]=0;});venta.detalle.forEach(d=>{m[d.nombre]=d.cantidad;});return m;});
-  const [pago,setPago]=useState(venta.pago||"contado");
+  const esMixtaOrig = venta.pago==="mixto" || (Number(venta.montoTrans)||0)>0;
+  const [pago,setPago]=useState(esMixtaOrig?"mixto":(venta.pago||"contado"));
   const [monto,setMonto]=useState(()=>String(venta.pagadoNum||venta.neto||""));
-  const [montoEfec,setMontoEfec]=useState("");
-  const [montoTrans,setMontoTrans]=useState("");
-  const [obs,setObs]=useState(venta.obs||"");
+  const [montoEfec,setMontoEfec]=useState(esMixtaOrig?String(venta.montoEfec||""):"");
+  const [montoTrans,setMontoTrans]=useState(esMixtaOrig?String(venta.montoTrans||""):"");
+  const [obs,setObs]=useState((venta.obs||"").replace(/\s*\[Mixto:[^\]]*\]/g,""));
   const detalle=productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
   const bruto=detalle.reduce((a,d)=>a+d.total,0);
   const neto=bruto;
@@ -68,8 +69,8 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detall
         <button style={{...s.btnPrimary,flex:2,padding:"10px"}} onClick={()=>{
           if(pago==="mixto"){
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
-            onGuardar(detalle,"mixto",String(ef),venta.saldoAplicado||0,
-              `[Mixto: ef $${ef} + tr $${tr}]`,tr);
+            if(ef+tr===0){ alert("⚠️ Completá el desglose: cuánto en efectivo y cuánto por transferencia."); return; }
+            onGuardar(detalle,"mixto",String(ef),venta.saldoAplicado||0,obs,tr);
           } else {
             onGuardar(detalle,pago,pago==="fiado"?"":monto,venta.saldoAplicado||0,obs);
           }
@@ -591,50 +592,12 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
 }
 
 function NuevoCliente({diaActual,onGuardar,onVolver}) {
-  const [datos,setDatos]=useState({
-    nombre:"",dia:diaActual||"Martes",barrio:"",manzana:"",lote:"",sector:"",
-    calle:"",nro:"",aclaracion:"",telefono:"",maps:"",foto:"",
-    notas:"",sifon:0,bidon10:0,bidon20:0,orden:"",saldo:0
-  });
-  const set=(k,v)=>setDatos(d=>({...d,[k]:v}));
+  // Usa el FormCliente UNIFICADO (en 04-utils.js) — mismo formulario en toda la app
   return (
     <div style={s.screen}>
       <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Nuevo cliente</span></div>
-      <div style={{padding:16,display:"flex",flexDirection:"column",gap:10}}>
-        <div><label style={s.label}>Día de reparto</label>
-          <select style={s.select} value={datos.dia} onChange={e=>set("dia",e.target.value)}>
-            {DIAS.map(d=><option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
-        <div><label style={s.label}>Número de orden en la ruta</label>
-          <input style={s.input} type="number" min={1} placeholder="ej: 5" value={datos.orden||""} onChange={e=>set("orden",Number(e.target.value)||"")} />
-        </div>
-        {[["nombre","Nombre y apellido *"],["barrio","Barrio"],["manzana","Manzana"],["lote","Lote"],["sector","Sector"],["calle","Calle"],["nro","Número"],["aclaracion","Aclaración (piso, dpto, etc)"],["telefono","Teléfono (sin 0 ni 15)"],["maps","Link Google Maps"],["foto","Link foto del domicilio"],["notas","Notas rápidas (timbre, perro, deuda...)"]].map(([k,pl])=>(
-          <div key={k}><label style={s.label}>{pl.replace(" *","")}</label>
-            <input style={s.input} placeholder={pl.replace(" *","")} value={datos[k]||""} onChange={e=>set(k,e.target.value)} />
-          </div>
-        ))}
-        <span style={{...s.label,fontSize:13,marginTop:4}}>Envases habituales</span>
-        <div style={s.grid3}>
-          {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
-            <div key={k}><label style={{...s.label,textAlign:"center"}}>{l}</label>
-              <input style={{...s.input,textAlign:"center"}} type="number" min={0} value={datos[k]} onChange={e=>set(k,Number(e.target.value))} />
-            </div>
-          ))}
-        </div>
-        <div>
-          <label style={s.label}>Dispenser en comodato</label>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>set("dispenser",Math.max(0,(datos.dispenser||0)-1))}>−</button>
-            <span style={{fontSize:20,fontWeight:500,minWidth:32,textAlign:"center",color:"var(--color-text-primary)"}}>{datos.dispenser||0}</span>
-            <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>set("dispenser",(datos.dispenser||0)+1)}>+</button>
-            <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>unidades prestadas</span>
-          </div>
-        </div>
-        {datos.foto&&<img src={datos.foto} alt="Domicilio" style={{width:"100%",borderRadius:8,maxHeight:160,objectFit:"cover"}} />}
-        <button style={{...s.btnPrimary,marginTop:8,opacity:!datos.nombre?0.45:1}} disabled={!datos.nombre} onClick={()=>onGuardar(datos)}>
-          Agregar cliente
-        </button>
+      <div style={{padding:16}}>
+        <FormCliente inicial={{dia:diaActual||"Martes"}} textoGuardar="Agregar cliente" onGuardar={onGuardar} />
       </div>
     </div>
   );

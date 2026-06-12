@@ -165,6 +165,8 @@ function App() {
     });
   };
   const [planillas, setPlanillas] = useLS("cat_planillas_v1", {});
+  // Cargas de salida por día — declarado acá arriba para que estadoRef pueda incluirlo y viaje a Firebase
+  const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
   // Firebase — credentials embedded in SDK config above
   const [apiKey, setApiKey] = useLS("cat_apikey", "");
   const [binId,  setBinId]  = useLS("cat_binid",  "");
@@ -252,6 +254,7 @@ function App() {
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
+      if (data.cargasDia && Object.keys(data.cargasDia).length) { setCargasDia(data.cargasDia); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(data.cargasDia));}catch{} }
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
       setCargandoNube(false);
@@ -259,8 +262,8 @@ function App() {
   }, []);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
-  const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos});
-  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto}; });
+  const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,cargasDia});
+  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto,cargasDia}; });
 
   // Hooks globales: respaldo COMPLETO descargable + restaurar
   React.useEffect(()=>{
@@ -295,6 +298,7 @@ function App() {
         if(data.mantVeh!==undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh||[]));
         if(data.histPrecios!==undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios||[]));
         if(data.zonasReparto!==undefined) setZonasReparto(data.zonasReparto||{});
+        if(data.cargasDia && Object.keys(data.cargasDia).length) { setCargasDia(data.cargasDia); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(data.cargasDia));}catch{} }
         try { cloudSave({ ...estadoRef.current, ...data }, window._negocioId); } catch {}
         return true;
       } catch(e){ alert("Error al restaurar: "+e.message); return false; }
@@ -489,8 +493,7 @@ function App() {
     localStorage.setItem("lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
     setProductos(v); syncData({productos:v});
   };
-  const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
-  const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(v));}catch{} };
+  const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(v));}catch{} syncData({cargasDia:v}); };
   const saveNoVisitas= (v) => { setNoVisitas(v); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(v));}catch{} };
   const saveProspectos=(v)=>{ setProspectos(v); try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(v));}catch{} syncData({prospectos:v}); };
 
@@ -574,8 +577,10 @@ function App() {
       (planillaActual.productos?.b10?.llenos > 0) || 
       (planillaActual.productos?.b20?.llenos > 0) || 
       (planillaActual.productos?.soda?.llenos > 0);
-    if(planillaActual.iniciado && huboReparto && !localStorage.getItem(camionCerradoKey)) {
+    if(planillaActual.iniciado && huboReparto && !planillaActual._stockCerrado && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
+      // Marca sincronizada en la planilla (viaja por Firebase) — evita que otro dispositivo repita el cierre y duplique el stock
+      savePlanilla(planillaKey, {...nueva, _stockCerrado:true});
       const prodMap = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda","Dispenser":"disp"};
       // Cuánto salió en el camión (según planilla de inicio de reparto)
       const llenos = {
@@ -672,6 +677,7 @@ function App() {
   }
 
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
+    montoTrans2 = Number(montoTrans2)||0; // defensa: el desglose mixto depende de esto
     const c = cliente;
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
@@ -743,31 +749,48 @@ function App() {
 
   const eliminarVenta = (ventaId) => {
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
-    const nv = ventas.filter(x=>x.id!==ventaId);
+    const eraMixta = (Number(v.montoTrans)||0)>0;
+    let ajusteSaldoExtra = 0;
+    let nv = ventas.filter(x=>{
+      if(x.id===ventaId) return false;
+      const ligada = x._esMixtoTrans && (
+        x._mixtoDe===ventaId ||
+        (x._mixtoDe===undefined && eraMixta && x.clienteId===v.clienteId && x.fechaKey===v.fechaKey)
+      );
+      if(ligada && (Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
+      return !ligada;
+    });
+    nv = nv.filter(x=>!(x._esMixtoTrans && x._mixtoDe!==undefined && !nv.some(y=>y.id===x._mixtoDe)));
     saveVentas(nv);
     const c = clientes.find(x=>x.id===v.clienteId);
-    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta}:x); saveClientes(nc); }
+    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta-ajusteSaldoExtra}:x); saveClientes(nc); }
   };
+
+  // Limpieza automática: partes-transferencia cuya venta principal ya fue eliminada
+  React.useEffect(()=>{
+    const huerfanas = ventas.filter(v=>v._esMixtoTrans && v._mixtoDe!==undefined && !ventas.some(x=>x.id===v._mixtoDe));
+    if(huerfanas.length>0){
+      const ids=new Set(huerfanas.map(v=>v.id));
+      saveVentas(ventas.filter(v=>!ids.has(v.id)));
+    }
+  }, [ventas]);
 
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
     const vV = ventas.find(v=>v.id===ventaId); if(!vV) return;
     const c  = clientes.find(x=>x.id===vV.clienteId);
     const esMixto = pago==="mixto";
-    const pagoReal = esMixto ? "mixto" : pago;
-    const montoParaCalc = esMixto
-      ? String((Number(montoPagado)||0)+(Number(montoTrans2)||0))
-      : montoPagado;
-    const calc = calcVenta(detalle, esMixto?"contado":pago, montoParaCalc, saldoAplicado, productos);
-    // Eliminar la vieja venta separada de transferencia si existía (versión anterior)
-    let nev = ventas.filter(v=>!(v.obs==="[Parte transfer. de pago mixto]"&&v.clienteId===vV.clienteId&&v.fechaKey===vV.fechaKey));
-    nev = nev.map(v=>v.id===ventaId?{
-      ...vV, detalle, pago:pagoReal, obs, saldoAplicado:saldoAplicado||0, ...calc,
-      montoEfec: esMixto ? Number(montoPagado)||0 : 0,
-      montoTrans: esMixto ? Number(montoTrans2)||0 : 0,
-    }:v);
-    const saldoExtra = c ? (c.saldo - vV.saldoDelta + calc.saldoDelta) : 0;
+    const ef = esMixto?(Number(montoPagado)||0):0;
+    const tr = esMixto?(Number(montoTrans2)||0):0;
+    // MIXTO (diseño comercial): UNA sola venta con pago "mixto" y desglose; el cálculo usa el total
+    const calc = calcVenta(detalle, esMixto?"contado":pago, esMixto?String(ef+tr):montoPagado, saldoAplicado, productos);
+    const obsLimpia = (obs||"").replace(/\s*\[Mixto:[^\]]*\]/g,"");
+    const obsFinal  = esMixto ? obsLimpia+` [Mixto: ef $${ef} + tr $${tr}]` : obsLimpia;
+    // Limpiar restos de versiones viejas que creaban una venta-transferencia aparte
+    let nev = ventas.filter(v=>!(v._esMixtoTrans && v._mixtoDe===ventaId));
+    nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:esMixto?"mixto":pago,obs:obsFinal,saldoAplicado:saldoAplicado||0,...calc,montoEfec:esMixto?ef:0,montoTrans:esMixto?tr:0,transConfirmada:esMixto?(vV.transConfirmada||false):vV.transConfirmada}:v);
+    const saldoNuevo = c ? (c.saldo - vV.saldoDelta + calc.saldoDelta) : 0;
     saveVentas(nev);
-    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
+    if(c) saveClientes(clientes.map(x=>x.id===c.id?{...x,saldo:saldoNuevo}:x));
   };
 
   return (
@@ -826,7 +849,7 @@ function App() {
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
-      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} ventasTodas={ventas} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
+      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} todasVentas={ventas} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onEditarCliente={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           const otros=clientes.filter(c=>c.dia!==diaActual);
           saveClientes([...otros,...lista]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
@@ -860,7 +883,7 @@ function App() {
         onAbrirMapa={()=>irA("mapaClientes")}
         onPlanilla={()=>{ setInitCierre(true); irA("planilla"); }}
         />}
-      {pantalla==="clientesDormidos" && <ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("gestionClientes")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} />}
+      {pantalla==="clientesDormidos" && <ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("gestionClientes")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
             const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
@@ -1130,7 +1153,7 @@ function App() {
         }}
         onVolver={()=>irA("menu")}
       />}
-      {pantalla==="fiadosPendientes" && <FiadosPendientes clientes={clientes} onVolver={()=>irA("menu")} onCobrar={(clienteId,monto,pago)=>{
+      {pantalla==="fiadosPendientes" && <FiadosPendientes clientes={clientes} ventas={ventas} onEditarCliente={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onVolver={()=>irA("menu")} onCobrar={(clienteId,monto,pago)=>{
           const c=clientes.find(x=>x.id===clienteId); if(!c) return;
           const saldoAntes=c.saldo||0; const saldoDespues=saldoAntes+monto;
           const fk=fechaActual||new Date().toISOString().slice(0,10);

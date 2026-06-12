@@ -379,20 +379,25 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
 
   const extraEnvases = React.useMemo(()=>{
     const m={};
+    const KP={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
     (ventas||[]).forEach(v=>{
-      if(!m[v.clienteId]) m[v.clienteId]={sifon:0,bidon10:0,bidon20:0};
-      (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
-      (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
+      if(!m[v.clienteId]) m[v.clienteId]={sifon:0,bidon10:0,bidon20:0,dispenser:0};
+      (v.envPrest||[]).forEach(e=>{const k=KP[e.prod];if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
+      (v.envDev||[]).forEach(e=>{const k=KP[e.prod];if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
     });
     return m;
   },[ventas]);
 
+
   const filtrados = clientes
     .filter(c=>filtroDia==="todos"||c.dia===filtroDia)
-    .filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase())||
-               (c.barrio||"").toLowerCase().includes(busqueda.toLowerCase())||
-               (c.telefono||"").includes(busqueda))
+    .filter(c=>buscarCliente(c,busqueda)>0)
     .sort((a,b)=>{
+      // Con búsqueda activa: primero las coincidencias por DOMICILIO
+      if(busqueda.trim()){
+        const dif=buscarCliente(b,busqueda)-buscarCliente(a,busqueda);
+        if(dif!==0) return dif;
+      }
       if(a.dia!==b.dia) return DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia);
       return (a.orden||9999)-(b.orden||9999);
     });
@@ -446,7 +451,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
       {tab === "lista" && (
         <>
           <div style={{padding:"10px 14px 6px"}}>
-            <input style={s.input} placeholder="Buscar por nombre, barrio o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
+            <input style={s.input} placeholder="Buscar por domicilio, nombre o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
             <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
               {["todos",...DIAS].map(d=>(
                 <button key={d} style={{...s.btn,fontSize:11,padding:"3px 10px",
@@ -497,28 +502,6 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
                     inicial={c}
                     onGuardar={(datos)=>{onEditar(c.id,datos);setEditandoId(null);}}
                   />
-                  {(()=>{
-                    const ex = extraEnvases[c.id]||{sifon:0,bidon10:0,bidon20:0};
-                    const aj = c.envAjuste||{sifon:0,bidon10:0,bidon20:0};
-                    const total = {sifon:ex.sifon+(aj.sifon||0),bidon10:ex.bidon10+(aj.bidon10||0),bidon20:ex.bidon20+(aj.bidon20||0)};
-                    const setTotal=(k,val)=>{const n=Number(val)||0;onEditar(c.id,{envAjuste:{...aj,[k]:n-(ex[k]||0)}});};
-                    return (
-                      <div style={{...s.card,margin:"4px 0",background:"var(--color-background-tertiary)",padding:"10px 12px",borderLeft:"3px solid var(--color-border-warning)"}}>
-                        <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-warning)",marginBottom:4}}>📦 Envases extra prestados al cliente</div>
-                        <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:8}}>Editá directamente la cantidad que tiene en su poder.</div>
-                        <div style={{display:"flex",gap:8}}>
-                          {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
-                            <div key={k} style={{flex:1,textAlign:"center"}}>
-                              <label style={{...s.label,textAlign:"center",fontSize:11}}>{l}</label>
-                              <input style={{...s.inputNum,textAlign:"center",fontSize:18,fontWeight:700,color:total[k]>0?"var(--color-text-warning)":total[k]<0?"var(--color-text-success)":"var(--color-text-tertiary)"}}
-                                type="number" value={total[k]} onChange={e=>setTotal(k,e.target.value)} />
-                              <div style={{fontSize:9,color:"var(--color-text-tertiary)",marginTop:3}}>{total[k]>0?"prestado":total[k]<0?"devuelto de más":"ok"}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
                 </>
               ) : (
                 <>
@@ -545,13 +528,11 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
                       <span style={{fontSize:18,cursor:"pointer",lineHeight:1}} onClick={e=>{e.stopPropagation();setFotoClienteId(fotoClienteId===c.id?null:c.id);}}>📷</span>
                     </div>
                   </div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
-                    <button style={{background:"rgba(226,75,74,0.2)",color:"#ffffff",border:"1px solid rgba(226,75,74,0.5)",borderRadius:6,padding:"2px 9px",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑 Eliminar</button>
-                    <div style={{display:"flex",gap:6}}>
-                      {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
-                      <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
-                    </div>
-                  </div>
+                  <PieEnvases c={c} ventas={ventas} onEditar={onEditar}
+                    izquierda={<button style={{background:"rgba(226,75,74,0.2)",color:"#ffffff",border:"1px solid rgba(226,75,74,0.5)",borderRadius:6,padding:"2px 9px",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑 Eliminar</button>}>
+                    {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
+                    <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
+                  </PieEnvases>
                 </>
               )}
             </div>
@@ -608,136 +589,6 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
   );
 }
 
-function FormCliente({inicial,onGuardar}) {
-  const [datos,setDatos] = useState({...inicial});
-  const set = (k,v) => setDatos(d=>({...d,[k]:v}));
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-      <div style={s.grid2}>
-        <div>
-          <label style={s.label}>Día de reparto</label>
-          <select style={s.select} value={datos.dia||"Martes"} onChange={e=>set("dia",e.target.value)}>
-            {DIAS.map(d=><option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={s.label}>Número de orden</label>
-          <input style={s.input} type="number" min={1} placeholder="ej: 5" value={datos.orden||""} onChange={e=>set("orden",Number(e.target.value)||"")} />
-        </div>
-      </div>
-      <div>
-        <label style={s.label}>Nombre y apellido *</label>
-        <input style={s.input} placeholder="Nombre completo" value={datos.nombre||""} onChange={e=>set("nombre",e.target.value)} />
-      </div>
-      <div style={s.grid2}>
-        <div><label style={s.label}>Barrio</label><input style={s.input} placeholder="Barrio" value={datos.barrio||""} onChange={e=>set("barrio",e.target.value)} /></div>
-        <div><label style={s.label}>Sector</label><input style={s.input} placeholder="Sector" value={datos.sector||""} onChange={e=>set("sector",e.target.value)} /></div>
-      </div>
-      <div style={s.grid3}>
-        <div><label style={s.label}>Manzana</label><input style={s.input} placeholder="Mz" value={datos.manzana||""} onChange={e=>set("manzana",e.target.value)} /></div>
-        <div><label style={s.label}>Lote</label><input style={s.input} placeholder="Lote" value={datos.lote||""} onChange={e=>set("lote",e.target.value)} /></div>
-        <div><label style={s.label}>Casa</label><input style={s.input} placeholder="Casa" value={datos.aclaracion||""} onChange={e=>set("aclaracion",e.target.value)} /></div>
-      </div>
-      <div style={s.grid2}>
-        <div><label style={s.label}>Calle</label><input style={s.input} placeholder="Calle" value={datos.calle||""} onChange={e=>set("calle",e.target.value)} /></div>
-        <div><label style={s.label}>Número</label><input style={s.input} placeholder="Nro" value={datos.nro||""} onChange={e=>set("nro",e.target.value)} /></div>
-      </div>
-      <div>
-        <label style={s.label}>Teléfono (sin 0 ni 15)</label>
-        <input style={s.input} placeholder="3816559000" value={datos.telefono||""} onChange={e=>set("telefono",e.target.value)} />
-      </div>
-      <div>
-        <label style={s.label}>Link Google Maps</label>
-        <input style={s.input} placeholder="https://maps.app.goo.gl/..." value={datos.maps||""} onChange={e=>set("maps",e.target.value)} />
-      </div>
-      <div>
-        <label style={s.label}>Notas rápidas</label>
-        <input style={s.input} placeholder="timbre roto, perro, cobrar deuda..." value={datos.notas||""} onChange={e=>set("notas",e.target.value)} />
-      </div>
-      <label style={{...s.label,marginTop:4}}>Envases habituales asignados</label>
-      <div style={s.grid3}>
-        {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
-          <div key={k}>
-            <label style={{...s.label,textAlign:"center"}}>{l}</label>
-            <input style={{...s.input,textAlign:"center"}} type="number" min={0} value={datos[k]||0} onChange={e=>set(k,Number(e.target.value))} />
-          </div>
-        ))}
-      </div>
-      <div>
-        <label style={s.label}>Dispenser en comodato</label>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <button style={{...s.btn,padding:"5px 14px",fontSize:18,lineHeight:1}} onClick={()=>set("dispenser",Math.max(0,(datos.dispenser||0)-1))}>−</button>
-          <span style={{fontSize:18,fontWeight:500,minWidth:28,textAlign:"center",color:"var(--color-text-primary)"}}>{datos.dispenser||0}</span>
-          <button style={{...s.btn,padding:"5px 14px",fontSize:18,lineHeight:1}} onClick={()=>set("dispenser",(datos.dispenser||0)+1)}>+</button>
-          <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>unidades</span>
-        </div>
-      </div>
-      <div style={{...s.card,margin:"4px 0",background:"var(--color-background-tertiary)",padding:"10px 12px"}}>
-        <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Saldo del cliente</div>
-        <div style={{display:"flex",gap:8,marginBottom:6}}>
-          {[["favor","A favor"],["deuda","Debe"],["cero","Sin saldo"]].map(([v,l])=>(
-            <button key={v} style={{flex:1,fontSize:11,padding:"6px 4px",borderRadius:8,border:"0.5px solid var(--color-border-secondary)",cursor:"pointer",
-              background:datos._tipoSaldo===v?"#185FA5":"var(--color-background-secondary)",
-              color:datos._tipoSaldo===v?"#e2eaf4":"var(--color-text-secondary)"}}
-              onClick={()=>set("_tipoSaldo",v)}>
-              {l}
-            </button>
-          ))}
-        </div>
-        {datos._tipoSaldo&&datos._tipoSaldo!=="cero"&&(
-          <div>
-            <label style={s.label}>{datos._tipoSaldo==="favor"?"Monto a favor ($)":"Monto que debe ($)"}</label>
-            <input style={s.input} type="number" min={0} placeholder="0" value={datos._montoSaldo||""} onChange={e=>set("_montoSaldo",e.target.value)} />
-          </div>
-        )}
-        {datos.saldo!==0&&<div style={{fontSize:11,color:datos.saldo<0?"var(--color-text-danger)":"var(--color-text-success)",marginTop:4}}>
-          Saldo actual: {fmt(datos.saldo)} · {datos.saldo<0?"Debe":"A favor"}
-        </div>}
-        <div style={{marginTop:6}}>
-          <label style={s.label}>O ingresá el saldo directamente (−negativo = debe · +positivo = a favor)</label>
-          <input style={s.input} type="number" placeholder="ej: -2500 o 1800"
-            value={datos._saldoDirecto??""} onChange={e=>set("_saldoDirecto",e.target.value)} />
-        </div>
-      </div>
-      <button style={{...s.btnPrimary,marginTop:4,opacity:!datos.nombre?0.45:1}} disabled={!datos.nombre}
-        onClick={()=>{
-          let saldo = datos.saldo||0;
-          if(datos._tipoSaldo==="favor")  saldo =  Math.abs(Number(datos._montoSaldo)||0);
-          if(datos._tipoSaldo==="deuda")  saldo = -Math.abs(Number(datos._montoSaldo)||0);
-          if(datos._tipoSaldo==="cero")   saldo = 0;
-          if(datos._saldoDirecto!==undefined&&datos._saldoDirecto!=="") saldo=Number(datos._saldoDirecto);
-          onGuardar({...datos, saldo});
-        }}>
-        Guardar cliente
-      </button>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════
-// ◆  GPS / Mapa de Clientes — agregado desde conversación
-// ════════════════════════════════════════════════════════════════════
-
-// ── Helpers GPS ──────────────────────────────────────────────────────────────
-function extraerCoordsDeURL(url) {
-  if(!url) return null;
-  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/\/dir\/[^/]*\/(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/\/(-2[0-9]\.\d{4,}),(-6[0-9]\.\d{4,})/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  return null;
-}
-function esLinkCorto(url) {
-  return url && (url.includes("maps.app.goo.gl") || url.includes("goo.gl/maps"));
-}
-
-// ── CargaGPSMasiva ────────────────────────────────────────────────────────────
 function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
   const sinGPS = React.useMemo(()=>(clientes||[]).filter(c=>!c.lat||!c.lng),[]);
   const [idx, setIdx] = React.useState(0);
