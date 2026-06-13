@@ -424,6 +424,12 @@ function App() {
   const saveVentas   = (v) => { setVentasRaw(v);   syncData({ventas:v}); };
   const savePlanillasCloud = (v) => { setPlanillas(v); syncData({planillas:v}); };
 
+  // Limpieza automática: partes-transferencia de pago mixto cuya venta principal ya no existe
+  React.useEffect(()=>{
+    const huerfanas = ventasRaw.filter(v=>v._esMixtoTrans && v._mixtoDe!==undefined && !ventasRaw.some(x=>x.id===v._mixtoDe));
+    if(huerfanas.length>0){ const ids=new Set(huerfanas.map(v=>v.id)); setVentasRaw(ventasRaw.filter(v=>!ids.has(v.id))); }
+  }, [ventasRaw]);
+
   // ── INFORMES EMAIL ──────────────────────────────────────────────
   const {enviarDiario, enviarSemanal, enviarMensual} = usarInformes({ventas,clientes,planillas,noVisitas:noVisitas||[],productos});
   const cerrarDia = async (fecha, dia) => {
@@ -766,15 +772,6 @@ function App() {
     const c = clientes.find(x=>x.id===v.clienteId);
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta-ajusteSaldoExtra}:x); saveClientes(nc); }
   };
-
-  // Limpieza automática: partes-transferencia cuya venta principal ya fue eliminada
-  React.useEffect(()=>{
-    const huerfanas = ventas.filter(v=>v._esMixtoTrans && v._mixtoDe!==undefined && !ventas.some(x=>x.id===v._mixtoDe));
-    if(huerfanas.length>0){
-      const ids=new Set(huerfanas.map(v=>v.id));
-      saveVentas(ventas.filter(v=>!ids.has(v.id)));
-    }
-  }, [ventas]);
 
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
     const vV = ventas.find(v=>v.id===ventaId); if(!vV) return;
