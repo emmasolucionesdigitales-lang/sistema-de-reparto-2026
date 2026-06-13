@@ -53,6 +53,12 @@
     }, "control");
     window.dbLicencias = firebase.app("control").firestore();
 
+    // ── Device ID permanente (para atar la licencia a este dispositivo) ──
+    (function(){
+      let id = localStorage.getItem("sr_device_id");
+      if(!id){ id = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("sr_device_id", id); }
+    })();
+
     // Verifica el código contra la base del admin y devuelve los datos
     window.verificarLicencia = async function(codigo) {
       try {
@@ -62,8 +68,15 @@
           .get();
         if(!snap.exists) return null;
         const d = snap.data();
-        if(d.estado !== "activo") return null;
-        return d; // incluye: pin, negocio, email, celular, nombre
+        // Estados que NO permiten entrar
+        if(d.estado === "inactivo" || d.estado === "pendiente") return null;
+        // Si el código ya fue usado en OTRO dispositivo, bloquear
+        if(d.estado === "usado" && d.deviceId) {
+          const miDevice = localStorage.getItem("sr_device_id");
+          if(miDevice && d.deviceId !== miDevice) return null;
+        }
+        // "activo" (sin usar) o "usado" en este mismo dispositivo → OK
+        return d; // incluye: pin, negocio, email, celular, nombre, deviceId
       } catch(e) { console.error("verificarLicencia:", e); return null; }
     };
 

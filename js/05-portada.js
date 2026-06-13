@@ -377,12 +377,49 @@ function PantallaActivacion({onActivado}) {
 
     setEstado("verificando");
     try {
+      // ── Control de dispositivo: que el código no se use en varios equipos ──
+      const cod = (lic.codigo || "").trim().toUpperCase();
+      let deviceId = localStorage.getItem("sr_device_id");
+      if(!deviceId) {
+        deviceId = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem("sr_device_id", deviceId);
+      }
+      if(cod && window.dbLicencias) {
+        try {
+          const snap = await window.dbLicencias.collection("licencias").doc(cod).get();
+          if(snap.exists) {
+            const d = snap.data();
+            // Si ya fue usado en OTRO dispositivo, bloquear
+            if(d.estado === "usado" && d.deviceId && d.deviceId !== deviceId) {
+              setEstado("error");
+              setError("Este código ya fue usado en otro dispositivo. Contactá al administrador.");
+              return;
+            }
+            // Validar email/celular contra lo registrado (si el admin los cargó)
+            if(d.celular && lic.celular && String(d.celular).trim() !== String(lic.celular).trim()) {
+              setEstado("error");
+              setError("El celular no coincide con el registrado. Contactá al administrador.");
+              return;
+            }
+            // Marcar como usado + atar al dispositivo
+            await window.dbLicencias.collection("licencias").doc(cod).update({
+              estado: "usado",
+              deviceId,
+              email: email.trim(),
+              negocio: negocio.trim(),
+              aceptoTerminos: true,
+              activadoEn: new Date().toISOString()
+            });
+          }
+        } catch(e) { /* sin conexión: la activación local sigue, se reintenta luego */ }
+      }
       // Marcar como activado en localStorage
       const licActualizada = {
         ...lic,
         negocio:  negocio.trim(),
         email:    email.trim(),
         pin:      pinAsignado,
+        deviceId,
         activado: true,
         fechaActivacion: new Date().toISOString(),
       };
