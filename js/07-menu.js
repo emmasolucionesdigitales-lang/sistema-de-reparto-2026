@@ -427,6 +427,7 @@ function DetalleVentasDia({ventas, clientes, prospectos, noVisitas, fecha}) {
 }
 
 function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,onCerrarDia,initCierre,noVisitas}) {
+  const [enviosInforme,setEnviosInforme] = React.useState(()=>Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`)||0));
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
   // Todas las ventas registradas con fechaKey === fecha (sin importar el día del cliente)
   const todasFecha = ventas.filter(v=>v.fechaKey===fecha);
@@ -903,40 +904,32 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
           </div>
         </div>
         <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
-        {onCerrarDia&&ventas.length>0&&!yaCerrado&&(()=>{
-          const yaEnviado = !!localStorage.getItem(`sr_informe_${fecha}_${dia}`);
-          return (
-            <button style={{width:"100%",padding:"14px",borderRadius:10,border:"none",background:"#4c1d95",color:"#e9d5ff",fontSize:15,fontWeight:600,cursor:"pointer",marginTop:10,opacity:yaEnviado?0.6:1}}
-              onClick={async()=>{
-                if(yaEnviado){alert("El informe del día ya fue enviado a tu email.");return;}
-                try {
-                  const ok = await onCerrarDia();
-                  if(ok) alert("✅ Informe enviado a tu email.");
-                } catch(err) {
-                  alert("❌ Error al enviar: " + (err.message||err));
-                }
-              }}>
-              📊 {yaEnviado?"Informe ya enviado":"Cerrar día y enviar informe"}
-            </button>
-          );
-        })()}
-        {/* Botón enviar email siempre disponible */}
         {onCerrarDia&&ventas.length>0&&(()=>{
-          const yaEnviado = !!localStorage.getItem(`sr_informe_${fecha}_${dia}`);
+          const MAX_ENVIOS = 3;
+          const envios = enviosInforme;
+          const quedan = MAX_ENVIOS - envios;
+          const agotado = quedan<=0;
           return (
-            <button style={{width:"100%",padding:"12px",borderRadius:10,border:"0.5px solid #4c1d95",background:"transparent",color:"#a78bfa",fontSize:13,fontWeight:500,cursor:"pointer",marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
+            <button style={{width:"100%",padding:"14px",borderRadius:10,border:"none",background:agotado?"#555":envios>0?"#0F6E56":"#4c1d95",color:agotado?"#ccc":envios>0?"#d1fae5":"#e9d5ff",fontSize:15,fontWeight:600,cursor:agotado?"default":"pointer",marginTop:10,opacity:agotado?0.7:1}}
               onClick={async()=>{
+                if(agotado){alert(`Ya enviaste el informe del día ${MAX_ENVIOS} veces (el máximo). Revisá tu email, incluida la carpeta de spam.`);return;}
                 try {
                   const ok = await onCerrarDia();
                   if(ok){
-                    alert("✅ Informe enviado a tu email.");
-                    localStorage.setItem(`sr_informe_${fecha}_${dia}`,"1");
+                    setEnviosInforme(Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`)||envios+1));
+                    alert(`✅ Informe enviado a tu email.${quedan-1>0?`\n\nSi no te llega, podés reenviarlo ${quedan-1} ${quedan-1===1?"vez":"veces"} más.`:""}`);
+                  } else {
+                    alert("❌ No se pudo enviar el informe. Verificá tu conexión e intentá de nuevo.");
                   }
                 } catch(err) {
                   alert("❌ Error al enviar: " + (err.message||err));
                 }
               }}>
-              📧 {yaEnviado?"Reenviar informe por email":"Enviar informe por email"}
+              {agotado
+                ? "📊 Informe enviado (máximo alcanzado)"
+                : envios>0
+                  ? `🔄 Reenviar informe (${quedan} ${quedan===1?"envío":"envíos"} restante${quedan===1?"":"s"})`
+                  : "📊 Cerrar día y enviar informe"}
             </button>
           );
         })()}
