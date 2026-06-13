@@ -387,6 +387,15 @@ function PantallaActivacion({onActivado}) {
         fechaActivacion: new Date().toISOString(),
       };
       localStorage.setItem("sr_licencia", JSON.stringify(licActualizada));
+      // ── Email de bienvenida con el PIN (vía proxy Apps Script) ──
+      if(window.enviarEmailBrevoRM) {
+        window.enviarEmailBrevoRM({
+          to: email.trim(),
+          toName: negocio.trim(),
+          subject: "✅ Sistema de Reparto activado correctamente",
+          htmlContent: `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:24px"><div style="background:#185FA5;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px"><h2 style="color:#fff;margin:0">¡Bienvenido!</h2><p style="color:rgba(255,255,255,.8);margin:8px 0 0">${negocio.trim()}</p></div><p style="color:#333">Tu app <b>Sistema de Reparto</b> fue activada correctamente.</p><div style="background:#f0f7ff;border-radius:10px;padding:16px;text-align:center;margin:16px 0"><div style="font-size:13px;color:#666;margin-bottom:4px">Tu PIN de acceso</div><div style="font-size:32px;font-weight:800;color:#185FA5;letter-spacing:8px">${pinAsignado}</div><div style="font-size:12px;color:#999;margin-top:4px">Guardalo en un lugar seguro</div></div><p style="color:#555;font-size:13px">Lo vas a necesitar cada vez que abras la app.</p><p style="color:#999;font-size:12px;margin-top:20px">¿Ayuda? WhatsApp: <b>+54 9 381 339-9962</b></p><p style="color:#bbb;font-size:11px">Emma Soluciones Digitales</p></div>`
+        }).catch(()=>{}); // si el mail falla, la activación NO se interrumpe
+      }
       setEstado("ok");
       setTimeout(()=>onActivado(), 700);
     } catch(e) {
