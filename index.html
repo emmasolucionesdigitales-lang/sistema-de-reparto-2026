@@ -83,22 +83,22 @@
       } catch(e) { console.error("cloudLoad error:", e); return null; }
     }
 
-    // ── Brevo email ─────────────────────────────────────────────────────
+    // ── Email vía Google Apps Script ────────────────────────────────────
+    // La clave de Brevo ya NO está acá: vive oculta en tu Apps Script.
+    // 1) Pegá la URL de tu Apps Script (termina en /exec)
+    // 2) Pegá el MISMO token que pusiste en el Code.gs
+    const EMAIL_ENDPOINT = "https://script.google.com/macros/s/AKfycbzmNoGW8yrdtUTjGUhLym67rDfRc9-h4FtYqFWkOEojkIYnDGEy13gt1704S74YU9xj/exec";
+    const EMAIL_TOKEN    = "Emma131017";
+
     window.enviarEmailBrevoRM = async function({to, toName, subject, htmlContent}) {
-      const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+      // OJO: sin header Content-Type a propósito — evita el "preflight" CORS
+      // que Apps Script no soporta. No lo agregues.
+      const resp = await fetch(EMAIL_ENDPOINT, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": "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"
-        },
-        body: JSON.stringify({
-          sender: { name: "Sistema de Reparto", email: "carabajalponce1980@gmail.com" },
-          to: [{ email: to, name: toName || "" }],
-          subject: subject,
-          htmlContent: htmlContent
-        })
+        body: JSON.stringify({ token: EMAIL_TOKEN, to, toName, subject, htmlContent })
       });
-      if(!resp.ok) { const t = await resp.text(); throw new Error("Brevo " + resp.status + ": " + t); }
+      const data = await resp.json().catch(()=>({ ok:false, error:"respuesta inválida del servicio" }));
+      if(!data.ok) throw new Error(data.error || "Error al enviar email");
       return true;
     };
   </script>

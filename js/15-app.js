@@ -12,7 +12,7 @@ function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
       return false;
     }
     // Buscar email: primero en config, luego en la licencia (activación)
-    const emailConfig = (()=>{ try{ return localStorage.getItem("lc_email_informes")||""; }catch{ return ""; } })();
+    const emailConfig = (()=>{ try{ return localStorage.getItem("sr_lc_email_informes")||""; }catch{ return ""; } })();
     const emailLic = lic.email || "";
     const emailFinal = emailConfig || emailLic;
     if(!emailFinal) {
@@ -84,28 +84,28 @@ function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
     const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"]; // historial does NOT need dia
-    const savedDia = (() => { try { return JSON.parse(localStorage.getItem("cat_dia_actual")||'""'); } catch{ return ""; } })();
+    const savedDia = (() => { try { return JSON.parse(localStorage.getItem("sr_dia_actual")||'""'); } catch{ return ""; } })();
     if(needsDia.includes(h) && !savedDia) return "portada";
     return h;
   });
-  const [diaActual, setDiaActual]   = useLS("cat_dia_actual", "");
+  const [diaActual, setDiaActual]   = useLS("sr_dia_actual", "");
   // Reset diaActual when it's invalid
   React.useEffect(()=>{
     if(diaActual && !DIAS.includes(diaActual)) setDiaActual("");
   },[]);
-  const [fechaActual, setFechaActual] = useLS("cat_fecha_actual", ""); // ISO date key YYYY-MM-DD
+  const [fechaActual, setFechaActual] = useLS("sr_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
   const [prospectoId, setProspectoId] = useState(null);
   const [initCierre, setInitCierre] = useState(false);
-  const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
-  const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
-  const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
+  const [noVisitas, setNoVisitas] = useLS("sr_novisitas_v1", []);
+  const [prospectos, setProspectos] = useLS("sr_prospectos_v1", []);
+  const [recordatorios, setRecordatorios] = useLS("sr_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   const saveRecordatorios = (r) => { setRecordatorios(r); syncData({recordatorios:r}); };
   const recordatoriosActivos = (recordatorios||[]).filter(r=>!r.confirmado); // [{clienteId,dia,fecha,motivo}]
-  const [clientes, setClientes]   = useLS("cat_clientes_v3", CLIENTES_INICIALES);
-  const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
+  const [clientes, setClientes]   = useLS("sr_clientes_v3", CLIENTES_INICIALES);
+  const [ventasRaw, setVentasRaw] = useLS("sr_ventas_v3", []);
   const normalizarFechaKey = (v) => {
     if(v.fechaKey) return v;
     const fk = v.fecha ? (()=>{
@@ -120,7 +120,7 @@ function App() {
   };
   const ventas = React.useMemo(()=>(ventasRaw||[]).map(normalizarFechaKey),[ventasRaw]);
   const setVentas = (arg) => setVentasRaw(typeof arg==='function' ? prev=>arg(prev) : arg);
-  const [productos, setProductos] = useLS("cat_productos_v3", PRODUCTOS_INICIALES);
+  const [productos, setProductos] = useLS("sr_productos_v3", PRODUCTOS_INICIALES);
   const normStock = (s) => {
     const e = () => ({sifon:0,bidon10:0,bidon20:0,dispenser:0});
     const pick = (o) => { const r={sifon:0,bidon10:0,bidon20:0,dispenser:0}; if(o&&typeof o==="object"){ for(const k in o){ r[k]=Math.max(0,Math.round(Number(o[k])||0)); } } return r; };
@@ -136,7 +136,7 @@ function App() {
     }
     return {soderia:pick(s), soderia_vacios:e(), casa:e(), camion:e()};
   };
-  const [stockRaw, setStockRaw] = useLS("cat_stock_v4", {soderia:{sifon:0,bidon10:0,bidon20:0,dispenser:0},soderia_vacios:{sifon:0,bidon10:0,bidon20:0,dispenser:0},casa:{sifon:0,bidon10:0,bidon20:0,dispenser:0},camion:{sifon:0,bidon10:0,bidon20:0,dispenser:0}});
+  const [stockRaw, setStockRaw] = useLS("sr_stock_v4", {soderia:{sifon:0,bidon10:0,bidon20:0,dispenser:0},soderia_vacios:{sifon:0,bidon10:0,bidon20:0,dispenser:0},casa:{sifon:0,bidon10:0,bidon20:0,dispenser:0},camion:{sifon:0,bidon10:0,bidon20:0,dispenser:0}});
   const stockNorm = React.useMemo(()=>normStock(stockRaw), [JSON.stringify(stockRaw)]);
   const setStock = (sOrFn) => {
     if(typeof sOrFn === "function") {
@@ -164,12 +164,12 @@ function App() {
       return s;
     });
   };
-  const [planillas, setPlanillas] = useLS("cat_planillas_v1", {});
+  const [planillas, setPlanillas] = useLS("sr_planillas_v1", {});
   // Cargas de salida por día — declarado acá arriba para que estadoRef pueda incluirlo y viaje a Firebase
-  const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
+  const [cargasDia, setCargasDia] = useLS("sr_cargas_dia_v1", CARGA_DIA_DEFAULT);
   // Firebase — credentials embedded in SDK config above
-  const [apiKey, setApiKey] = useLS("cat_apikey", "");
-  const [binId,  setBinId]  = useLS("cat_binid",  "");
+  const [apiKey, setApiKey] = useLS("sr_apikey", "");
+  const [binId,  setBinId]  = useLS("sr_binid",  "");
   const [syncStatus, setSyncStatus] = useState("idle");
   const [ecToken, setEcToken] = useState(()=>localStorage.getItem('lc_ec_token')||'');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -177,12 +177,12 @@ function App() {
     ()=>!!localStorage.getItem("sr_offline_pending")
   );
   const [cloudSetup, setCloudSetup] = useState(false);
-  const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
+  const [darkMode, setDarkMode]   = useLS("sr_darkmode", false);
   
   const [modalResumenDia, setModalResumenDia] = useState(null);
   const [tabConfig, setTabConfig] = useState("stock");
-  const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
-  const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
+  const [zonasReparto, setZonasReparto] = useLS("sr_zonas_v1", {});
+  const [scaleIdx, setScaleIdx]   = useLS("sr_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
   const SCALE_LABELS = ["S","M","L","XL"];
 
@@ -234,9 +234,9 @@ function App() {
     setSyncStatus("loading");
     cloudLoad(negocioId).then(function(data) {
       if(!data) { setSyncStatus("idle"); setCargandoNube(false); return; }
-      if (data.clientes?.length)   { setClientes(data.clientes);    try{localStorage.setItem("cat_clientes_v3",JSON.stringify(data.clientes));}catch{} }
-      if (data.ventas?.length)     { setVentasRaw(data.ventas);     try{localStorage.setItem("cat_ventas_v3",JSON.stringify(data.ventas));}catch{} }
-      if (data.planillas)          { setPlanillas(data.planillas);  try{localStorage.setItem("cat_planillas_v1",JSON.stringify(data.planillas));}catch{} }
+      if (data.clientes?.length)   { setClientes(data.clientes);    try{localStorage.setItem("sr_clientes_v3",JSON.stringify(data.clientes));}catch{} }
+      if (data.ventas?.length)     { setVentasRaw(data.ventas);     try{localStorage.setItem("sr_ventas_v3",JSON.stringify(data.ventas));}catch{} }
+      if (data.planillas)          { setPlanillas(data.planillas);  try{localStorage.setItem("sr_planillas_v1",JSON.stringify(data.planillas));}catch{} }
       if (data.stock) {
         const ds = data.stock;
         const normStock = ds.soderia ? ds : {
@@ -245,16 +245,16 @@ function App() {
           camion: {sifon:0,bidon10:0,bidon20:0},
         };
         setStock(normStock);
-        try { localStorage.setItem("cat_stock_v4", JSON.stringify(normStock)); } catch {}
+        try { localStorage.setItem("sr_stock_v4", JSON.stringify(normStock)); } catch {}
       }
-      if (data.productos?.length)     { setProductos(data.productos);    try{localStorage.setItem("cat_productos_v3",JSON.stringify(data.productos));}catch{} }
-      if (data.noVisitas?.length)     { setNoVisitas(data.noVisitas);    try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(data.noVisitas));}catch{} }
-      if (data.prospectos?.length)    { setProspectos(data.prospectos);  try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(data.prospectos));}catch{} }
-      if (data.recordatorios?.length) { setRecordatorios(data.recordatorios); try{localStorage.setItem("cat_recordatorios_v1",JSON.stringify(data.recordatorios));}catch{} }
-      if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
-      if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
+      if (data.productos?.length)     { setProductos(data.productos);    try{localStorage.setItem("sr_productos_v3",JSON.stringify(data.productos));}catch{} }
+      if (data.noVisitas?.length)     { setNoVisitas(data.noVisitas);    try{localStorage.setItem("sr_novisitas_v1",JSON.stringify(data.noVisitas));}catch{} }
+      if (data.prospectos?.length)    { setProspectos(data.prospectos);  try{localStorage.setItem("sr_prospectos_v1",JSON.stringify(data.prospectos));}catch{} }
+      if (data.recordatorios?.length) { setRecordatorios(data.recordatorios); try{localStorage.setItem("sr_recordatorios_v1",JSON.stringify(data.recordatorios));}catch{} }
+      if (data.mantVeh?.length)    localStorage.setItem("sr_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
+      if (data.histPrecios?.length) localStorage.setItem("sr_lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
-      if (data.cargasDia && Object.keys(data.cargasDia).length) { setCargasDia(data.cargasDia); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(data.cargasDia));}catch{} }
+      if (data.cargasDia && Object.keys(data.cargasDia).length) { setCargasDia(data.cargasDia); try{localStorage.setItem("sr_cargas_dia_v1",JSON.stringify(data.cargasDia));}catch{} }
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
       setCargandoNube(false);
@@ -268,8 +268,8 @@ function App() {
   // Hooks globales: respaldo COMPLETO descargable + restaurar
   React.useEffect(()=>{
     window._descargarRespaldo = () => {
-      const mantVeh = (()=>{ try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
-      const histPrecios = (()=>{ try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
+      const mantVeh = (()=>{ try { return JSON.parse(localStorage.getItem("sr_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
+      const histPrecios = (()=>{ try { return JSON.parse(localStorage.getItem("sr_lc_hist_precios")||"[]"); } catch { return []; } })();
       const data = { ...estadoRef.current, mantVeh, histPrecios,
         _respaldo:true, _app:"sistema-de-reparto", _fecha:new Date().toISOString() };
       const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
@@ -283,22 +283,22 @@ function App() {
     window._restaurarRespaldo = (data) => {
       if(!data || typeof data!=="object") { alert("El archivo no es un respaldo válido."); return false; }
       try {
-        if(data.clientes!==undefined){ setClientes(data.clientes||[]); try{localStorage.setItem("cat_clientes_v3",JSON.stringify(data.clientes||[]));}catch{} }
-        if(data.ventas!==undefined){ setVentasRaw(data.ventas||[]); try{localStorage.setItem("cat_ventas_v3",JSON.stringify(data.ventas||[]));}catch{} }
-        if(data.planillas!==undefined){ setPlanillas(data.planillas||{}); try{localStorage.setItem("cat_planillas_v1",JSON.stringify(data.planillas||{}));}catch{} }
+        if(data.clientes!==undefined){ setClientes(data.clientes||[]); try{localStorage.setItem("sr_clientes_v3",JSON.stringify(data.clientes||[]));}catch{} }
+        if(data.ventas!==undefined){ setVentasRaw(data.ventas||[]); try{localStorage.setItem("sr_ventas_v3",JSON.stringify(data.ventas||[]));}catch{} }
+        if(data.planillas!==undefined){ setPlanillas(data.planillas||{}); try{localStorage.setItem("sr_planillas_v1",JSON.stringify(data.planillas||{}));}catch{} }
         if(data.stock){
           const ds=data.stock;
           const ns = ds.soderia ? ds : {soderia:{sifon:ds.sifon||0,bidon10:ds.bidon10||0,bidon20:ds.bidon20||0},casa:{sifon:0,bidon10:0,bidon20:0},camion:{sifon:0,bidon10:0,bidon20:0}};
-          setStock(ns); try{localStorage.setItem("cat_stock_v4",JSON.stringify(ns));}catch{}
+          setStock(ns); try{localStorage.setItem("sr_stock_v4",JSON.stringify(ns));}catch{}
         }
-        if(data.productos!==undefined){ setProductos(data.productos||[]); try{localStorage.setItem("cat_productos_v3",JSON.stringify(data.productos||[]));}catch{} }
-        if(data.noVisitas!==undefined){ setNoVisitas(data.noVisitas||[]); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(data.noVisitas||[]));}catch{} }
-        if(data.prospectos!==undefined){ setProspectos(data.prospectos||[]); try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(data.prospectos||[]));}catch{} }
-        if(data.recordatorios!==undefined){ setRecordatorios(data.recordatorios||[]); try{localStorage.setItem("cat_recordatorios_v1",JSON.stringify(data.recordatorios||[]));}catch{} }
-        if(data.mantVeh!==undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh||[]));
-        if(data.histPrecios!==undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios||[]));
+        if(data.productos!==undefined){ setProductos(data.productos||[]); try{localStorage.setItem("sr_productos_v3",JSON.stringify(data.productos||[]));}catch{} }
+        if(data.noVisitas!==undefined){ setNoVisitas(data.noVisitas||[]); try{localStorage.setItem("sr_novisitas_v1",JSON.stringify(data.noVisitas||[]));}catch{} }
+        if(data.prospectos!==undefined){ setProspectos(data.prospectos||[]); try{localStorage.setItem("sr_prospectos_v1",JSON.stringify(data.prospectos||[]));}catch{} }
+        if(data.recordatorios!==undefined){ setRecordatorios(data.recordatorios||[]); try{localStorage.setItem("sr_recordatorios_v1",JSON.stringify(data.recordatorios||[]));}catch{} }
+        if(data.mantVeh!==undefined) localStorage.setItem("sr_mant_vehiculo_v1", JSON.stringify(data.mantVeh||[]));
+        if(data.histPrecios!==undefined) localStorage.setItem("sr_lc_hist_precios", JSON.stringify(data.histPrecios||[]));
         if(data.zonasReparto!==undefined) setZonasReparto(data.zonasReparto||{});
-        if(data.cargasDia && Object.keys(data.cargasDia).length) { setCargasDia(data.cargasDia); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(data.cargasDia));}catch{} }
+        if(data.cargasDia && Object.keys(data.cargasDia).length) { setCargasDia(data.cargasDia); try{localStorage.setItem("sr_cargas_dia_v1",JSON.stringify(data.cargasDia));}catch{} }
         try { cloudSave({ ...estadoRef.current, ...data }, window._negocioId); } catch {}
         return true;
       } catch(e){ alert("Error al restaurar: "+e.message); return false; }
@@ -308,14 +308,14 @@ function App() {
 
   // Auto backup DIARIO a localStorage
   React.useEffect(()=>{
-    const ultimoBackup = localStorage.getItem("lc_ultimo_backup");
+    const ultimoBackup = localStorage.getItem("sr_lc_ultimo_backup");
     const hoy = new Date().toISOString().slice(0,10);
     if(ultimoBackup===hoy) return; // ya se hizo hoy
     try {
-      localStorage.setItem("lc_backup_"+hoy, JSON.stringify({clientes,ventas,planillas}));
-      localStorage.setItem("lc_ultimo_backup", hoy);
+      localStorage.setItem("sr_lc_backup_"+hoy, JSON.stringify({clientes,ventas,planillas}));
+      localStorage.setItem("sr_lc_ultimo_backup", hoy);
       // Mantener solo el último backup (el de ayer)
-      const keys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
+      const keys = Object.keys(localStorage).filter(k=>k.startsWith("sr_lc_backup_")).sort().reverse();
       keys.slice(1).forEach(k=>localStorage.removeItem(k));
       console.log("Auto-backup diario guardado:", hoy);
     } catch(e){ console.warn("Auto-backup falló:", e); }
@@ -324,8 +324,8 @@ function App() {
   const syncData = (overrides={}) => {
     if(!window.db) return;
     setSyncStatus("saving");
-    const mantVehActual = (() => { try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
-    const histPreciosActual = (() => { try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
+    const mantVehActual = (() => { try { return JSON.parse(localStorage.getItem("sr_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
+    const histPreciosActual = (() => { try { return JSON.parse(localStorage.getItem("sr_lc_hist_precios")||"[]"); } catch { return []; } })();
     const data = { ...estadoRef.current, ...overrides, noVisitas: overrides.noVisitas!==undefined ? overrides.noVisitas : (estadoRef.current.noVisitas||[]), prospectos: overrides.prospectos!==undefined ? overrides.prospectos : (estadoRef.current.prospectos||[]), recordatorios: overrides.recordatorios!==undefined ? overrides.recordatorios : (estadoRef.current.recordatorios||[]), mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||estadoRef.current.zonasReparto||{} };
     estadoRef.current = data;
     debounceSave(() => {
@@ -398,7 +398,7 @@ function App() {
     const t18 = programar18hs();
     const chequearMantenimiento = () => {
       if(Notification.permission!=="granted") return;
-      const mantList = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); }catch{ return []; } })();
+      const mantList = (()=>{ try{ return JSON.parse(localStorage.getItem("sr_mant_vehiculo_v1")||"[]"); }catch{ return []; } })();
       const hoy = new Date(); hoy.setHours(0,0,0,0);
       mantList.forEach(m=>{
         if(!m.proximaFechaISO) return;
@@ -495,14 +495,14 @@ function App() {
   const saveProductos= (v) => {
     // Registrar cambio de precio en historial
     const hoy = new Date().toISOString().slice(0,16);
-    const histPrecios = JSON.parse(localStorage.getItem("lc_hist_precios")||"[]");
+    const histPrecios = JSON.parse(localStorage.getItem("sr_lc_hist_precios")||"[]");
     histPrecios.push({fecha:hoy, productos:v.map(p=>({nombre:p.nombre,precio:p.precio,costo:p.costo}))});
-    localStorage.setItem("lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
+    localStorage.setItem("sr_lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
     setProductos(v); syncData({productos:v});
   };
-  const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(v));}catch{} syncData({cargasDia:v}); };
-  const saveNoVisitas= (v) => { setNoVisitas(v); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(v));}catch{} };
-  const saveProspectos=(v)=>{ setProspectos(v); try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(v));}catch{} syncData({prospectos:v}); };
+  const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("sr_cargas_dia_v1",JSON.stringify(v));}catch{} syncData({cargasDia:v}); };
+  const saveNoVisitas= (v) => { setNoVisitas(v); try{localStorage.setItem("sr_novisitas_v1",JSON.stringify(v));}catch{} };
+  const saveProspectos=(v)=>{ setProspectos(v); try{localStorage.setItem("sr_prospectos_v1",JSON.stringify(v));}catch{} syncData({prospectos:v}); };
 
   const cliente = clientes.find(c=>c.id===clienteId)||null;
   const prospecto = (prospectos||[]).find(p=>p.id===prospectoId)||null;
@@ -863,7 +863,7 @@ function App() {
             const nuevo = {...p, saldo:0, _esProspecto:true};
             const nuevosClientes = [...clientes, nuevo];
             setClientes(nuevosClientes);
-            try { localStorage.setItem("cat_clientes_v3", JSON.stringify(nuevosClientes)); } catch{}
+            try { localStorage.setItem("sr_clientes_v3", JSON.stringify(nuevosClientes)); } catch{}
           }
           setClienteId(p.id);
           irA("venta");
