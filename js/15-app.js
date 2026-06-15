@@ -1149,6 +1149,10 @@ function App() {
           if(!c){alert("Seleccioná un cliente");return;}
           saveRecordatorios([...(recordatorios||[]),{...datos,id:Date.now(),clienteId:c.id,clienteNombre:c.nombre,dia:c.dia,confirmado:false}]);
         }}
+        onIrCliente={(clienteId)=>{
+          const c=clientes.find(x=>x.id===clienteId);
+          if(c){setClienteId(clienteId);setDiaActual(c.dia);irA("detalleCliente");}
+        }}
         onVolver={()=>irA("menu")}
       />}
       {pantalla==="fiadosPendientes" && <FiadosPendientes clientes={clientes} ventas={ventas} onEditarCliente={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onVolver={()=>irA("menu")} onCobrar={(clienteId,monto,pago)=>{
