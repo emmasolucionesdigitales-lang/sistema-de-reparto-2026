@@ -7,7 +7,7 @@ function AgendaScreen({recordatorios,clientes,onConfirmar,onEliminar,onNuevo,onV
   const [clienteBusq,setClienteBusq]  = React.useState("");
   const [clienteSel,setClienteSel]    = React.useState(null);
   const [filtro,setFiltro]            = React.useState("pendiente"); // pendiente | todos
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = (()=>{const d=new Date(Date.now()-3*60*60*1000);return d.toISOString().slice(0,10);})();
 
   const tipoIco  = {visita:"🏠",cobro:"💰"};
   const tipoCl   = {visita:"var(--color-text-info)",cobro:"var(--color-text-warning)"};
@@ -137,7 +137,7 @@ function AgendaScreen({recordatorios,clientes,onConfirmar,onEliminar,onNuevo,onV
 }
 
 function NuevoRecordatorioForm({clientes,onGuardar,onCerrar}) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = (()=>{const d=new Date(Date.now()-3*60*60*1000);return d.toISOString().slice(0,10);})();
   const [tipo,setTipo]     = React.useState("visita");
   const [fecha,setFecha]   = React.useState(hoy);
   const [hora,setHora]     = React.useState("10:00");
@@ -200,7 +200,7 @@ function NuevoRecordatorioForm({clientes,onGuardar,onCerrar}) {
         <button style={{...s.btn,flex:1}} onClick={onCerrar}>Cancelar</button>
         <button style={{...s.btnPrimary,flex:2,opacity:(!clienteId||!motivo.trim())?0.5:1}}
           disabled={!clienteId||!motivo.trim()}
-          onClick={()=>onGuardar({tipo,fecha,hora,motivo:motivo.trim(),clienteId})}>
+          onClick={()=>onGuardar({id:Date.now(),tipo,fecha,hora,motivo:motivo.trim(),clienteId,clienteNombre:(clientes.find(c=>c.id===clienteId)||{}).nombre||"",confirmado:false})}>
           Guardar recordatorio
         </button>
       </div>
