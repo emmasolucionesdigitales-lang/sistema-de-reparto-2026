@@ -40,7 +40,9 @@
     };
     firebase.initializeApp(firebaseConfig);
     // ── App Check: solo las peticiones desde ESTA app verificada pueden tocar la base ──
-    try { firebase.appCheck().activate("6LezmystAAAAAAJHmliElRAppgAunE8Qs7Yb7oap", true); } catch(e) { console.warn("App Check:", e); }
+    // Se activa cuando el DOM está listo (reCAPTCHA necesita el <body> para poder cargar)
+    function activarAppCheck(){ try { firebase.appCheck().activate("6LezmystAAAAAAJHmliElRAppgAunE8Qs7Yb7oap", true); } catch(e) { console.warn("App Check:", e); } }
+    if(document.body){ activarAppCheck(); } else { document.addEventListener("DOMContentLoaded", activarAppCheck); }
     window.db = firebase.firestore();
     window.db.enablePersistence().catch(()=>{});
     const db = window.db;
