@@ -25,6 +25,7 @@
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
   <script>
     // ═══════════════════════════════════════════
     // REEMPLAZÁ ESTOS VALORES CON TU FIREBASE CONFIG
@@ -38,6 +39,8 @@
       appId:             "1:162304851374:web:0a60847807c8fe9a7a1c3f"
     };
     firebase.initializeApp(firebaseConfig);
+    // ── App Check: solo las peticiones desde ESTA app verificada pueden tocar la base ──
+    try { firebase.appCheck().activate("6LezmystAAAAAAJHmliElRAppgAunE8Qs7Yb7oap", true); } catch(e) { console.warn("App Check:", e); }
     window.db = firebase.firestore();
     window.db.enablePersistence().catch(()=>{});
     const db = window.db;
