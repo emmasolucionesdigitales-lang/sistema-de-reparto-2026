@@ -245,7 +245,7 @@ function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}
   const confirmarImport = () => {
     const maxId = Math.max(0, ...(clientes||[]).map(c=>c.id||0), ...(prospectos||[]).map(p=>p.id||0));
     let nextId = maxId + 1;
-    const hoy = new Date().toISOString().slice(0,10);
+    const hoy = new Date().toLocaleDateString("en-CA");
     const nuevosClientes = [], nuevosProspectos = [];
     preview.forEach(p => {
       const base = {

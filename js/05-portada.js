@@ -42,10 +42,10 @@ function formatFecha(d) {
 }
 
 function fechaKey(d) {
-  return d.toISOString().slice(0,10);
+  return d.toLocaleDateString("en-CA");
 }
 
-function hoyKey() { return new Date().toISOString().slice(0,10); }
+function hoyKey() { return new Date().toLocaleDateString("en-CA"); }
 
 function SelectorFecha({dia,planillas,ventas,noVisitas,onSeleccionar,onVolver}) {
   const fechas = getFechasDelAnio(dia);
