@@ -424,12 +424,9 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
       <div style={{display:"flex", borderBottom:"0.5px solid var(--color-border-tertiary)", background:"var(--color-background-secondary)", overflowX:"auto"}}>
         {[
           {id:"lista",    ico:"👥", lbl:"Lista"},
-          {id:"prospectos",ico:"🚀",lbl:"Prospectos", nav:"promocion"},
           {id:"fiados",   ico:"💰", lbl:"Fiados",  badge:cantFiados},
           {id:"dormidos", ico:"😴", lbl:"Dormidos", nav:"clientesDormidos"},
-          {id:"agenda",   ico:"📅", lbl:"Agenda",  badge:cantAgenda},
           {id:"mapa",     ico:"🗺", lbl:"Mapa"},
-
         ].map(({id,ico,lbl,badge,nav})=>(
           <button key={id}
             style={{

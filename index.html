@@ -26,7 +26,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
   <script>
     // ═══════════════════════════════════════════
     // REEMPLAZÁ ESTOS VALORES CON TU FIREBASE CONFIG
@@ -42,10 +41,6 @@
     firebase.initializeApp(firebaseConfig);
     // ── Autenticación anónima — necesaria para las reglas de Firestore ──
     firebase.auth().signInAnonymously().catch(e=>console.warn("Auth anónima:", e));
-    // ── App Check: solo las peticiones desde ESTA app verificada pueden tocar la base ──
-    // Se activa cuando el DOM está listo (reCAPTCHA necesita el <body> para poder cargar)
-    function activarAppCheck(){ try { firebase.appCheck().activate("6LezmystAAAAAAJHmliElRAppgAunE8Qs7Yb7oap", true); } catch(e) { console.warn("App Check:", e); } }
-    if(document.body){ activarAppCheck(); } else { document.addEventListener("DOMContentLoaded", activarAppCheck); }
     window.db = firebase.firestore();
     window.db.enablePersistence().catch(()=>{});
     const db = window.db;
