@@ -23,9 +23,10 @@ function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
     Object.assign(lic, {email: emailFinal});
     console.log("📧 Enviando informe a:", lic.email);
     try {
-      const ventasDia=(ventas||[]).filter(v=>v.fechaKey===fecha&&v.dia===dia&&!v._esCobro&&!v._esAjuste);
-      const ef=ventasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-      const tr=ventasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+      const clientesDiaSet=new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
+      const ventasDia=(ventas||[]).filter(v=>v.fechaKey===fecha&&!v._esCobro&&!v._esAjuste&&(clientesDiaSet.has(v.clienteId)||v.dia===dia));
+      const ef=ventasDia.filter(v=>v.pago==="contado"||v.pago==="mixto").reduce((a,v)=>a+(v.pago==="mixto"?(Number(v.montoEfec)||0):(v.pagadoNum||v.neto||0)),0);
+      const tr=ventasDia.filter(v=>v.pago==="transferencia"||v.pago==="mixto").reduce((a,v)=>a+(v.pago==="mixto"?(Number(v.montoTrans)||0):(v.pagadoNum||v.neto||0)),0);
       const fi=ventasDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
       const ret=Math.round(tr*0.025); const trN=tr-ret;
       const cS=(productos||[]).find(p=>p.nombre==="Sifón 1.5L")?.costo||133.33;
