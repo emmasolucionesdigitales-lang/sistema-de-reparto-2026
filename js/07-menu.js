@@ -798,6 +798,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
           <textarea style={{...s.input,minHeight:56,resize:"vertical"}} placeholder="Notas del día..." value={datos.obs||""} onChange={e=>set("obs",e.target.value)} />
         </div>
         <div style={s.divider} />
+        <div id="planilla-capture">
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Resumen del día</span>
         {todasVentasDia.length>0
           ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} prospectos={prospectos} noVisitas={noVisitas} fecha={fecha} />
@@ -903,6 +904,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
             <span style={{fontSize:22,fontWeight:500,color:ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(ganancia)}</span>
           </div>
         </div>
+        </div>{/* fin planilla-capture */}
         <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
         {onCerrarDia&&ventas.length>0&&(()=>{
           const MAX_ENVIOS = 3;
@@ -913,24 +915,25 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
             <button style={{width:"100%",padding:"14px",borderRadius:10,border:"none",background:agotado?"#555":envios>0?"#0F6E56":"#4c1d95",color:agotado?"#ccc":envios>0?"#d1fae5":"#e9d5ff",fontSize:15,fontWeight:600,cursor:agotado?"default":"pointer",marginTop:10,opacity:agotado?0.7:1}}
               onClick={async()=>{
                 if(agotado){alert(`Ya enviaste el informe del día ${MAX_ENVIOS} veces (el máximo). Revisá tu email, incluida la carpeta de spam.`);return;}
+                let imgData = null;
                 try {
-                  const vals = {
-                    cobEfectivo, cobTransBruto, cobTransDesc, cobTransNeto,
-                    cobFiado, fiadoNeto, totalVentaLlenar, totalGastos, ganancia,
-                    entregas: todasVentasDia.filter(v=>!v._esCobro&&!v._esAjuste).length,
-                    salSoda: sifonesCargados, salB10: b10Cargados, salB20: b20Cargados,
-                    vendSoda: totalesPorProd.soda.vacios, vendB10: totalesPorProd.b10.vacios, vendB20: totalesPorProd.b20.vacios,
-                    cajSoda: sodaCajones,
-                  };
-                  const ok = await onCerrarDia();
-                  if(ok){
-                    setEnviosInforme(Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`)||envios+1));
-                    alert(`✅ Informe enviado a tu email.${quedan-1>0?`\n\nSi no te llega, podés reenviarlo ${quedan-1} ${quedan-1===1?"vez":"veces"} más.`:""}`);
-                  } else {
-                    alert("❌ No se pudo enviar el informe. Verificá tu conexión e intentá de nuevo.");
+                  const el = document.getElementById("planilla-capture");
+                  if(el && window.html2canvas) {
+                    const canvas = await window.html2canvas(el, {
+                      scale:1.5, useCORS:true, allowTaint:true,
+                      backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--color-background-primary").trim()||"#0f1923",
+                      scrollY:0, scrollX:0, width:el.offsetWidth,
+                      height:el.scrollHeight, windowWidth:el.offsetWidth, windowHeight:el.scrollHeight
+                    });
+                    imgData = canvas.toDataURL("image/jpeg", 0.78);
                   }
-                } catch(err) {
-                  alert("❌ Error al enviar: " + (err.message||err));
+                } catch(e) { console.warn("Captura falló:", e); }
+                const ok = await onCerrarDia(imgData);
+                if(ok){
+                  setEnviosInforme(Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`)||envios+1));
+                  alert(`✅ Informe enviado a tu email.${quedan-1>0?`\n\nSi no te llega, podés reenviarlo ${quedan-1} ${quedan-1===1?"vez":"veces"} más.`:""}`);
+                } else {
+                  alert("❌ No se pudo enviar el informe. Verificá tu conexión e intentá de nuevo.");
                 }
               }}>
               {agotado
