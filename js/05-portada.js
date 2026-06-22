@@ -546,10 +546,46 @@ function PantallaActivacion({onActivado}) {
 }
 
 // ── Pantalla PIN (se muestra cada vez que se abre la app) ─────────
+// ── Acceso biométrico (huella / Face ID) con WebAuthn ──────────────────────────
+const SR_BIO_KEY = "sr_bio_cred";
+function bioSoportado(){ return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create); }
+function bioEnrolado(){ try { return !!localStorage.getItem(SR_BIO_KEY); } catch { return false; } }
+function bioRechazado(){ try { return localStorage.getItem("sr_bio_no")==="1"; } catch { return false; } }
+function _srB64ToBuf(b64){ const s=atob(b64); const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i); return u.buffer; }
+function _srBufToB64(buf){ const u=new Uint8Array(buf); let s=""; for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]); return btoa(s); }
+async function bioRegistrar(){
+  if(!bioSoportado()) throw new Error("no_soportado");
+  const cred = await navigator.credentials.create({ publicKey:{
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rp:{ name:"Sistema de Reparto" },
+    user:{ id: crypto.getRandomValues(new Uint8Array(16)), name:"usuario", displayName:"Usuario" },
+    pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],
+    authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required" },
+    timeout:60000, attestation:"none",
+  }});
+  if(!cred) throw new Error("cancelado");
+  localStorage.setItem(SR_BIO_KEY, _srBufToB64(cred.rawId));
+  localStorage.removeItem("sr_bio_no");
+  return true;
+}
+async function bioVerificar(){
+  if(!bioSoportado() || !bioEnrolado()) throw new Error("no_disponible");
+  const r = await navigator.credentials.get({ publicKey:{
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    allowCredentials:[{ type:"public-key", id:_srB64ToBuf(localStorage.getItem(SR_BIO_KEY)) }],
+    userVerification:"required", timeout:60000,
+  }});
+  return !!r;
+}
+
 function PantallaPINIndividual({onOk}) {
   const [pin, setPin]       = React.useState("");
   const [error, setError]   = React.useState("");
   const [intentos, setIntentos] = React.useState(0);
+  const [faseEnrolar, setFaseEnrolar] = React.useState(false);
+  const [bioMsg, setBioMsg] = React.useState("");
+  const puedeBio = bioSoportado();
+  const bioOn = bioEnrolado();
 
   const pinGuardado = (() => {
     try { const p = JSON.parse(localStorage.getItem("sr_licencia")||"{}").pin; return p ? String(p) : ""; } catch { return ""; }
@@ -562,7 +598,8 @@ function PantallaPINIndividual({onOk}) {
     if(valor.length < 4) return;
     if(valor === pinGuardado) {
       setError("");
-      onOk();
+      if(puedeBio && !bioEnrolado() && !bioRechazado()) { setPin(""); setFaseEnrolar(true); }
+      else onOk();
     } else {
       const nuevosIntentos = intentos + 1;
       setIntentos(nuevosIntentos);
@@ -582,6 +619,16 @@ function PantallaPINIndividual({onOk}) {
   };
 
   const borrar = () => { setPin(p=>p.slice(0,-1)); setError(""); };
+
+  const entrarConHuella = async () => {
+    setBioMsg("");
+    try { if(await bioVerificar()) onOk(); } catch(e){ setBioMsg("No se pudo leer la huella. Usá tu PIN."); }
+  };
+  const activarHuella = async () => {
+    setBioMsg("");
+    try { await bioRegistrar(); onOk(); } catch(e){ setBioMsg("No se pudo activar. Entrás con tu PIN."); setTimeout(onOk,1200); }
+  };
+  const saltarHuella = () => { try{localStorage.setItem("sr_bio_no","1");}catch(e){} onOk(); };
 
   const btnStyle = (color) => ({
     width:72, height:72, borderRadius:"50%", border:"none", cursor:"pointer",
@@ -627,8 +674,20 @@ function PantallaPINIndividual({onOk}) {
       {error && (
         <p style={{color:"#f07070", fontSize:13, marginBottom:20, textAlign:"center"}}>{error}</p>
       )}
+      {bioMsg && (
+        <p style={{color:"#f5b942", fontSize:13, marginBottom:16, textAlign:"center"}}>{bioMsg}</p>
+      )}
 
-      {/* Teclado numérico */}
+      {faseEnrolar ? (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,maxWidth:280}}>
+          <div style={{fontSize:46}}>👆</div>
+          <p style={{fontSize:16,color:"var(--color-text-primary,#e2eaf4)",textAlign:"center",margin:0,fontWeight:600}}>¿Entrar con tu huella la próxima vez?</p>
+          <p style={{fontSize:12,color:"var(--color-text-secondary,#7a9ab8)",textAlign:"center",margin:0,lineHeight:1.5}}>Más rápido. Tu PIN sigue funcionando igual por si lo necesitás.</p>
+          <button style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:10,padding:"12px 20px",fontSize:15,fontWeight:600,cursor:"pointer",width:210}} onClick={activarHuella}>Activar huella</button>
+          <button style={{background:"none",border:"none",color:"var(--color-text-secondary,#7a9ab8)",fontSize:13,cursor:"pointer"}} onClick={saltarHuella}>Ahora no</button>
+        </div>
+      ) : (
+      /* Teclado numérico */
       <div style={{display:"grid", gridTemplateColumns:"repeat(3,72px)", gap:12}}>
         {[1,2,3,4,5,6,7,8,9].map(n=>(
           <button key={n} style={btnStyle()} onClick={()=>presionar(String(n))}>
@@ -641,6 +700,11 @@ function PantallaPINIndividual({onOk}) {
           ⌫
         </button>
       </div>
+      )}
+
+      {!faseEnrolar && bioOn && (
+        <button style={{marginTop:22,background:"var(--color-background-secondary,#1a2b3c)",border:"0.5px solid var(--color-border-secondary,rgba(255,255,255,0.13))",borderRadius:10,padding:"11px 20px",fontSize:14,fontWeight:600,color:"var(--color-text-primary,#e2eaf4)",cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onClick={entrarConHuella}>👆 Entrar con huella</button>
+      )}
 
       <p style={{fontSize:11, color:"var(--color-text-tertiary,#4a6a85)", marginTop:24, textAlign:"center"}}>
         Sistema de Reparto · Emma Soluciones Digitales
