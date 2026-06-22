@@ -534,7 +534,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
     syncData({stock:s});
     onGuardar({...datos,_diaCerrado:true,_stockActualizado:true,...(Object.keys(diffs).length>0?{_cierreDiffs:diffs}:{})});
     setMostrarCierre(false);
-    if(onCerrarDia) setTimeout(()=>onCerrarDia({cobEfectivo,cobTransBruto,cobTransDesc,cobTransNeto,cobFiado,fiadoNeto,totalVentaLlenar,totalGastos,ganancia,entregas:todasVentasDia.filter(v=>!v._esCobro&&!v._esAjuste).length,salSoda:sifonesCargados,salB10:b10Cargados,salB20:b20Cargados,vendSoda:totalesPorProd.soda.vacios,vendB10:totalesPorProd.b10.vacios,vendB20:totalesPorProd.b20.vacios,cajSoda:sodaCajones}), 800);
+    if(onCerrarDia) setTimeout(()=>onCerrarDia(), 800);
   };
 
   if(mostrarCierre){
@@ -922,7 +922,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
                     vendSoda: totalesPorProd.soda.vacios, vendB10: totalesPorProd.b10.vacios, vendB20: totalesPorProd.b20.vacios,
                     cajSoda: sodaCajones,
                   };
-                  const ok = await onCerrarDia(vals);
+                  const ok = await onCerrarDia();
                   if(ok){
                     setEnviosInforme(Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`)||envios+1));
                     alert(`✅ Informe enviado a tu email.${quedan-1>0?`\n\nSi no te llega, podés reenviarlo ${quedan-1} ${quedan-1===1?"vez":"veces"} más.`:""}`);

@@ -4,52 +4,96 @@
 function usarInformes({ventas, clientes, planillas, noVisitas, productos}) {
   const getLic = () => { try{ return JSON.parse(localStorage.getItem("sr_licencia")||"{}"); }catch{ return {}; } };
   const fmtP = (n) => "$" + Math.round(Number(n)||0).toLocaleString("es-AR");
-  const enviarDiario = async (fecha, dia, vals) => {
+  const enviarDiario = async (fecha, dia) => {
     const lic = getLic();
-    // Diagnóstico claro de por qué falla
     if(!window.enviarEmailBrevoRM) {
       alert("⚠️ Función de email no disponible. Actualizá el archivo index.html.");
       return false;
     }
-    // Buscar email: primero en config, luego en la licencia (activación)
     const emailConfig = (()=>{ try{ return localStorage.getItem("sr_lc_email_informes")||""; }catch{ return ""; } })();
-    const emailLic = lic.email || "";
-    const emailFinal = emailConfig || emailLic;
+    const emailFinal = emailConfig || lic.email || "";
     if(!emailFinal) {
       alert("⚠️ No hay email configurado.\n\nAndá a Config → tab Datos → Email para informes → guardá tu email.");
       return false;
     }
     Object.assign(lic, {email: emailFinal});
-    console.log("📧 Enviando informe a:", lic.email);
     try {
-      // Usar valores exactos de la planilla (vals) en vez de recalcular
-      const ef  = vals?.cobEfectivo   ?? 0;
-      const tr  = vals?.cobTransBruto ?? 0;
-      const ret = vals?.cobTransDesc  ?? 0;
-      const trN = vals?.cobTransNeto  ?? (tr - ret);
-      const fi  = vals?.cobFiado      ?? 0;
-      const costo = vals?.totalVentaLlenar ?? 0;
-      const gastos = vals?.totalGastos ?? 0;
-      const gan = vals?.ganancia ?? 0;
-      const entregas = vals?.entregas ?? 0;
+      // ── Mismas fórmulas exactas que PlanillaDelDia ──────────────────
+      const CAJON_SODA = 6;
+      const calcCajones = (s) => { const f=Math.floor(s/CAJON_SODA); return (s%CAJON_SODA)>=4?f+1:f; };
+      const todasFecha = (ventas||[]).filter(v=>v.fechaKey===fecha);
+      const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
+      const ventasPropias  = todasFecha.filter(v=>clientesDia.has(v.clienteId));
+      const ventasExtraDia = todasFecha.filter(v=>!clientesDia.has(v.clienteId));
+      const todasVentasDia = [...ventasPropias,...ventasExtraDia];
+      // Cantidades vendidas
+      const vendSoda=todasVentasDia.reduce((a,v)=>a+(v.detalle||[]).find(d=>d.nombre==="Sifón 1.5L")?.cantidad||0,0);
+      const vendB10 =todasVentasDia.reduce((a,v)=>a+(v.detalle||[]).find(d=>d.nombre==="Bidón 10L")?.cantidad||0,0);
+      const vendB20 =todasVentasDia.reduce((a,v)=>a+(v.detalle||[]).find(d=>d.nombre==="Bidón 20L")?.cantidad||0,0);
+      const cajVend = calcCajones(vendSoda);
+      // Cargados (salida)
+      const plan = (planillas||{})[`${dia}_${fecha}`]||{};
+      const salSoda = Number(plan.productos?.soda?.llenos||0);
+      const salB10  = Number(plan.productos?.b10?.llenos||0);
+      const salB20  = Number(plan.productos?.b20?.llenos||0);
+      const cajSal  = calcCajones(salSoda);
+      // Costos de llenado
+      const cS=(productos||[]).find(p=>p.nombre==="Sifón 1.5L")?.costo||133.33;
+      const cB10=(productos||[]).find(p=>p.nombre==="Bidón 10L")?.costo||800;
+      const cB20=(productos||[]).find(p=>p.nombre==="Bidón 20L")?.costo||1100;
+      const costo = cajVend*(cS*CAJON_SODA) + vendB10*cB10 + vendB20*cB20;
+      // Cobranza (igual que planilla, incluye mixto)
+      const ef  = todasVentasDia.filter(v=>v.pago==="contado"||v.pago==="mixto").reduce((a,v)=>a+(v.pago==="mixto"?(Number(v.montoEfec)||0):(v.pagadoNum||v.neto||0)),0);
+      const tr  = todasVentasDia.filter(v=>v.pago==="transferencia"||v.pago==="mixto").reduce((a,v)=>a+(v.pago==="mixto"?(Number(v.montoTrans)||0):(v.pagadoNum||v.neto||0)),0);
+      const fi  = todasVentasDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
+      const ret = Math.round(tr*0.025); const trN = tr-ret;
+      // Gastos (solo los confirmados)
+      const gastosList = (plan.gastos||[]).filter(g=>g.confirmado&&g.monto);
+      const gastos = gastosList.reduce((a,g)=>a+Math.round(Number(g.monto)||0),0);
       const mano = ef - costo - gastos;
-      // Envases
-      const salSoda = vals?.salSoda ?? 0; const cajSal = Math.floor(salSoda/6);
-      const salB10  = vals?.salB10  ?? 0;
-      const salB20  = vals?.salB20  ?? 0;
-      const vendSoda = vals?.vendSoda ?? 0; const cajVend = vals?.cajSoda ?? 0;
-      const vendB10  = vals?.vendB10  ?? 0;
-      const vendB20  = vals?.vendB20  ?? 0;
-      const volvSoda = cajSal - cajVend;
-      const volvB10  = salB10 - vendB10;
-      const volvB20  = salB20 - vendB20;
+      const gan  = (ef+trN) - costo - gastos;
+      const entregas = todasVentasDia.filter(v=>!v._esCobro&&!v._esAjuste).length;
+      const noVis = (noVisitas||[]).filter(v=>v.fecha===fecha&&v.dia===dia).length;
+      // ── Email ─────────────────────────────────────────────────────────
       const neg=lic.negocio||lic.nombre||"Sistema de Reparto";
       const fila=(l,v,col="")=>`<tr><td style="padding:7px 0;color:#555;border-bottom:1px solid #eee">${l}</td><td style="text-align:right;font-weight:600;border-bottom:1px solid #eee;color:${col||"#222"}">${v}</td></tr>`;
       const sep=(t)=>`<tr><td colspan="2" style="padding:10px 0 4px;font-size:11px;font-weight:700;color:#999;text-transform:uppercase">${t}</td></tr>`;
-      const html=`<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#f9fafb"><div style="background:#185FA5;border-radius:12px 12px 0 0;padding:20px 24px"><h2 style="color:#fff;margin:0;font-size:18px">📋 Cierre del día · ${dia} ${fecha}</h2><p style="color:#c8dcf0;margin:4px 0 0;font-size:13px">${neg}</p></div><div style="background:#fff;border-radius:0 0 12px 12px;padding:20px 24px"><div style="background:#f0f7ff;border-radius:10px;padding:16px;margin-bottom:20px;text-align:center"><div style="font-size:32px;font-weight:800;color:#185FA5">${fmtP(ef+tr+fi)}</div><div style="color:#666;font-size:13px">${entregas} entregas</div></div><table style="width:100%;border-collapse:collapse;font-size:14px">${cajSal>0||cajVend>0?`${sep("📦 Envases")}<tr style="background:#f5f5f5"><td style="padding:5px;font-size:12px;color:#666">Producto</td><td style="padding:5px;text-align:center;font-size:12px;color:#666">Salida</td><td style="padding:5px;text-align:center;font-size:12px;color:#666">Vendidos</td><td style="padding:5px;text-align:center;font-size:12px;color:#666">Vuelve</td></tr>${cajSal>0||cajVend>0?`<tr><td style="padding:6px 5px;border-bottom:1px solid #eee">Soda (cajones)</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee">${cajSal}</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee;color:#185FA5;font-weight:600">${cajVend}</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee">${volvSoda}</td></tr>`:""}${salB10>0||vendB10>0?`<tr><td style="padding:6px 5px;border-bottom:1px solid #eee">Bidón 10L</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee">${salB10}</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee;color:#185FA5;font-weight:600">${vendB10}</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee">${volvB10}</td></tr>`:""}${salB20>0||vendB20>0?`<tr><td style="padding:6px 5px;border-bottom:1px solid #eee">Bidón 20L</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee">${salB20}</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee;color:#185FA5;font-weight:600">${vendB20}</td><td style="text-align:center;padding:6px 5px;border-bottom:1px solid #eee">${volvB20}</td></tr>`:""}`:""} ${sep("💵 Cobranza")}${fila("Efectivo",fmtP(ef))}${tr>0?fila("Transferencias (bruto)",fmtP(tr)):""}${ret>0?fila("Retención 2.5%","−"+fmtP(ret),"#e05c5c"):""}${tr>0?fila("Transferencias (neto)",fmtP(trN),"#185FA5"):""}${fi>0?fila("Fiado",fmtP(fi),"#f5a623"):""}${sep("📦 Costos")}${fila("Llenado","−"+fmtP(costo),"#e05c5c")}${gastos>0?`${sep("💸 Gastos extras")}${fila("Total gastos","−"+fmtP(gastos),"#e05c5c")}`:""}${sep("💰 Resultado")}${fila("<b>Plata en mano</b>","<b>"+fmtP(mano)+"</b>",mano>=0?"#0a7c3e":"#e05c5c")}${fila("<b>Ganancia neta</b>","<b>"+fmtP(gan)+"</b>",gan>=0?"#0a7c3e":"#e05c5c")}</table></div><p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Sistema de Reparto · Emma Soluciones Digitales</p></div>`;
+      const envRow=(prod,sal,vend,volv)=>sal>0||vend>0?`<tr><td style="padding:5px 4px;border-bottom:1px solid #eee">${prod}</td><td style="text-align:center;padding:5px 4px;border-bottom:1px solid #eee">${sal}</td><td style="text-align:center;padding:5px 4px;border-bottom:1px solid #eee;color:#185FA5;font-weight:700">${vend}</td><td style="text-align:center;padding:5px 4px;border-bottom:1px solid #eee">${volv}</td></tr>`:"";
+      const html=`<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#f9fafb">
+<div style="background:#185FA5;border-radius:12px 12px 0 0;padding:20px 24px">
+  <h2 style="color:#fff;margin:0;font-size:18px">📋 Cierre del día · ${dia} ${fecha}</h2>
+  <p style="color:#c8dcf0;margin:4px 0 0;font-size:13px">${neg}</p>
+</div>
+<div style="background:#fff;border-radius:0 0 12px 12px;padding:20px 24px">
+  <div style="background:#f0f7ff;border-radius:10px;padding:16px;margin-bottom:20px;text-align:center">
+    <div style="font-size:32px;font-weight:800;color:#185FA5">${fmtP(ef+tr+fi)}</div>
+    <div style="color:#666;font-size:13px">${entregas} entregas · ${noVis} sin visita</div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:14px">
+    ${cajSal>0||cajVend>0?`${sep("📦 Envases")}
+    <tr style="background:#f5f5f5"><td style="padding:4px;font-size:11px;color:#888">Producto</td><td style="text-align:center;padding:4px;font-size:11px;color:#888">Salida</td><td style="text-align:center;padding:4px;font-size:11px;color:#888">Vendido</td><td style="text-align:center;padding:4px;font-size:11px;color:#888">Vuelve</td></tr>
+    ${envRow("Soda (cajones)",cajSal,cajVend,cajSal-cajVend)}
+    ${envRow("Bidón 10L",salB10,vendB10,salB10-vendB10)}
+    ${envRow("Bidón 20L",salB20,vendB20,salB20-vendB20)}`:""}
+    ${sep("💵 Cobranza")}
+    ${fila("Efectivo",fmtP(ef))}
+    ${tr>0?fila("Transferencias (bruto)",fmtP(tr)):""}
+    ${ret>0?fila("Retención 2.5%","−"+fmtP(ret),"#e05c5c"):""}
+    ${tr>0?fila("Transferencias (neto)",fmtP(trN),"#185FA5"):""}
+    ${fi>0?fila("Fiado",fmtP(fi),"#f5a623"):""}
+    ${sep("📦 Costos")}
+    ${fila("Llenado de envases","−"+fmtP(costo),"#e05c5c")}
+    ${gastos>0?`${sep("💸 Gastos extras")}${gastosList.map(g=>fila(g.cat+(g.desc?` · ${g.desc}`:""),"−"+fmtP(g.monto),"#e05c5c")).join("")}${fila("<b>Total gastos</b>","−"+fmtP(gastos),"#e05c5c")}`:""}
+    ${sep("💰 Resultado")}
+    ${fila("<b>Plata en mano</b>","<b>"+fmtP(mano)+"</b>",mano>=0?"#0a7c3e":"#e05c5c")}
+    ${fila("<b>Ganancia neta</b>","<b>"+fmtP(gan)+"</b>",gan>=0?"#0a7c3e":"#e05c5c")}
+  </table>
+</div>
+<p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Sistema de Reparto · Emma Soluciones Digitales</p>
+</div>`;
       await window.enviarEmailBrevoRM({to:lic.email,toName:neg,subject:`📋 Cierre ${dia} ${fecha} · ${fmtP(ef+tr+fi)} · Mano ${fmtP(mano)}`,htmlContent:html});
       return true;
-    } catch(e){ console.error("enviarDiario:",e); alert("❌ Error Brevo: " + (e.message||e)); return false; }
+    } catch(e){ console.error("enviarDiario:",e); alert("❌ Error: "+(e.message||e)); return false; }
   };
   const enviarSemanal = async (fecha) => {
     const lic=getLic(); if(!lic.email||!window.enviarEmailBrevoRM) return false;
@@ -445,7 +489,7 @@ function App() {
 
   // ── INFORMES EMAIL ──────────────────────────────────────────────
   const {enviarDiario, enviarSemanal, enviarMensual} = usarInformes({ventas,clientes,planillas,noVisitas:noVisitas||[],productos});
-  const cerrarDia = async (fecha, dia, vals) => {
+  const cerrarDia = async (fecha, dia) => {
     const key = `sr_informe_${fecha}_${dia}`;
     const envios = Number(localStorage.getItem(key)||0);
     if(envios>=3) return false; // máximo 3 envíos por día
@@ -453,7 +497,7 @@ function App() {
     const licPreview = (()=>{ try{return JSON.parse(localStorage.getItem("sr_licencia")||"{}").email||"";}catch{return "";} })();
     if(licPreview) console.log("Enviando informe a:", licPreview);
     setSyncStatus("saving");
-    const ok = await enviarDiario(fecha, dia, vals);
+    const ok = await enviarDiario(fecha, dia);
     if(ok) {
       localStorage.setItem(key, String(envios+1));
       const d = new Date(fecha+"T12:00:00");
@@ -839,7 +883,7 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} prospectos={prospectos||[]} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);}} onVolver={()=>irA("menu")} onCerrarDia={(vals)=>cerrarDia(fechaActual,diaActual,vals)} initCierre={initCierre} noVisitas={noVisitas} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} prospectos={prospectos||[]} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);}} onVolver={()=>irA("menu")} onCerrarDia={()=>cerrarDia(fechaActual,diaActual)} initCierre={initCierre} noVisitas={noVisitas} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{
