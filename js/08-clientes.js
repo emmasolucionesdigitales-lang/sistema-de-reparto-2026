@@ -556,7 +556,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     </div>
                     <div style={{fontSize:13,color:"var(--color-text-primary)",marginBottom:2,paddingLeft:22}}>{v.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")}</div>
                     <div style={{fontSize:11,color:"var(--color-text-secondary)",paddingLeft:22,marginBottom:6}}>
-                      {v.pago}{v.desc>0?` · desc. ${fmt(v.desc)}`:""}{v.saldoAplicado>0?` · saldo apl. ${fmt(v.saldoAplicado)}`:""}{v.obs?` · ${v.obs}`:""}
+                      {(()=>{const esMixto=v.pago==="mixto"&&(Number(v.montoEfec)||0)>0&&(Number(v.montoTrans)||0)>0;return esMixto?`Mixto · ef ${fmt(v.montoEfec)} + tr ${fmt(v.montoTrans)}`:v.pago;})()}{v.desc>0?` · desc. ${fmt(v.desc)}`:""}{v.saldoAplicado>0?` · saldo apl. ${fmt(v.saldoAplicado)}`:""}{v.obs?` · ${v.obs.replace(/\s*\[Mixto:[^\]]*\]/g,"")}`:""} 
                     </div>
                     <div style={{display:"flex",justifyContent:"flex-end",gap:6}}>
                       <button style={{...s.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setEditandoVentaId(v.id)}>Editar</button>

@@ -246,7 +246,16 @@ function App() {
     cloudLoad(negocioId).then(function(data) {
       if(!data) { setSyncStatus("idle"); setCargandoNube(false); return; }
       if (data.clientes?.length)   { setClientes(data.clientes);    try{localStorage.setItem("sr_clientes_v3",JSON.stringify(data.clientes));}catch{} }
-      if (data.ventas?.length)     { setVentasRaw(data.ventas);     try{localStorage.setItem("sr_ventas_v3",JSON.stringify(data.ventas));}catch{} }
+      if (data.ventas?.length)     {
+        // Merge: no pisar ventas locales más nuevas que Firebase
+        const ventasLocales=(()=>{try{return JSON.parse(localStorage.getItem("sr_ventas_v3")||"[]");}catch{return[];}})();
+        const idsFirebase=new Set((data.ventas||[]).map(v=>v.id));
+        const soloEnLocal=ventasLocales.filter(v=>!idsFirebase.has(v.id));
+        const merged=soloEnLocal.length>0?[...data.ventas,...soloEnLocal]:data.ventas;
+        setVentasRaw(merged);
+        try{localStorage.setItem("sr_ventas_v3",JSON.stringify(merged));}catch{}
+        if(soloEnLocal.length>0){console.log("Merge: "+soloEnLocal.length+" ventas locales sincronizadas con Firebase");setTimeout(()=>syncData({ventas:merged}),2000);}
+      }
       if (data.planillas)          { setPlanillas(data.planillas);  try{localStorage.setItem("sr_planillas_v1",JSON.stringify(data.planillas));}catch{} }
       if (data.stock) {
         const ds = data.stock;
@@ -575,9 +584,12 @@ function App() {
     const prodKey={"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
     ventasDia.forEach(v=>v.detalle.forEach(d=>{const k=prodKey[d.nombre];if(k)tots[k].vacios+=d.cantidad;}));
     const sodaCajones=Math.floor(tots.soda.vacios/CAJON_SODA)||0;
-    const cobEfectivo=ventasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+    // Pago mixto: guardado como pago="mixto" con montoEfec y montoTrans
+    const cobEfectivo=ventasDia.filter(v=>v.pago==="contado"&&!v._esMixtoTrans).reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0)
+      + ventasDia.filter(v=>v.pago==="mixto").reduce((a,v)=>a+(Number(v.montoEfec)||0),0);
     const cobFiado=ventasDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
-    const cobTransBruto=ventasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+    const cobTransBruto=ventasDia.filter(v=>v.pago==="transferencia"&&!v._esMixtoTrans).reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0)
+      + ventasDia.filter(v=>v.pago==="mixto").reduce((a,v)=>a+(Number(v.montoTrans)||0),0);
     const cobTransDesc=Math.round(cobTransBruto*0.025);
     const planillaKey=`${diaActual}_${fechaActual}`;
     const planillaActual=planillas[planillaKey]||planillaDiaVacia();
