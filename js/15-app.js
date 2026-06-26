@@ -946,7 +946,7 @@ function App() {
             const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
             const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:diaActual,fechaKey:fechaActual,fecha:new Date().toLocaleString("es-AR"),
               detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
-              neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
+              neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
               saldoAntes,saldoDespues,_esCobro:true};
             saveVentas([...ventas,vt]);
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
@@ -1162,7 +1162,7 @@ function App() {
               const vt={id:Date.now(),clienteId:cliente.id,cliente:cliente.nombre,
                 dia:diaActual||cliente.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
                 detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
-                neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
+                neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
                 saldoAntes,saldoDespues,_esCobro:true};
               saveVentas([...ventas,vt]);
               saveClientes(clientes.map(x=>x.id===cliente.id?{...x,saldo:saldoDespues}:x));
@@ -1190,7 +1190,7 @@ function App() {
           const fk=fechaActual||new Date().toLocaleDateString("en-CA");
           const vt={id:Date.now(),clienteId:c.id,cliente:c.nombre,dia:c.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
             detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
-            neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
+            neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
           saveVentas([...ventas,vt]);
           saveClientes(clientes.map(x=>x.id===c.id?{...x,saldo:saldoDespues}:x));
         }} />}
