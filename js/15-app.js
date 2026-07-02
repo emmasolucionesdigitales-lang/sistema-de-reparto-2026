@@ -726,7 +726,7 @@ function App() {
     const c = cliente;
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
-    if(opcionSaldo!=="cobro_deuda") {
+    if(opcionSaldo!=="cobro_deuda" && opcionSaldo!=="cambio_envase") {
       detalle.forEach(d=>{
         const asignado = d.nombre==="Sifón 1.5L"?(c.sifon||0):d.nombre==="Bidón 10L"?(c.bidon10||0):d.nombre==="Bidón 20L"?(c.bidon20||0):0;
         const extra = d.cantidad - asignado;
@@ -767,6 +767,7 @@ function App() {
       montoEfec: esMixto ? montoEfec : 0,
       montoTrans: esMixto ? montoTrans : 0,
       _upd:Date.now(),
+      ...(opcionSaldo==="cambio_envase"?{_esCambio:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
     };
 
     saveVentas([...ventas, nuevaVenta]);
@@ -961,7 +962,7 @@ function App() {
             saveVentas([...ventas,vt]);
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
           }}
-          onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
+          onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} onGuardarCambio={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual} ventasCliente={ventas.filter(v=>v.clienteId===cliente.id)}
         progressData={(()=>{
           const clientesDia  = clientes.filter(c=>c.dia===diaActual&&!c._esProspecto);
@@ -1149,7 +1150,7 @@ function App() {
             });
             saveProspectos(mergedP);
           }
-        }} onIr={irA} />}
+        }} onIr={irA} productos={productos} onGuardarCambio={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="mapaClientes" && <MapaClientes
         clientes={clientes}
         dia={diaActual}
@@ -1177,7 +1178,8 @@ function App() {
               saveVentas([...ventas,vt]);
               saveClientes(clientes.map(x=>x.id===cliente.id?{...x,saldo:saldoDespues}:x));
             }
-          }} />}
+          }}
+          onGuardarCambio={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="agenda" && <AgendaScreen
         recordatorios={recordatorios||[]}
         clientes={clientes}

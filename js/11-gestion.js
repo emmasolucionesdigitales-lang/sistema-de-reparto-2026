@@ -368,7 +368,7 @@ function ImportarExcelTab({clientes, prospectos, onImportar, modoSoloProspectos}
 
 
 // ── GestionClientes (con tabs) ───────────────────────────────────────
-function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onReordenarTodo, onRegistrarVenta, onVerDetalle, ventas, prospectos, recordatorios, onConfirmarRecordatorio, onImportar, onIr}) {
+function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onReordenarTodo, onRegistrarVenta, onVerDetalle, ventas, prospectos, recordatorios, onConfirmarRecordatorio, onImportar, onIr, productos, onGuardarCambio}) {
   const [tab, setTab] = React.useState("lista"); // lista | fiados | agenda | importar
   const [fotoClienteId, setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
@@ -376,6 +376,10 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
   const [filtroDia, setFiltroDia] = useState("todos");
   const [modoNuevo, setModoNuevo] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
+  const [cambioId, setCambioId] = useState(null);
+  const [productoViejoCambio, setProductoViejoCambio] = useState("Bidón 20L");
+  const [productoNuevoCambio, setProductoNuevoCambio] = useState("Bidón 20L");
+  const [motivoCambio, setMotivoCambio] = useState("Agua en mal estado");
 
   const extraEnvases = React.useMemo(()=>{
     const m={};
@@ -528,8 +532,46 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
                   <PieEnvases c={c} ventas={ventas} onEditar={onEditar}
                     izquierda={<button style={{background:"rgba(226,75,74,0.2)",color:"#ffffff",border:"1px solid rgba(226,75,74,0.5)",borderRadius:6,padding:"2px 9px",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑 Eliminar</button>}>
                     {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
+                    <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setCambioId(cambioId===c.id?null:c.id);}}>🔄 Cambio</button>
                     <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
                   </PieEnvases>
+                  {cambioId===c.id&&(
+                    <div style={{...s.card,margin:"8px 0 0",border:"1px solid #818cf8"}} onClick={e=>e.stopPropagation()}>
+                      <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:8,fontWeight:500}}>🔄 Cambio de envase (no se cobra)</div>
+                      <div style={{display:"flex",gap:8,marginBottom:8}}>
+                        <div style={{flex:1}}>
+                          <label style={{...s.label,marginBottom:4}}>Se retira</label>
+                          <select style={s.select} value={productoViejoCambio} onChange={e=>setProductoViejoCambio(e.target.value)}>
+                            {(productos||[]).map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                          </select>
+                        </div>
+                        <div style={{flex:1}}>
+                          <label style={{...s.label,marginBottom:4}}>Se entrega</label>
+                          <select style={s.select} value={productoNuevoCambio} onChange={e=>setProductoNuevoCambio(e.target.value)}>
+                            {(productos||[]).map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{marginBottom:8}}>
+                        <label style={{...s.label,marginBottom:4}}>Motivo</label>
+                        <input style={s.input} placeholder="Ej: Agua en mal estado" value={motivoCambio} onChange={e=>setMotivoCambio(e.target.value)}/>
+                      </div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button style={{...s.btn,flex:1,fontSize:12}} onClick={()=>setCambioId(null)}>Cancelar</button>
+                        <button style={{...s.btnPrimary,flex:2,fontSize:12,padding:"8px"}} onClick={()=>{
+                          const vt={id:Date.now(),clienteId:c.id,cliente:c.nombre,
+                            dia:c.dia,fechaKey:new Date().toLocaleDateString("en-CA"),fecha:new Date().toLocaleString("es-AR"),
+                            detalle:[{nombre:"Cambio de envase",cantidad:1,precio:0,total:0}],
+                            pago:"cambio",obs:`Cambio: ${productoViejoCambio} → ${productoNuevoCambio}${motivoCambio.trim()?` · ${motivoCambio.trim()}`:""}`,
+                            neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:0,saldoDelta:0,
+                            envDev:[{prod:productoViejoCambio,cant:1}],envPrest:[{prod:productoNuevoCambio,cant:1}],
+                            _esCambio:true,_upd:Date.now()};
+                          onGuardarCambio&&onGuardarCambio(vt);
+                          setCambioId(null);setMotivoCambio("Agua en mal estado");
+                        }}>✓ Registrar cambio</button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
