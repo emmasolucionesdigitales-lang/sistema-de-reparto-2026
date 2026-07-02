@@ -74,6 +74,20 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           const totalProspectos = (prospectos||[]).filter(p=>p.dia===d&&p.estado==="activo").length;
           const totalDia = totalClientes;
           const zona = (zonasReparto||{})[d]||"";
+          let noCargado = false, fechaNoCargadoLabel = "";
+          if(d!==hoyDiaNombre){
+            const idxDiaMap = {"Domingo":0,"Lunes":1,"Martes":2,"Miércoles":3,"Jueves":4,"Viernes":5,"Sábado":6};
+            let diff = new Date().getDay() - idxDiaMap[d];
+            if(diff<=0) diff += 7;
+            const fechaObj = new Date(); fechaObj.setDate(fechaObj.getDate()-diff);
+            const fkObj = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth()+1).padStart(2,'0')}-${String(fechaObj.getDate()).padStart(2,'0')}`;
+            const clientesEseDia = (clientes||[]).filter(c=>c.dia===d);
+            const ventasEseDiaIds = new Set((ventas||[]).filter(v=>v.fechaKey===fkObj).map(v=>v.clienteId));
+            const noVisitasEseDiaIds = new Set((noVisitas||[]).filter(v=>v.fecha===fkObj).map(v=>v.clienteId));
+            const cargadoEseDia = clientesEseDia.some(c=>ventasEseDiaIds.has(c.id)||noVisitasEseDiaIds.has(c.id));
+            noCargado = clientesEseDia.length>0 && !cargadoEseDia;
+            fechaNoCargadoLabel = fechaObj.toLocaleDateString("es-AR",{day:"numeric",month:"short"});
+          }
           return (<React.Fragment key={d}>
           <div style={{display:"flex",gap:6,alignItems:"stretch"}}>
           <button style={{...s.card,margin:0,flex:1,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 16px"}} onClick={()=>onDia(d)}>
@@ -120,6 +134,17 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
             </button>
             );
           })()}
+          {noCargado&&onDiaHoy&&(
+            <button
+              style={{background:"#b91c1c",borderRadius:12,padding:"8px 10px",
+                display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+                gap:2,minWidth:56,border:"1.5px solid #fca5a5",cursor:"pointer",flexShrink:0}}
+              onClick={()=>onDia(d)}>
+              <span style={{fontSize:16}}>🔴</span>
+              <span style={{fontSize:9,color:"#ffe4e4",fontWeight:500,textAlign:"center",lineHeight:1.3}}>No cargado</span>
+              <span style={{fontSize:9,color:"#ffc9c9",lineHeight:1}}>{fechaNoCargadoLabel}</span>
+            </button>
+          )}
           )}
           </div>
           {editandoZona===d&&(
