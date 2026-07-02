@@ -74,7 +74,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           const totalProspectos = (prospectos||[]).filter(p=>p.dia===d&&p.estado==="activo").length;
           const totalDia = totalClientes;
           const zona = (zonasReparto||{})[d]||"";
-          let noCargado = false, fechaNoCargadoLabel = "";
+          let noCargado = false, fechaNoCargadoLabel = "", fechaNoCargadoKey = "";
           if(d!==hoyDiaNombre){
             const idxDiaMap = {"Domingo":0,"Lunes":1,"Martes":2,"Miércoles":3,"Jueves":4,"Viernes":5,"Sábado":6};
             let diff = new Date().getDay() - idxDiaMap[d];
@@ -87,6 +87,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
             const cargadoEseDia = clientesEseDia.some(c=>ventasEseDiaIds.has(c.id)||noVisitasEseDiaIds.has(c.id));
             noCargado = clientesEseDia.length>0 && !cargadoEseDia;
             fechaNoCargadoLabel = fechaObj.toLocaleDateString("es-AR",{day:"numeric",month:"short"});
+            fechaNoCargadoKey = fkObj;
           }
           return (<React.Fragment key={d}>
           <div style={{display:"flex",gap:6,alignItems:"stretch"}}>
@@ -139,7 +140,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
               style={{background:"#b91c1c",borderRadius:12,padding:"8px 10px",
                 display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
                 gap:2,minWidth:56,border:"1.5px solid #fca5a5",cursor:"pointer",flexShrink:0}}
-              onClick={()=>onDia(d)}>
+              onClick={()=>onDiaHoy(d,fechaNoCargadoKey)}>
               <span style={{fontSize:16}}>🔴</span>
               <span style={{fontSize:9,color:"#ffe4e4",fontWeight:500,textAlign:"center",lineHeight:1.3}}>No cargado</span>
               <span style={{fontSize:9,color:"#ffc9c9",lineHeight:1}}>{fechaNoCargadoLabel}</span>
