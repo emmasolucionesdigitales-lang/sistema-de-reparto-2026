@@ -2,7 +2,7 @@
 // ◆  07-menu.js — MenuDias · DiaPrincipal · PlanillaDelDia · InicioReparto
 // ════════════════════════════════════════════════════════════════════
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados,prospectos,onDormidos}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,scaleIdx,onToggleScale,scaleLabel,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados,prospectos,onDormidos}) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   const hoyDiaNombre = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][new Date().getDay()];
   const hoyFechaKey = (()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;})();
@@ -26,6 +26,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Sistema de Reparto</span>
         <button style={{...s.btn,padding:"5px 10px",fontSize:18,lineHeight:1}} onClick={onToggleDark}>{darkMode?"☀":"🌙"}</button>
+        {onToggleScale&&<button style={{...s.btn,padding:"5px 10px",fontSize:12,fontWeight:700,lineHeight:1,minWidth:28}} onClick={onToggleScale} title="Tamaño de texto">{scaleLabel}</button>}
       </div>
       
       
