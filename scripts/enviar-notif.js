@@ -112,7 +112,7 @@ async function main(){
 
     // ── 2) Transferencias pendientes (13:00 y 19:00) ──
     if(hora===13 || hora===19){
-      const pend = ventas.filter(v => v.fechaKey===hoy && v.pago==='transferencia' && !v.transConfirmada).length;
+      const pend = ventas.filter(v => v.fechaKey===hoy && (v.pago==='transferencia' || (v.pago==='mixto' && Number(v.montoTrans)>0)) && !v.transConfirmada).length;
       const clave = 'trans_'+hoy+'_'+hora;
       if(pend>0 && !log[clave]){
         const ok = await enviarATodos(subsMap, datosRef, { title:'💳 Transferencias sin confirmar', body:`Tenés ${pend} transferencia${pend>1?'s':''} pendiente${pend>1?'s':''} de hoy.`, tag:'trans-pend', requireInteraction:true });
