@@ -679,7 +679,7 @@ function App() {
     return <PantallaPINIndividual onOk={()=>{ setPantalla("portada"); setPinOk(true); }} />;
   }
 
-  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
+  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, transConfirmadaInicial) => {
     montoTrans2 = Number(montoTrans2)||0; // defensa: el desglose mixto depende de esto
     const c = cliente;
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
@@ -724,6 +724,7 @@ function App() {
       // Campos extras del mixto — para mostrar confirmación de transferencia
       montoEfec: esMixto ? montoEfec : 0,
       montoTrans: esMixto ? montoTrans : 0,
+      transConfirmada: !!transConfirmadaInicial,
       _upd:Date.now(),
       ...(opcionSaldo==="cambio_envase"?{_esCambio:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
     };
