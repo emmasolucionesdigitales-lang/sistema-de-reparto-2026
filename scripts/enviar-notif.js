@@ -63,17 +63,19 @@ async function main(){
   const diaHoy   = diaSemana(arg);
   console.log('Hora Argentina:', hoy, String(hora).padStart(2,'0')+':'+String(arg.getUTCMinutes()).padStart(2,'0'), '—', diaHoy);
 
-  const usuarios = await db.collection('users').get();
-  console.log(`Negocios encontrados: ${usuarios.docs.length}`);
+  // Busca directamente los docs "push_subs" en cualquier negocio — evita
+  // depender de que el documento padre "users/{id}" tenga datos propios
+  // (Firestore no lo lista en collection('users').get() si solo tiene subcolecciones).
+  const subsSnaps = await db.collectionGroup('datos').get();
+  const pushSubsDocs = subsSnaps.docs.filter(d => d.id === 'push_subs');
+  console.log(`Negocios encontrados: ${pushSubsDocs.length}`);
   let enviados = 0;
 
-  for (const userDoc of usuarios.docs){
-    const id       = userDoc.id;
-    const datosRef = db.collection('users').doc(id).collection('datos');
+  for (const subsDoc of pushSubsDocs){
+    const id       = subsDoc.ref.parent.parent.id;
+    const datosRef = subsDoc.ref.parent;
 
-    const subsSnap = await datosRef.doc('push_subs').get();
-    if(!subsSnap.exists){ console.log(`[${id}] sin doc push_subs`); continue; }
-    const subsMap = subsSnap.data() || {};
+    const subsMap = subsDoc.data() || {};
     if(!Object.keys(subsMap).length){ console.log(`[${id}] push_subs vacío`); continue; }
     console.log(`[${id}] dispositivos suscriptos: ${Object.keys(subsMap).length}`);
 
