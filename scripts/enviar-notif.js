@@ -5,7 +5,7 @@ const webpush = require('web-push');
 
 const VAPID_PUBLIC  = 'BFXBrNy6Xca3ejWylkF-sZ9_pZQzZNMjDbInqlsPzn1oF3F8EDnDOBLqt8fEZs-g_-HJCIJRZ3-dd0yiQECcHpk';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE;
-const VENTANA_MIN = 20;
+const VENTANA_MIN = 15; // con cron cada 5 min alcanza y no llega tarde
 
 if(!process.env.VAPID_PRIVATE){ console.error('❌ FALTA VAPID_PRIVATE'); process.exit(1); }
 if(!process.env.FIREBASE_SA){ console.error('❌ FALTA FIREBASE_SA'); process.exit(1); }
@@ -17,10 +17,15 @@ webpush.setVapidDetails('mailto:carabajalponce1980@gmail.com', VAPID_PUBLIC, VAP
 admin.initializeApp({ credential: admin.credential.cert(sa) });
 const db = admin.firestore();
 
+const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const NOMBRES_DIA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
 function ahoraArg(){ return new Date(Date.now() - 3*60*60*1000); }
 function fechaStr(d){ return d.toISOString().slice(0,10); }
 function minutosDelDia(d){ return d.getUTCHours()*60 + d.getUTCMinutes(); }
+function diaSemana(d){ return NOMBRES_DIA[d.getUTCDay()]; }
 
+// ── Enviar a UN dispositivo, devuelve true / código de error ────────────────
 async function enviarPush(sub, payload){
   try {
     await webpush.sendNotification(sub, JSON.stringify(payload));
@@ -31,13 +36,32 @@ async function enviarPush(sub, payload){
     return e.statusCode;
   }
 }
+// ── Enviar el mismo aviso a TODOS los dispositivos del negocio ──────────────
+// Devuelve true si se pudo entregar a al menos uno (para marcar el log como enviado).
+async function enviarATodos(subsMap, datosRef, payload){
+  const entries = Object.entries(subsMap || {});
+  if(!entries.length) return false;
+  let algunoOk = false;
+  for(const [deviceId, info] of entries){
+    let sub;
+    try { sub = JSON.parse(info.sub); } catch { continue; }
+    const st = await enviarPush(sub, payload);
+    if(st === true) algunoOk = true;
+    else if(st === 410 || st === 404){
+      await datosRef.doc('push_subs').update({ [deviceId]: admin.firestore.FieldValue.delete() }).catch(()=>{});
+      console.log(`⚠ Suscripción de ${deviceId} expirada, borrada.`);
+    }
+  }
+  return algunoOk;
+}
 
 async function main(){
   const arg      = ahoraArg();
   const hoy      = fechaStr(arg);
   const hora     = arg.getUTCHours();
   const ahoraMin = minutosDelDia(arg);
-  console.log('Hora Argentina:', hoy, String(hora).padStart(2,'0')+':'+String(arg.getUTCMinutes()).padStart(2,'0'));
+  const diaHoy   = diaSemana(arg);
+  console.log('Hora Argentina:', hoy, String(hora).padStart(2,'0')+':'+String(arg.getUTCMinutes()).padStart(2,'0'), '—', diaHoy);
 
   const usuarios = await db.collection('users').get();
   let enviados = 0;
@@ -46,18 +70,19 @@ async function main(){
     const id       = userDoc.id;
     const datosRef = db.collection('users').doc(id).collection('datos');
 
-    const subSnap = await datosRef.doc('push_sub').get();
-    if(!subSnap.exists) continue;
-    let sub;
-    try { sub = JSON.parse(subSnap.data().sub); } catch { continue; }
+    const subsSnap = await datosRef.doc('push_subs').get();
+    if(!subsSnap.exists) continue;
+    const subsMap = subsSnap.data() || {};
+    if(!Object.keys(subsMap).length) continue;
 
     const mainSnap = await datosRef.doc('main').get();
     if(!mainSnap.exists) continue;
     const data          = mainSnap.data();
     const recordatorios = data.recordatorios || [];
-    const clientes      = data.clientes || [];
-    const ventas        = data.ventas || [];
-    const mantVeh       = data.mantVeh || [];
+    const clientes       = data.clientes || [];
+    const ventas         = data.ventas || [];
+    const mantVeh        = data.mantVeh || [];
+    const planillas       = data.planillas || {};
 
     const logSnap = await datosRef.doc('push_log').get();
     const log     = logSnap.exists ? (logSnap.data().enviados || {}) : {};
@@ -75,9 +100,8 @@ async function main(){
       const cli = clientes.find(c => c.id === r.clienteId);
       const nombre = (cli && cli.nombre) || r.clienteNombre || '';
       const cuerpo = (nombre ? nombre+' — ' : '') + (r.motivo || 'Tenés un recordatorio');
-      const st = await enviarPush(sub, { title: r.tipo==='cobro'?'💰 Recordatorio de cobro':'🏠 Recordatorio de visita', body:cuerpo, tag:clave, requireInteraction:true });
-      if(st===true){ log[clave]=Date.now(); cambioLog=true; enviados++; }
-      else if(st===410||st===404){ await datosRef.doc('push_sub').delete().catch(()=>{}); }
+      const ok = await enviarATodos(subsMap, datosRef, { title: r.tipo==='cobro'?'💰 Recordatorio de cobro':'🏠 Recordatorio de visita', body:cuerpo, tag:clave, requireInteraction:true });
+      if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
     }
 
     // ── 2) Transferencias pendientes (13:00 y 19:00) ──
@@ -85,8 +109,8 @@ async function main(){
       const pend = ventas.filter(v => v.fechaKey===hoy && v.pago==='transferencia' && !v.transConfirmada).length;
       const clave = 'trans_'+hoy+'_'+hora;
       if(pend>0 && !log[clave]){
-        const st = await enviarPush(sub, { title:'💳 Transferencias sin confirmar', body:`Tenés ${pend} transferencia${pend>1?'s':''} pendiente${pend>1?'s':''} de hoy.`, tag:'trans-pend', requireInteraction:true });
-        if(st===true){ log[clave]=Date.now(); cambioLog=true; enviados++; }
+        const ok = await enviarATodos(subsMap, datosRef, { title:'💳 Transferencias sin confirmar', body:`Tenés ${pend} transferencia${pend>1?'s':''} pendiente${pend>1?'s':''} de hoy.`, tag:'trans-pend', requireInteraction:true });
+        if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
       }
     }
 
@@ -101,27 +125,34 @@ async function main(){
           const clave = 'mant_'+mv.proximaFechaISO;
           if(log[clave]) continue;
           const cuando = dias===0?'HOY':`en ${dias} día${dias>1?'s':''}`;
-          const st = await enviarPush(sub, { title:'🔧 Mantenimiento de vehículo', body:`${mv.tipo||'Mantenimiento'} vence ${cuando}${mv.descripcion?' — '+mv.descripcion:''}.`, tag:clave, requireInteraction:false });
-          if(st===true){ log[clave]=Date.now(); cambioLog=true; enviados++; }
+          const ok = await enviarATodos(subsMap, datosRef, { title:'🔧 Mantenimiento de vehículo', body:`${mv.tipo||'Mantenimiento'} vence ${cuando}${mv.descripcion?' — '+mv.descripcion:''}.`, tag:clave, requireInteraction:false });
+          if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
         }
       }
     }
 
-    // ── 4) Aviso cierre 18:00 ──
-    if(hora===18){
-      const clave='cierre18_'+hoy;
-      if(!log[clave]){
-        const st = await enviarPush(sub, { title:'🚚 Sistema de Reparto — 18:00 hs', body:'¿Ya revisaste todas las entregas del día?', tag:'cierre-18', requireInteraction:false });
-        if(st===true){ log[clave]=Date.now(); cambioLog=true; enviados++; }
-      }
-    }
-
-    // ── 5) Aviso cierre planilla 20:00 ──
-    if(hora===20){
-      const clave='cierre20_'+hoy;
-      if(!log[clave]){
-        const st = await enviarPush(sub, { title:'⏰ Son las 20:00 hs', body:'Hora de cerrar la planilla. Los pendientes quedarán como no visitados.', tag:'cierre-20', requireInteraction:true });
-        if(st===true){ log[clave]=Date.now(); cambioLog=true; enviados++; }
+    // ── 4) y 5) Avisos de cierre — SOLO si hoy es día de reparto, hubo reparto
+    //     (planilla iniciada o alguna venta) y la planilla sigue sin cerrar.
+    if((hora===18 || hora===20) && DIAS.includes(diaHoy)){
+      const planKey = `${diaHoy}_${hoy}`;
+      const plan = planillas[planKey];
+      const huboReparto = (plan && plan.iniciado) || ventas.some(v => v.fechaKey===hoy && v.dia===diaHoy);
+      const sinCerrar = !plan || ((!plan.efectivo || plan.efectivo==='') && (!plan.fiado || plan.fiado===''));
+      if(huboReparto && sinCerrar){
+        if(hora===18){
+          const clave='cierre18_'+hoy;
+          if(!log[clave]){
+            const ok = await enviarATodos(subsMap, datosRef, { title:'🚚 Sistema de Reparto — 18:00 hs', body:`¿Ya cerraste la planilla de ${diaHoy}?`, tag:'cierre-18', requireInteraction:false });
+            if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
+          }
+        }
+        if(hora===20){
+          const clave='cierre20_'+hoy;
+          if(!log[clave]){
+            const ok = await enviarATodos(subsMap, datosRef, { title:'⏰ Son las 20:00 hs', body:'Hora de cerrar la planilla. Los pendientes quedarán como no visitados.', tag:'cierre-20', requireInteraction:true });
+            if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
+          }
+        }
       }
     }
 
