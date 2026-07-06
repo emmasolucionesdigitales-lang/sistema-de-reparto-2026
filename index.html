@@ -169,18 +169,24 @@
       for(var i=0;i<r.length;i++) o[i]=r.charCodeAt(i); return o;
     }
     function idActual(){ return window._negocioId || 'firebase'; }
+    function deviceIdActual(){ return localStorage.getItem("sr_device_id") || "unknown"; }
     async function guardarSub(sub){
       if(!window.db) return;
       var id = idActual();
-      await window.db.collection('users').doc(id).collection('datos').doc('push_sub')
-        .set({ sub: JSON.stringify(sub), id: id, ts: Date.now() });
+      var deviceId = deviceIdActual();
+      // Se guarda bajo la clave de ESTE dispositivo — no pisa la suscripción
+      // de otro celu/PC que use el mismo negocio.
+      var payload = {};
+      payload[deviceId] = { sub: JSON.stringify(sub), ts: Date.now() };
+      await window.db.collection('users').doc(id).collection('datos').doc('push_subs').set(payload, { merge:true });
     }
     async function activarNotif(){
       var p = await Notification.requestPermission();
       if(p !== 'granted'){ alert('Para recibir avisos tenés que permitir las notificaciones.'); return false; }
       var reg = await navigator.serviceWorker.ready;
-      var sub = await reg.pushManager.getSubscription();
-      if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64ToUint8(VAPID_PUB_KEY) });
+      var subVieja = await reg.pushManager.getSubscription();
+      if(subVieja){ try{ await subVieja.unsubscribe(); }catch(e){} } // siempre limpio, evita quedar con endpoint viejo
+      var sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64ToUint8(VAPID_PUB_KEY) });
       await guardarSub(sub);
       return true;
     }
@@ -188,7 +194,12 @@
       var reg = await navigator.serviceWorker.ready;
       var sub = await reg.pushManager.getSubscription();
       if(sub) await sub.unsubscribe();
-      if(window.db){ try{ await window.db.collection('users').doc(idActual()).collection('datos').doc('push_sub').delete(); }catch(e){} }
+      if(window.db){
+        var deviceId = deviceIdActual();
+        var upd = {};
+        upd[deviceId] = firebase.firestore.FieldValue.delete();
+        try{ await window.db.collection('users').doc(idActual()).collection('datos').doc('push_subs').update(upd); }catch(e){}
+      }
     }
     async function estadoNotif(){
       var reg = await navigator.serviceWorker.ready;

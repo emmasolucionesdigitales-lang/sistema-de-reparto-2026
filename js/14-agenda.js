@@ -214,6 +214,39 @@ function NuevoRecordatorioForm({clientes,onGuardar,onCerrar}) {
 
 
 
+function DatosNegocioLC() {
+  const [nombre,setNombre] = React.useState(()=>localStorage.getItem("sr_negocio_nombre")||"");
+  const [logo,setLogo] = React.useState(()=>localStorage.getItem("sr_negocio_logo")||"");
+  const [guardado,setGuardado] = React.useState(false);
+  const guardarNombre = (v) => { setNombre(v); localStorage.setItem("sr_negocio_nombre", v); setGuardado(true); setTimeout(()=>setGuardado(false),1500); };
+  const subirLogo = async (file) => {
+    if(!file) return;
+    const b64 = await comprimirFoto(file, 300, 0.8);
+    setLogo(b64); localStorage.setItem("sr_negocio_logo", b64);
+  };
+  return (
+    <div style={{...s.card,marginBottom:12,background:"var(--color-background-secondary)"}}>
+      <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:10}}>🏪 Datos del negocio</div>
+      <label style={{...s.label,marginBottom:4}}>Nombre (aparece arriba de todo)</label>
+      <input style={s.input} placeholder="Ej: Distribuidora Pérez" value={nombre} onChange={e=>guardarNombre(e.target.value)} />
+      {guardado&&<div style={{fontSize:11,color:"var(--color-text-success)",marginTop:4}}>✓ Guardado</div>}
+      <div style={{marginTop:12,display:"flex",alignItems:"center",gap:12}}>
+        {logo
+          ? <img src={logo} alt="Logo" style={{width:56,height:56,borderRadius:10,objectFit:"cover",border:"0.5px solid var(--color-border-secondary)"}} />
+          : <div style={{width:56,height:56,borderRadius:10,background:"var(--color-background-tertiary)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🖼️</div>
+        }
+        <div style={{display:"flex",gap:8}}>
+          <label style={{...s.btn,padding:"8px 14px",cursor:"pointer"}}>
+            {logo?"Cambiar":"Subir logo"}
+            <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>subirLogo(e.target.files&&e.target.files[0])} />
+          </label>
+          {logo&&<button style={{...s.btnDanger,padding:"8px 12px"}} onClick={()=>{setLogo("");localStorage.removeItem("sr_negocio_logo");}}>Quitar</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConfigAparienciaLC() {
   const [temaActual, setTemaActual] = React.useState(getTemaLC);
   const [modoVista, setModoVista] = React.useState(()=>TEMAS_LC[getTemaLC()]?.modo||"oscuro");
@@ -226,6 +259,7 @@ function ConfigAparienciaLC() {
   const temasFiltrados = Object.entries(TEMAS_LC).filter(([,t])=>t.modo===modoVista);
   return (
     <div>
+      <DatosNegocioLC />
       <div style={{...s.card,marginBottom:12,background:"var(--color-background-secondary)"}}>
         <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:10}}>🎨 Paleta de colores</div>
         <div style={{display:"flex",gap:8,marginBottom:12}}>
