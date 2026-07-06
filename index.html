@@ -206,17 +206,11 @@
       var sub = await reg.pushManager.getSubscription();
       return !!sub;
     }
-    window.addEventListener('load', async function(){
-      var reg = await navigator.serviceWorker.ready.catch(function(){ return null; });
-      if(!reg) return;
-      var btn = document.createElement('button');
-      btn.id = 'btn-push-notif';
-      btn.style.cssText = 'position:fixed;top:8px;right:56px;z-index:9999;width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.5);background:#1a2b3c;color:#fff;';
-      var upd = async function(){ var a = await estadoNotif(); btn.textContent = a?'🔔':'🔕'; btn.title = a?'Desactivar avisos':'Activar avisos'; btn.style.opacity = a?'1':'0.55'; };
-      btn.onclick = async function(){ var a = await estadoNotif(); if(a){ await desactivarNotif(); } else { await activarNotif(); } await upd(); };
-      document.body.appendChild(btn);
-      await upd();
-    });
+    // El activar/desactivar/estado ahora se maneja desde Configuración
+    // (NotifConfig en 13-config.js), no con un botón flotante acá.
+    window.activarNotif = activarNotif;
+    window.desactivarNotif = desactivarNotif;
+    window.estadoNotif = estadoNotif;
   })();
   </script>
 </body>
