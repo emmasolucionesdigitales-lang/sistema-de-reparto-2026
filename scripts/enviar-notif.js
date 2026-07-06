@@ -64,6 +64,7 @@ async function main(){
   console.log('Hora Argentina:', hoy, String(hora).padStart(2,'0')+':'+String(arg.getUTCMinutes()).padStart(2,'0'), '—', diaHoy);
 
   const usuarios = await db.collection('users').get();
+  console.log(`Negocios encontrados: ${usuarios.docs.length}`);
   let enviados = 0;
 
   for (const userDoc of usuarios.docs){
@@ -71,18 +72,21 @@ async function main(){
     const datosRef = db.collection('users').doc(id).collection('datos');
 
     const subsSnap = await datosRef.doc('push_subs').get();
-    if(!subsSnap.exists) continue;
+    if(!subsSnap.exists){ console.log(`[${id}] sin doc push_subs`); continue; }
     const subsMap = subsSnap.data() || {};
-    if(!Object.keys(subsMap).length) continue;
+    if(!Object.keys(subsMap).length){ console.log(`[${id}] push_subs vacío`); continue; }
+    console.log(`[${id}] dispositivos suscriptos: ${Object.keys(subsMap).length}`);
 
     const mainSnap = await datosRef.doc('main').get();
-    if(!mainSnap.exists) continue;
+    if(!mainSnap.exists){ console.log(`[${id}] sin doc main`); continue; }
     const data          = mainSnap.data();
     const recordatorios = data.recordatorios || [];
     const clientes       = data.clientes || [];
     const ventas         = data.ventas || [];
     const mantVeh        = data.mantVeh || [];
     const planillas       = data.planillas || {};
+    console.log(`[${id}] recordatorios: ${recordatorios.length}`);
+    recordatorios.forEach(r => console.log(`   - fecha=${r.fecha} hora=${r.hora} confirmado=${!!r.confirmado}`));
 
     const logSnap = await datosRef.doc('push_log').get();
     const log     = logSnap.exists ? (logSnap.data().enviados || {}) : {};
