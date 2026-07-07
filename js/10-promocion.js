@@ -529,13 +529,12 @@ function PromoDetalle({prospecto:p,ventas,noVisitas,productos,listo,comprasCount
 
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>{p.nombre}</span>
-        <div style={{display:"flex",gap:6}}>
+      <HeaderApp titulo="Promoción" onVolver={onVolver}/>
+      <div style={{background:"var(--color-background-secondary)",borderRadius:10,margin:"8px 14px 0",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+        <span style={{fontSize:15,fontWeight:600,color:"var(--color-text-primary)"}}>{p.nombre}</span>
+        <div style={{display:"flex",gap:6,flexShrink:0}}>
           <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setEditando(true)}>Editar</button>
           <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={onComodato}>📋</button>
-          <HeaderBotones/>
         </div>
       </div>
       <div style={{padding:14}}>
