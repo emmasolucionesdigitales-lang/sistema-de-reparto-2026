@@ -30,11 +30,7 @@ function SeguridadHuella() {
   };
 
   return (
-    <div style={{...s.card,margin:0}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-        <span style={{fontSize:18}}>🔒</span>
-        <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Acceso con huella</span>
-      </div>
+    <>
       {!soportado ? (
         <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"4px 0 0",lineHeight:1.5}}>
           Este dispositivo no tiene lector de huella / Face ID disponible. Suele funcionar desde el celular; probá abriendo la app ahí.
@@ -57,12 +53,29 @@ function SeguridadHuella() {
         )}
         {msg && <p style={{fontSize:12,color:"var(--color-text-secondary)",margin:"8px 0 0",lineHeight:1.5}}>{msg}</p>}
       </>)}
+    </>
+  );
+}
+
+// ── Acordeón simple: título + resumen, se expande al tocar ─────────────────
+function SeccionPlegable({icono, titulo, resumen, children}) {
+  const [abierto, setAbierto] = React.useState(false);
+  return (
+    <div style={{marginBottom:8,border:"0.5px solid var(--color-border-tertiary)",borderRadius:8,overflow:"hidden"}}>
+      <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",padding:"8px 10px",display:"flex",alignItems:"center",gap:6,cursor:"pointer",textAlign:"left"}}
+        onClick={()=>setAbierto(!abierto)}>
+        <span style={{fontSize:13}}>{icono}</span>
+        <span style={{fontSize:11,color:"var(--color-text-secondary)",flex:1}}>{titulo}</span>
+        <span style={{fontSize:12,color:"var(--color-text-primary)",fontWeight:600}}>{resumen}</span>
+        <span style={{fontSize:11,color:"var(--color-text-tertiary)",marginLeft:4}}>{abierto?"▲":"▼"}</span>
+      </button>
+      {abierto&&<div style={{padding:"10px"}}>{children}</div>}
     </div>
   );
 }
 
 // ── Tarjeta de notificaciones ──────────────────────────────────────────────
-function NotifConfig() {
+function NotifConfig({syncData}) {
   const pedirPermiso = async () => {
     if(!('Notification' in window)) return;
     const r = await Notification.requestPermission();
@@ -85,11 +98,7 @@ function NotifConfig() {
   const estadoColor = permiso === 'granted' ? '#4dd9a0' : permiso === 'denied' ? '#f07070' : '#f5b942';
   const estadoTexto = permiso === 'granted' ? '✅ Activadas' : permiso === 'denied' ? '🚫 Bloqueadas por el sistema' : permiso === 'no-soportado' ? '⚠ No soportado' : '⏳ Sin activar';
   return (
-    <div style={{...s.card,margin:0}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-        <span style={{fontSize:18}}>🔔</span>
-        <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Notificaciones</span>
-      </div>
+    <>
       <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"0 0 10px",lineHeight:1.5}}>
         Avisos de cierre, transferencias, mantenimiento y agenda — funcionan con la app cerrada.
       </p>
@@ -113,13 +122,61 @@ function NotifConfig() {
             {resultado.ok?"✓ ":"✗ "}{resultado.msg}
           </div>
         )}
+        <SeccionPlegable icono="💳" titulo="Transferencias — horas de aviso" resumen={(()=>{try{const a=JSON.parse(localStorage.getItem('sr_horas_notif_trans')||'["13:00","19:00"]');return a[0]+' y '+a[1];}catch{return '13:00 y 19:00';}})()}>
+          <div style={{display:"flex",gap:8}}>
+            <input type="time"
+              style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",flex:1}}
+              defaultValue={(()=>{try{return JSON.parse(localStorage.getItem('sr_horas_notif_trans')||'["13:00","19:00"]')[0];}catch{return '13:00';}})()}
+              onChange={e=>{
+                let arr; try{arr=JSON.parse(localStorage.getItem('sr_horas_notif_trans')||'["13:00","19:00"]');}catch{arr=['13:00','19:00'];}
+                arr[0]=e.target.value; localStorage.setItem('sr_horas_notif_trans',JSON.stringify(arr)); syncData({horasAvisoTrans:arr});
+              }}
+            />
+            <input type="time"
+              style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",flex:1}}
+              defaultValue={(()=>{try{return JSON.parse(localStorage.getItem('sr_horas_notif_trans')||'["13:00","19:00"]')[1];}catch{return '19:00';}})()}
+              onChange={e=>{
+                let arr; try{arr=JSON.parse(localStorage.getItem('sr_horas_notif_trans')||'["13:00","19:00"]');}catch{arr=['13:00','19:00'];}
+                arr[1]=e.target.value; localStorage.setItem('sr_horas_notif_trans',JSON.stringify(arr)); syncData({horasAvisoTrans:arr});
+              }}
+            />
+          </div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora hay transferencias sin confirmar, recibís un aviso.</div>
+        </SeccionPlegable>
+        <SeccionPlegable icono="🔧" titulo="Mantenimiento — días antes del vencimiento" resumen={localStorage.getItem('sr_dias_notif_mant') || '3,2,1,0'}>
+          <input type="text" placeholder="ej: 3,2,1,0"
+            style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",width:"100%"}}
+            defaultValue={localStorage.getItem('sr_dias_notif_mant') || '3,2,1,0'}
+            onChange={e=>{
+              localStorage.setItem('sr_dias_notif_mant', e.target.value);
+              const arr = e.target.value.split(',').map(n=>parseInt(n.trim(),10)).filter(n=>!isNaN(n));
+              syncData({diasAvisoMant: arr});
+            }}
+          />
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Números separados por coma. Se avisa a las 7am si faltan esos días exactos.</div>
+        </SeccionPlegable>
+        <SeccionPlegable icono="⏰" titulo="Cierre del día — hora de aviso" resumen={localStorage.getItem('sr_hora_notif_cierre') || '18:00'}>
+          <input type="time"
+            style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box"}}
+            defaultValue={localStorage.getItem('sr_hora_notif_cierre') || '18:00'}
+            onChange={e=>{ localStorage.setItem('sr_hora_notif_cierre', e.target.value); syncData({horaAvisoCierre: e.target.value}); }}
+          />
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora la planilla está vacía (y es día de reparto), recibís un aviso.</div>
+        </SeccionPlegable>
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",lineHeight:1.7,marginTop:8}}>
+          📅 Recordatorios de agenda → a la hora exacta
+        </div>
       </>)}
-    </div>
+    </>
   );
 }
 
 function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken,tabInicial}) {
   const [tab,setTab]=useState(["datos","vehiculo","apariencia"].includes(tabInicial)?tabInicial:"datos");
+  const [abiertoNotif,setAbiertoNotif]=useState(false);
+  const [abiertoHuella,setAbiertoHuella]=useState(false);
+  const [abiertoRespaldo,setAbiertoRespaldo]=useState(false);
+  const [abiertoMant,setAbiertoMant]=useState(false);
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
   const [importandoClientes,setImportandoClientes]=useState(false);
@@ -130,7 +187,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
   const stockKeys={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
   return (
     <div style={s.screen}>
-      <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Configuración</span></div>
+      <HeaderApp titulo="Configuración" onVolver={onVolver}/>
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:8}}>
           {[["datos","📋","Datos"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"]].map(([id,ico,lbl])=>(
@@ -296,17 +353,36 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
 
           {/* NOTIFICACIONES */}
-          <NotifConfig />
+          <div style={{...s.card,margin:0}}>
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoNotif(!abiertoNotif)}>
+              <span style={{fontSize:18}}>🔔</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Notificaciones</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoNotif?"▲":"▼"}</span>
+            </button>
+            {abiertoNotif&&<div style={{marginTop:10}}><NotifConfig syncData={syncData} /></div>}
+          </div>
 
           {/* SEGURIDAD — acceso con huella */}
-          <SeguridadHuella />
+          <div style={{...s.card,margin:0}}>
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoHuella(!abiertoHuella)}>
+              <span style={{fontSize:18}}>🔒</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Acceso con huella</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoHuella?"▲":"▼"}</span>
+            </button>
+            {abiertoHuella&&<div style={{marginTop:10}}><SeguridadHuella /></div>}
+          </div>
 
           {/* RESPALDO */}
           <div style={{...s.card,margin:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoRespaldo(!abiertoRespaldo)}>
               <span style={{fontSize:18}}>💾</span>
-              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Respaldo</span>
-            </div>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Respaldo</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoRespaldo?"▲":"▼"}</span>
+            </button>
+            {abiertoRespaldo&&(<div style={{marginTop:10}}>
             <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"0 0 12px",lineHeight:1.5}}>
               Guardá todos los datos en un archivo. Descargalo seguido y guardalo en otro lado (mail, Drive). Si se pierde el celular, lo restaurás y recuperás todo.
             </p>
@@ -339,6 +415,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                 📊 Exportar Excel
               </button>
             </div>
+            </div>)}
           </div>
 
           {/* IMPORTAR CLIENTES */}
@@ -470,10 +547,13 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
 
           {/* MANTENIMIENTO DE DATOS */}
           <div style={{...s.card,margin:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoMant(!abiertoMant)}>
               <span style={{fontSize:18}}>🔧</span>
-              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Mantenimiento de datos</span>
-            </div>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Mantenimiento de datos</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoMant?"▲":"▼"}</span>
+            </button>
+            {abiertoMant&&(<div style={{marginTop:10}}>
             <button style={{...s.btn,width:"100%",padding:"10px",fontSize:13}}
               onClick={()=>{if(window.confirm("¿Subir todos los datos a la nube?")){
                 cloudSave({clientes,ventas,planillas,stock,productos,noVisitas:(noVisitas||[]),prospectos:(prospectos||[])})
@@ -482,6 +562,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               }}}>
               🔄 Forzar sincronización
             </button>
+            </div>)}
           </div>
 
           {/* ESPACIO USADO */}

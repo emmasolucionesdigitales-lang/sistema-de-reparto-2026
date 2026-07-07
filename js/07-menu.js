@@ -22,12 +22,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
     : "normal";
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>{localStorage.getItem("sr_negocio_nombre")||"Sistema de Reparto"}</span>
-        <button style={{...s.btn,padding:"5px 10px",fontSize:18,lineHeight:1}} onClick={onToggleDark}>{darkMode?"☀":"🌙"}</button>
-        {onToggleScale&&<button style={{...s.btn,padding:"5px 10px",fontSize:12,fontWeight:700,lineHeight:1,minWidth:28}} onClick={onToggleScale} title="Tamaño de texto">{scaleLabel}</button>}
-      </div>
+      <HeaderApp onVolver={onVolver}/>
       
       
       {recordatoriosActivos&&recordatoriosActivos.length>0&&(
@@ -146,7 +141,6 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
               <span style={{fontSize:9,color:"#ffe4e4",fontWeight:500,textAlign:"center",lineHeight:1.3}}>No cargado</span>
               <span style={{fontSize:9,color:"#ffc9c9",lineHeight:1}}>{fechaNoCargadoLabel}</span>
             </button>
-          )}
           )}
           </div>
           {editandoZona===d&&(
@@ -282,10 +276,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
 function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver,onVerConfirmaciones,ventasPendientesTransfer}) {
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>{dia}</span>
-      </div>
+      <HeaderApp titulo={dia} onVolver={onVolver}/>
       <div style={{padding:"24px 16px",display:"flex",flexDirection:"column",gap:12}}>
         <button style={{...s.card,margin:0,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"20px 16px"}} onClick={onIrPlanilla}>
           <div>
@@ -595,10 +586,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
     };
     return (
       <div style={s.screen}>
-        <div style={s.header}>
-          <button style={s.backBtn} onClick={()=>setMostrarCierre(false)}>← Volver</button>
-          <span style={s.headerTitle}>Cierre del día · {dia}</span>
-        </div>
+        <HeaderApp titulo={`Cierre del día · ${dia}`} onVolver={()=>setMostrarCierre(false)}/>
         <div style={{padding:16}}>
           <span style={{...s.sectionTitle,padding:"0 0 8px"}}>LO QUE CARGASTE HOY</span>
           <div style={{...s.card,margin:"0 0 12px"}}>
@@ -716,9 +704,8 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
 
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Planilla · {dia}</span>
+      <HeaderApp titulo={`Planilla · ${dia}`} onVolver={onVolver}/>
+      <div style={{padding:"0 14px",display:"flex",justifyContent:"flex-end",marginTop:-4,marginBottom:6}}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
           <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{fecha}</span>
           {planilla._autoGuardado&&<span style={{fontSize:10,color:"#4dd9a0",fontWeight:500}}>✓ Auto-guardado</span>}
@@ -1014,10 +1001,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
   const yaIniciado = planilla?.iniciado;
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Inicio del reparto · {dia}</span>
-      </div>
+      <HeaderApp titulo={`Inicio del reparto · ${dia}`} onVolver={onVolver}/>
       <div style={{padding:16}}>
         <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)"}}>
           <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-info)",marginBottom:4}}>

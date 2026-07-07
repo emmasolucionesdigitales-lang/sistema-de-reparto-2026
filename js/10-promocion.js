@@ -76,11 +76,8 @@ function CargaHistorica({clientes,productos,onGuardar,onVolver,enConfig}) {
 
   return (
     <div style={s.screen}>
-      {!enConfig&&<div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Carga histórica</span>
-        {guardados>0&&<span style={{fontSize:12,color:"#4dd9a0"}}>{guardados} guardadas</span>}
-      </div>}
+      {!enConfig&&<HeaderApp titulo="Carga histórica" onVolver={onVolver}/>}
+      {!enConfig&&guardados>0&&<div style={{padding:"4px 16px 0",fontSize:12,color:"#4dd9a0"}}>✓ {guardados} guardadas</div>}
       {enConfig&&guardados>0&&<div style={{padding:"4px 16px",fontSize:12,color:"#4dd9a0"}}>✓ {guardados} ventas guardadas</div>}
       <div style={{padding:16}}>
 
@@ -267,10 +264,7 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
 
   if(subVista==="importar") return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={()=>setSubVista("menu")}>← Volver</button>
-        <span style={s.headerTitle}>Importar prospectos · Excel</span>
-      </div>
+      <HeaderApp titulo="Importar prospectos · Excel" onVolver={()=>setSubVista("menu")}/>
       <ImportarExcelTab
         clientes={[]}
         prospectos={prospectos||[]}
@@ -290,16 +284,13 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
     const lista = porDia(diaActivo);
     return (
       <div style={s.screen}>
-        <div style={s.header}>
-          <button style={s.backBtn} onClick={()=>setSubVista("menu")}>← Volver</button>
-          <span style={s.headerTitle}>Promoción · {diaActivo}</span>
-          <button style={{...s.btn,padding:"6px 12px",fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
-            onClick={()=>setSubVista("nuevo")}>+ Nuevo</button>
-        </div>
+        <HeaderApp titulo={`Promoción · ${diaActivo}`} onVolver={()=>setSubVista("menu")}/>
         <div style={{padding:"8px 14px 4px"}}>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
             <span style={s.badge("info")}>{lista.length} prospectos</span>
             {lista.filter(listo).length>0&&<span style={s.badge("success")}>{lista.filter(listo).length} listos ✓</span>}
+            <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto",background:"#185FA5",color:"#e2eaf4",border:"none"}}
+              onClick={()=>setSubVista("nuevo")}>+ Nuevo</button>
           </div>
         </div>
         {lista.length===0&&(
@@ -351,20 +342,17 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
   const convertidos = prospectos.filter(p=>p.estado==="convertido").length;
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Promoción</span>
-        <div style={{display:"flex",gap:6}}>
-          <button style={{...s.btn,padding:"6px 10px",fontSize:11,background:"#1a5e35",color:"#4dd9a0",border:"none"}}
-            onClick={()=>setSubVista("importar")}>📥 Excel</button>
-          <button style={{...s.btn,padding:"6px 12px",fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
-            onClick={()=>setSubVista("nuevo")}>+ Nuevo</button>
-        </div>
-      </div>
+      <HeaderApp titulo="Promoción" onVolver={onVolver}/>
       <div style={{...s.grid3,padding:"10px 14px 8px",gap:6}}>
         <div style={s.metricCard}><div style={s.metricLabel}>En promoción</div><div style={{...s.metricVal,color:"#5daaff"}}>{activos}</div></div>
         <div style={s.metricCard}><div style={s.metricLabel}>Listos ✓</div><div style={{...s.metricVal,color:"#4dd9a0"}}>{listos}</div></div>
         <div style={s.metricCard}><div style={s.metricLabel}>Convertidos</div><div style={s.metricVal}>{convertidos}</div></div>
+      </div>
+      <div style={{display:"flex",gap:6,padding:"0 14px 8px"}}>
+        <button style={{...s.btn,flex:1,fontSize:12,background:"#1a5e35",color:"#4dd9a0",border:"none"}}
+          onClick={()=>setSubVista("importar")}>📥 Excel</button>
+        <button style={{...s.btn,flex:1,fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
+          onClick={()=>setSubVista("nuevo")}>+ Nuevo</button>
       </div>
       {listos>0&&(
         <div style={{...s.card,margin:"0 14px 6px",background:"#0a2e1f",border:"0.5px solid #4dd9a0"}}>
@@ -411,10 +399,7 @@ function EditarProspecto({prospecto:p, onGuardar, onVolver}) {
   const s2=(k,v)=>setD(x=>({...x,[k]:v}));
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Editar prospecto</span>
-      </div>
+      <HeaderApp titulo="Editar prospecto" onVolver={onVolver}/>
       <div style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
         <div style={s.grid2}>
           <div><label style={s.label}>Día de visita</label>
@@ -550,6 +535,7 @@ function PromoDetalle({prospecto:p,ventas,noVisitas,productos,listo,comprasCount
         <div style={{display:"flex",gap:6}}>
           <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setEditando(true)}>Editar</button>
           <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={onComodato}>📋</button>
+          <HeaderBotones/>
         </div>
       </div>
       <div style={{padding:14}}>
@@ -731,10 +717,7 @@ function PromoNuevo({diaInicial,onGuardar,onVolver}) {
   const s2=(k,v)=>setD(x=>({...x,[k]:v}));
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Nuevo prospecto</span>
-      </div>
+      <HeaderApp titulo="Nuevo prospecto" onVolver={onVolver}/>
       <div style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
         <div>
           <label style={s.label}>Día de visita</label>
@@ -798,10 +781,7 @@ function PromoComodato({prospecto:p,onGuardar,onVolver}) {
   const sc=(k,v)=>setC(x=>({...x,[k]:v}));
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Comodato · {p.nombre}</span>
-      </div>
+      <HeaderApp titulo={`Comodato · ${p.nombre}`} onVolver={onVolver}/>
       <div style={{padding:14}}>
         <div style={{...s.card,textAlign:"center",marginBottom:10,background:"var(--color-background-tertiary)"}}>
           <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Sistema de Reparto</div>
