@@ -1074,8 +1074,8 @@ function App() {
           });
           irAlSiguiente(getSiguienteDelDia(nvFinal, clienteId));
         }}
-        onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,sd)=>{
-          registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd);
+        onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,sd,tc)=>{
+          registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd,tc);
           // Usar noVisitas actual (sin cambios) — la venta ya marca al cliente como visitado
           irAlSiguiente(getSiguienteDelDia(noVisitas, clienteId));
         }}
@@ -1306,4 +1306,3 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
