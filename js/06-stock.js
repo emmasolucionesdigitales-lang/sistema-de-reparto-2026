@@ -22,7 +22,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
     setStock(ns);
   };
   const setClienteEnv=(id,key,val)=>{
-    setClientes((clientes||[]).map(c=>c.id===id?{...c,[key]:Math.max(0,Math.round(Number(val)||0))}:c));
+    setClientes(prev=>(prev||[]).map(c=>c.id===id?{...c,[key]:Math.max(0,Math.round(Number(val)||0))}:c));
   };
   const setProdPrecio=(id,campo,val)=>{
     setProductos((productos||[]).map(p=>p.id===id?{...p,[campo]:Math.max(0,Number(val)||0)}:p));
