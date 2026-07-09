@@ -853,17 +853,23 @@ function App() {
     ultimoBorradoRef.current = {id:ventaId, ts:ahoraDel};
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
     const eraMixta = (Number(v.montoTrans)||0)>0;
+    // Calculamos qué se borra y el ajuste de saldo AHORA MISMO, de forma
+    // sincrónica — no depende de cuándo React decida correr el actualizador
+    // de saveVentas.
     let ajusteSaldoExtra = 0;
+    const idsABorrar = new Set([ventaId]);
+    ventas.forEach(x=>{
+      const ligada = x._esMixtoTrans && (
+        x._mixtoDe===ventaId ||
+        (x._mixtoDe===undefined && eraMixta && x.clienteId===v.clienteId && x.fechaKey===v.fechaKey)
+      );
+      if(ligada){
+        idsABorrar.add(x.id);
+        if((Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
+      }
+    });
     saveVentas(prev => {
-      let nv = prev.filter(x=>{
-        if(x.id===ventaId) return false;
-        const ligada = x._esMixtoTrans && (
-          x._mixtoDe===ventaId ||
-          (x._mixtoDe===undefined && eraMixta && x.clienteId===v.clienteId && x.fechaKey===v.fechaKey)
-        );
-        if(ligada && (Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
-        return !ligada;
-      });
+      let nv = prev.filter(x=>!idsABorrar.has(x.id));
       nv = nv.filter(x=>!(x._esMixtoTrans && x._mixtoDe!==undefined && !nv.some(y=>y.id===x._mixtoDe)));
       return nv;
     });
@@ -987,14 +993,11 @@ function App() {
       {pantalla==="clientesDormidos" && <ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("gestionClientes")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
-            let nvFinal=null;
-            saveNoVisitas(prev => {
-              const nv=[...(prev||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta",_upd:Date.now()}];
-              nvFinal=nv; return nv;
-            });
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta",_upd:Date.now()}];
+            saveNoVisitas(nv);
             const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
             const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
-            const noVMap={};nvFinal.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
+            const noVMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
             const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
             const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==cliente.id);
             const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==cliente.id);
@@ -1002,14 +1005,11 @@ function App() {
             if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
           }}
           onNoQuiereCliente={()=>{
-            let nvFinal=null;
-            saveNoVisitas(prev => {
-              const nv=[...(prev||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
-              nvFinal=nv; return nv;
-            });
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
+            saveNoVisitas(nv);
             const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
             const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
-            const noVMap={};nvFinal.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
+            const noVMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
             const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
             const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==cliente.id);
             const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==cliente.id);
@@ -1056,23 +1056,17 @@ function App() {
                    "20L":Math.max(0,(Number(planillaHoy.productos?.b20?.llenos)||0)-b20)}};
         })()}
         onNoEsta={()=>{
-          let nvFinal=null;
-          saveNoVisitas(prevNV => {
-            const base=prevNV||[];
-            const anterior=base.find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
-            const motivo=anterior?.motivo==="noesta"?"noesta2":"noesta";
-            const nv=[...base.filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo,_upd:Date.now()}];
-            nvFinal=nv; return nv;
-          });
-          irAlSiguiente(getSiguienteDelDia(nvFinal, clienteId));
+          const base=noVisitas||[];
+          const anterior=base.find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
+          const motivo=anterior?.motivo==="noesta"?"noesta2":"noesta";
+          const nv=[...base.filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo,_upd:Date.now()}];
+          saveNoVisitas(nv);
+          irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onNoQuiere={()=>{
-          let nvFinal=null;
-          saveNoVisitas(prevNV => {
-            const nv=[...(prevNV||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
-            nvFinal=nv; return nv;
-          });
-          irAlSiguiente(getSiguienteDelDia(nvFinal, clienteId));
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
+          saveNoVisitas(nv);
+          irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,sd,tc)=>{
           registrarVenta(d,p,m,sa,ep,ed,obs,op,mt2,sd,tc);
@@ -1080,12 +1074,9 @@ function App() {
           irAlSiguiente(getSiguienteDelDia(noVisitas, clienteId));
         }}
         onSaltar={()=>{
-          let nvFinal=null;
-          saveNoVisitas(prevNV => {
-            const nv=[...(prevNV||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado",_upd:Date.now()}];
-            nvFinal=nv; return nv;
-          });
-          irAlSiguiente(getSiguienteDelDia(nvFinal, clienteId));
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado",_upd:Date.now()}];
+          saveNoVisitas(nv);
+          irAlSiguiente(getSiguienteDelDia(nv, clienteId));
         }}
         onVolver={()=>{
           const esProsp = (prospectos||[]).some(p=>p.id===clienteId);
@@ -1306,3 +1297,4 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+

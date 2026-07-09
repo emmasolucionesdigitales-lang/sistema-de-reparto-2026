@@ -63,6 +63,31 @@
       if(!id){ id = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("sr_device_id", id); }
     })();
 
+    // ── Tipo de dispositivo (PC o móvil) — para el licenciamiento de 2 aparatos ──
+    window.tipoDispositivoRM = function() {
+      const ua = navigator.userAgent || "";
+      const esMovilUA = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
+      // iPadOS 13+ se identifica como "Macintosh" pero tiene pantalla táctil
+      const esIpadDisfrazado = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+      return (esMovilUA || esIpadDisfrazado) ? "movil" : "pc";
+    };
+
+    // Arma (sin guardar todavía) el objeto {pc,movil} de una licencia, migrando
+    // el esquema viejo de un solo "deviceId" la primera vez que se ve.
+    window.slotsLicenciaRM = function(d, miDevice, miTipo) {
+      let dispositivos = d.dispositivos;
+      if(!dispositivos) {
+        dispositivos = {pc:"", movil:""};
+        if(d.deviceId) {
+          // Si es el mismo aparato que ya tenía la licencia, asignarlo a SU tipo real.
+          // Si es uno distinto pidiendo entrar, dejamos el viejo reservado en el
+          // casillero contrario para no perderle el acceso a quien ya la usaba.
+          dispositivos[d.deviceId === miDevice ? miTipo : (miTipo === "pc" ? "movil" : "pc")] = d.deviceId;
+        }
+      }
+      return dispositivos;
+    };
+
     // Verifica el código contra la base del admin y devuelve los datos
     window.verificarLicencia = async function(codigo) {
       try {
@@ -74,13 +99,16 @@
         const d = snap.data();
         // Estados que NO permiten entrar
         if(d.estado === "inactivo" || d.estado === "pendiente") return null;
-        // Si el código ya fue usado en OTRO dispositivo, bloquear
-        if(d.estado === "usado" && d.deviceId) {
+        // Licencia del dueño: hasta 2 dispositivos, uno de PC y uno de móvil
+        if(d.estado === "usado") {
           const miDevice = localStorage.getItem("sr_device_id");
-          if(miDevice && d.deviceId !== miDevice) return null;
+          const miTipo = window.tipoDispositivoRM();
+          const dispositivos = window.slotsLicenciaRM(d, miDevice, miTipo);
+          const slotOcupado = dispositivos[miTipo];
+          if(slotOcupado && slotOcupado !== miDevice) return null; // ese tipo de aparato ya está ocupado por otro
         }
-        // "activo" (sin usar) o "usado" en este mismo dispositivo → OK
-        return d; // incluye: pin, negocio, email, celular, nombre, deviceId
+        // "activo" (sin usar) o dispositivo propio dentro del cupo → OK
+        return d; // incluye: pin, negocio, email, celular, nombre, deviceId, dispositivos
       } catch(e) { console.error("verificarLicencia:", e); return null; }
     };
 

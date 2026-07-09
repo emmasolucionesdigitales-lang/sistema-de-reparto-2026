@@ -386,10 +386,13 @@ function PantallaActivacion({onActivado}) {
           const snap = await window.dbLicencias.collection("licencias").doc(cod).get();
           if(snap.exists) {
             const d = snap.data();
-            // Si ya fue usado en OTRO dispositivo, bloquear
-            if(d.estado === "usado" && d.deviceId && d.deviceId !== deviceId) {
+            const miTipo = window.tipoDispositivoRM ? window.tipoDispositivoRM() : "pc";
+            const dispositivos = window.slotsLicenciaRM ? window.slotsLicenciaRM(d, deviceId, miTipo) : {pc:deviceId,movil:deviceId};
+            const slotOcupado = dispositivos[miTipo];
+            // Si ese TIPO de aparato (PC o móvil) ya está ocupado por otro dispositivo, bloquear
+            if(slotOcupado && slotOcupado !== deviceId) {
               setEstado("error");
-              setError("Este código ya fue usado en otro dispositivo. Contactá al administrador.");
+              setError(`Este código ya está en uso en ${miTipo==="pc"?"otra computadora":"otro celular"}. Contactá al administrador.`);
               return;
             }
             // Validar email/celular contra lo registrado (si el admin los cargó)
@@ -398,10 +401,12 @@ function PantallaActivacion({onActivado}) {
               setError("El celular no coincide con el registrado. Contactá al administrador.");
               return;
             }
-            // Marcar como usado + atar al dispositivo
+            // Marcar como usado + reservar el casillero de este tipo de aparato
+            dispositivos[miTipo] = deviceId;
             await window.dbLicencias.collection("licencias").doc(cod).update({
               estado: "usado",
-              deviceId,
+              dispositivos,
+              deviceId, // se mantiene por compatibilidad con pantallas que todavía lo lean
               email: email.trim(),
               negocio: negocio.trim(),
               aceptoTerminos: true,
