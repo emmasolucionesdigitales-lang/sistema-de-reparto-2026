@@ -318,7 +318,7 @@ function App() {
           const k = clave(v); const enNube = porClaveNV[k];
           if(!enNube){ porClaveNV[k] = v; cambiosLocalesNV++; return; }
           const uL = Number(v._upd)||0, uN = Number(enNube._upd)||0;
-          if(uL >= uN){ porClaveNV[k] = v; cambiosLocalesNV++; }
+          if(uL > uN){ porClaveNV[k] = v; cambiosLocalesNV++; }
         });
         const mergedNV = Object.values(porClaveNV);
         setNoVisitas(mergedNV);
