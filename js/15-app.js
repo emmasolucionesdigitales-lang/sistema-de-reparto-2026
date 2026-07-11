@@ -1014,11 +1014,12 @@ function App() {
       const token = await window.messagingLC.getToken({ vapidKey: VAPID_PUBLIC_RM, serviceWorkerRegistration: sw });
       if (!window.db || !negocioId) return false;
       const deviceId = getDeviceIdRM();
-      // Cada negocio tiene su propia lista de dispositivos suscriptos —
-      // así el aviso de UNO no le llega a los celulares de otro cliente.
-      await window.db.collection('users').doc(negocioId).collection('push_subs').doc('main').set({
-        [deviceId]: { token, ts: Date.now() }
-      }, { merge: true });
+      // Se guarda ADENTRO del mismo documento "main" que ya usa toda la app
+      // (users/{negocio}/datos/main) — ese camino ya tiene permiso de
+      // escritura. Una colección nueva (push_subs) las reglas de Firestore
+      // todavía no la conocen y la rechazan.
+      const ref = window.db.collection('users').doc(negocioId).collection('datos').doc('main');
+      await ref.set({ pushSubs: { [deviceId]: { token, ts: Date.now() } } }, { merge: true });
       return true;
     } catch (e) { console.warn('Error al activar notificaciones:', e); return false; }
   };
@@ -1417,4 +1418,3 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
