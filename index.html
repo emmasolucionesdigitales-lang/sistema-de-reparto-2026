@@ -27,6 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   <script>
     // ═══════════════════════════════════════════
     // REEMPLAZÁ ESTOS VALORES CON TU FIREBASE CONFIG
@@ -45,6 +46,11 @@
     window.db = firebase.firestore();
     window.db.enablePersistence().catch(()=>{});
     const db = window.db;
+
+    // Cloud Messaging — para las notificaciones push (15-app.js pide el
+    // token acá adentro con window.messagingLC.getToken(...))
+    try { if(firebase.messaging.isSupported()) window.messagingLC = firebase.messaging(); }
+    catch(e) { console.warn("Cloud Messaging no disponible en este navegador:", e); }
 
     // Firebase admin (app-control-de-apps) — verifica códigos de licencia
     firebase.initializeApp({
