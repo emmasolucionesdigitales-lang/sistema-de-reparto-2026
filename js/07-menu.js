@@ -536,6 +536,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
   const [mostrarCierre, setMostrarCierre] = useState(!!(initCierre && !yaConfirmado));
   const [realesLlenos, setRealesLlenos] = useState({soda:"",b10:"",b20:""});
   const [realesVacios, setRealesVacios] = useState({soda:"",b10:"",b20:""});
+  const [realesParaLlenar, setRealesParaLlenar] = useState({soda:"",b10:"",b20:""});
   const yaCerrado = !!planilla._diaCerrado;
   const llenosCargados = {soda:Number(datos.productos?.soda?.llenos||0),b10:Number(datos.productos?.b10?.llenos||0),b20:Number(datos.productos?.b20?.llenos||0)};
   const vendidosDia = {soda:0,b10:0,b20:0};
@@ -558,6 +559,23 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
   const diaSiguiente = DIAS_ORDEN[(DIAS_ORDEN.indexOf(dia)+1) % DIAS_ORDEN.length];
   const necesarioManana = (cargasDia && cargasDia[diaSiguiente]) || {soda:0,b10:0,b20:0};
 
+  // "Para llenar" (calculado) = de los vacíos que vuelven HOY, cuántos hacen
+  // falta llenar para completar lo que se necesita mañana — teniendo en
+  // cuenta lo que YA había en sodería de días anteriores, no solo lo de hoy.
+  const paraLlenarCalc={soda:0,b10:0,b20:0};
+  const vaciosRestoCalc={soda:0,b10:0,b20:0};
+  ["soda","b10","b20"].forEach(pk=>{
+    const sk=planKeyToStockKey[pk];
+    const cajon=pk==="soda"?CAJON_SODA:1;
+    const llenosHoy = Math.floor(sobrantes[pk]/(pk==="soda"?CAJON_SODA:1));
+    const vaciosHoy = Math.floor(vaciosRec[pk]/(pk==="soda"?CAJON_SODA:1));
+    const llenosYaHabia = pk==="soda" ? Math.floor((soderiaActual[sk]||0)/CAJON_SODA) : (soderiaActual[sk]||0);
+    const necDisp = pk==="soda" ? Math.ceil((necesarioManana[pk]||0)/CAJON_SODA) : (necesarioManana[pk]||0);
+    const falta = Math.max(0, necDisp - llenosYaHabia - llenosHoy);
+    paraLlenarCalc[pk] = Math.min(falta, vaciosHoy);
+    vaciosRestoCalc[pk] = Math.max(0, vaciosHoy - paraLlenarCalc[pk]);
+  });
+
   const confirmarCierre = () => {
     localStorage.setItem(cierreKey, "1"); // marcar como confirmado
     const s=JSON.parse(JSON.stringify(stock));
@@ -567,10 +585,14 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
       const sk=planKeyToStockKey[pk];
       const CAJON_F=pk==="soda"?CAJON_SODA:1;
       const llenReal=realesLlenos[pk]!==""?Number(realesLlenos[pk])*CAJON_F:sobrantes[pk];
-      const vacReal=realesVacios[pk]!==""?Number(realesVacios[pk])*CAJON_F:vaciosRec[pk];
-      const dl=llenReal-sobrantes[pk]; const dv=vacReal-vaciosRec[pk];
+      const paraLlenarReal=realesParaLlenar[pk]!==""?Number(realesParaLlenar[pk])*CAJON_F:paraLlenarCalc[pk]*CAJON_F;
+      const vacReal=realesVacios[pk]!==""?Number(realesVacios[pk])*CAJON_F:vaciosRestoCalc[pk]*CAJON_F;
+      // "Para llenar" se llena antes de salir mañana — para el stock ya
+      // cuenta como LLENO, no como vacío.
+      const llenTotal=llenReal+paraLlenarReal;
+      const dl=llenTotal-sobrantes[pk]; const dv=vacReal-vaciosRec[pk];
       if(dl!==0||dv!==0) diffs[pk]={llenos:dl,vacios:dv};
-      s.soderia[sk]        =(s.soderia[sk]||0)+llenReal;
+      s.soderia[sk]        =(s.soderia[sk]||0)+llenTotal;
       s.soderia_vacios[sk] =(s.soderia_vacios[sk]||0)+vacReal;
       s.camion[sk]         =0;
     });
@@ -582,16 +604,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
   };
 
   if(mostrarCierre){
-    const llenosVuelta={
-      soda: realesLlenos.soda!==""?Number(realesLlenos.soda):Math.floor(sobrantes.soda/CAJON_SODA),
-      b10:  realesLlenos.b10!==""?Number(realesLlenos.b10):sobrantes.b10,
-      b20:  realesLlenos.b20!==""?Number(realesLlenos.b20):sobrantes.b20,
-    };
-    const vaciosVuelta={
-      soda: realesVacios.soda!==""?Number(realesVacios.soda):Math.floor(vaciosRec.soda/CAJON_SODA),
-      b10:  realesVacios.b10!==""?Number(realesVacios.b10):vaciosRec.b10,
-      b20:  realesVacios.b20!==""?Number(realesVacios.b20):vaciosRec.b20,
-    };
     return (
       <div style={s.screen}>
         <HeaderApp titulo={`Cierre del día · ${dia}`} onVolver={()=>setMostrarCierre(false)}/>
@@ -640,60 +652,43 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,prospectos,planilla,productos
             </div>
           </details>
 
-          {/* LO QUE VUELVE A SODERÍA — confirmar o corregir, todo en un solo lugar */}
+          {/* LO QUE VUELVE A SODERÍA — 3 estados por producto: Lleno / Para llenar / Vacío */}
           <span style={{...s.sectionTitle,padding:"0 0 8px"}}>LO QUE VUELVE A SODERÍA</span>
-          <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"-4px 0 10px"}}>Contá lo que tenés en mano. Si coincide con el cálculo, dejalo así.</p>
+          <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"-4px 0 10px"}}>Contá lo que tenés físicamente en cada columna. Si coincide con el cálculo, dejalo así.</p>
           <div style={{...s.card,margin:"0 0 16px",padding:"10px 12px"}}>
-            <div style={{display:"grid",gridTemplateColumns:"1.3fr 0.75fr 0.95fr 0.8fr",gap:3,marginBottom:6}}>
-              {["","Calc.","En mano","Sodería"].map(h=>(
-                <div key={h} style={{fontSize:10,color:h==="Calc."?"#5daaff":h==="Sodería"?"var(--color-text-success)":"var(--color-text-secondary)",textAlign:h?"center":"left",fontWeight:500}}>{h}</div>
-              ))}
-            </div>
-            {[
-              ["Soda\n(sobrante lleno)","soda","llenos"],
-              ["Soda\n(vacíos)","soda","vacios"],
-              ["10L\n(sobrante lleno)","b10","llenos"],
-              ["10L\n(vacíos)","b10","vacios"],
-              ["20L\n(sobrante lleno)","b20","llenos"],
-              ["20L\n(vacíos)","b20","vacios"],
-            ].map(([label,pk,tipo])=>{
-              const calcVal=tipo==="vacios"
-                ?(pk==="soda"?Math.floor(vaciosRec[pk]/CAJON_SODA):vaciosRec[pk])
-                :(pk==="soda"?Math.floor(sobrantes[pk]/CAJON_SODA):sobrantes[pk]);
-              const stateObj=tipo==="vacios"?realesVacios:realesLlenos;
-              const setFn=tipo==="vacios"?setRealesVacios:setRealesLlenos;
-              const realVal=stateObj[pk]!==""?Number(stateObj[pk]):calcVal;
-              const diff=realVal-calcVal;
-              const sk=planKeyToStockKey[pk];
-              const actualSoderia=tipo==="vacios"?(soderiaVaciosActual[sk]||0):(soderiaActual[sk]||0);
-              const quedaEn=pk==="soda"?Math.floor(actualSoderia/CAJON_SODA)+realVal:actualSoderia+realVal;
-              const necManPk=necesarioManana[pk]||0;
-              const necManVal=pk==="soda"?Math.ceil(necManPk/CAJON_SODA):necManPk;
-              const faltaLlenar=tipo==="llenos"?Math.max(0,necManVal-quedaEn):0;
+            {[["Soda","soda"],["10L","b10"],["20L","b20"]].map(([label,pk])=>{
+              const cajon=pk==="soda"?CAJON_SODA:1;
+              const cols=[
+                {tipo:"llenos", titulo:"Lleno",       calc:Math.floor(sobrantes[pk]/cajon),  stateObj:realesLlenos,      setFn:setRealesLlenos},
+                {tipo:"pllenar",titulo:"Para llenar", calc:paraLlenarCalc[pk],               stateObj:realesParaLlenar,  setFn:setRealesParaLlenar},
+                {tipo:"vacios", titulo:"Vacío",        calc:vaciosRestoCalc[pk],              stateObj:realesVacios,      setFn:setRealesVacios},
+              ];
               return (
-                <div key={pk+"_"+tipo} style={{borderTop:"0.5px solid var(--color-border-tertiary)",padding:"8px 0"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1.3fr 0.75fr 0.95fr 0.8fr",gap:5,alignItems:"center"}}>
-                    <span style={{fontSize:11,color:"var(--color-text-primary)",whiteSpace:"pre-line",lineHeight:1.25}}>{label}</span>
-                    <div style={{textAlign:"center",fontSize:17,fontWeight:500,color:"#5daaff"}}>{calcVal}</div>
-                    <input type="number" min={0}
-                      value={stateObj[pk]}
-                      placeholder={String(calcVal)}
-                      style={{padding:"6px 2px",borderRadius:7,border:"1.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:16,textAlign:"center",width:"100%",boxSizing:"border-box"}}
-                      onChange={e=>setFn(r=>({...r,[pk]:e.target.value}))}
-                    />
-                    <div style={{textAlign:"center",fontSize:15,fontWeight:600,color:"var(--color-text-success)"}}>{quedaEn}</div>
+                <div key={pk} style={{borderTop:pk!=="soda"?"0.5px solid var(--color-border-tertiary)":"none",padding:"10px 0"}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:6}}>{label}{pk==="soda"?" (cajones)":""}</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                    {cols.map(({tipo,titulo,calc,stateObj,setFn})=>{
+                      const realVal=stateObj[pk]!==""?Number(stateObj[pk]):calc;
+                      const diff=realVal-calc;
+                      return (
+                        <div key={tipo}>
+                          <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginBottom:2}}>{titulo}</div>
+                          <div style={{fontSize:10,color:"#5daaff",textAlign:"center",marginBottom:3}}>calc. {calc}</div>
+                          <input type="number" min={0}
+                            value={stateObj[pk]}
+                            placeholder={String(calc)}
+                            style={{padding:"6px 2px",borderRadius:7,border:"1.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:16,textAlign:"center",width:"100%",boxSizing:"border-box"}}
+                            onChange={e=>setFn(r=>({...r,[pk]:e.target.value}))}
+                          />
+                          {diff!==0&&(
+                            <div style={{textAlign:"center",marginTop:2,fontSize:10,fontWeight:600,color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)"}}>
+                              {`${diff>0?"+":""}${diff} dif.`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  {tipo==="llenos"&&(
-                    <div style={{textAlign:"right",marginTop:3,fontSize:11,color:faltaLlenar>0?"var(--color-text-warning)":"var(--color-text-tertiary)",fontWeight:faltaLlenar>0?600:400}}>
-                      {faltaLlenar>0?`⚠️ Hay que llenar ${faltaLlenar} más para mañana`:`✓ Alcanza para mañana (necesitás ${necManVal})`}
-                    </div>
-                  )}
-                  {diff!==0&&(
-                    <div style={{textAlign:"right",marginTop:3,fontSize:11,fontWeight:600,
-                      color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)"}}>
-                      {`${diff>0?"+":""}${diff} dif.`}
-                    </div>
-                  )}
                 </div>
               );
             })}
