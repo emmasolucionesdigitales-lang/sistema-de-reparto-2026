@@ -442,7 +442,7 @@ function DetalleVentasDia({ventas, clientes, prospectos, noVisitas, fecha}) {
                 {noComp.map((n,i)=>{
                   const p = todosMap[n.clienteId] || {};
                   const info = lbl(n.motivo);
-                  const dir = (p.calle?`${p.calle} ${p.nro||""}`:p.manzana?`Mz ${p.manzana} L ${p.lote}`:"")+(p.barrio?` · ${p.barrio}`:"");
+                  const dir = direccionCliente(p);
                   return (
                     <div key={"nv"+i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 16px",borderTop:i>0?"0.5px solid var(--color-border-tertiary)":"none"}}>
                       <div style={{minWidth:0}}>

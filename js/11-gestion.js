@@ -541,7 +541,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
                         <span style={{background:"#1D9E75",color:"#fff",fontSize:10,padding:"1px 7px",borderRadius:20,fontWeight:700,flexShrink:0}}>{c.dia}</span>
                       </div>
                       <div style={{fontSize:17,color:"#e2eaf4",fontWeight:600,marginTop:2,marginBottom:4}}>
-                        {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
+                        {direccionCliente(c)}
                       </div>
                       {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginBottom:4}}>📝 {c.notas}</div>}
                       <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:4}}>
@@ -865,7 +865,7 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
       const num=mostrarRuta?rutaIdx+1:(c.orden||"·");
       const icon=L.divIcon({className:"",html:`<div style="width:30px;height:30px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${num}</div>`,iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-16]});
       const marker=L.marker([c.lat,c.lng],{icon}).addTo(map);
-      const dir=c.calle?c.calle+" "+(c.nro||""):c.manzana?"Mz "+c.manzana+" L "+(c.lote||""):c.barrio||"";
+      const dir=direccionCliente(c);
       const estado=entregado?"<span style='color:#059669;font-weight:600'>✓ Entregado</span>":noVis?"<span style='color:#dc2626;font-weight:600'>✗ No visitado</span>":"<span style='color:#2563eb;font-weight:600'>⏳ Pendiente</span>";
       const popupId=`popup_btn_${c.id}`;
       marker.bindPopup(`<div style="font-family:sans-serif;min-width:170px;padding:4px 0"><div style="font-size:14px;font-weight:700;margin-bottom:2px">${c.nombre}</div><div style="font-size:11px;color:#666;margin-bottom:4px">${c.dia} · ${dir}</div><div style="margin-bottom:8px">${estado}</div>${!entregado?`<button id="${popupId}" style="background:#185FA5;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;width:100%">Entregar →</button>`:""}</div>`);
