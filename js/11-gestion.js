@@ -540,7 +540,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
                         <div style={{fontWeight:700,fontSize:18,color:"#ffffff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
                         <span style={{background:"#1D9E75",color:"#fff",fontSize:10,padding:"1px 7px",borderRadius:20,fontWeight:700,flexShrink:0}}>{c.dia}</span>
                       </div>
-                      <div style={{fontSize:17,color:"#c8d8e8",fontWeight:500,marginTop:2,marginBottom:4}}>
+                      <div style={{fontSize:17,color:"#e2eaf4",fontWeight:600,marginTop:2,marginBottom:4}}>
                         {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
                       </div>
                       {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginBottom:4}}>📝 {c.notas}</div>}
@@ -555,10 +555,10 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
                     </div>
                   </div>
                   <PieEnvases c={c} ventas={ventas} onEditar={onEditar}
-                    izquierda={<button style={{background:"rgba(226,75,74,0.2)",color:"#ffffff",border:"1px solid rgba(226,75,74,0.5)",borderRadius:6,padding:"2px 9px",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑 Eliminar</button>}>
-                    {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
-                    <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setCambioId(cambioId===c.id?null:c.id);}}>🔄 Cambio</button>
-                    <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
+                    izquierda={<button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑️ Eliminar</button>}>
+                    {onRegistrarVenta&&<button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>💰 Venta</button>}
+                    <button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-secondary)"}} onClick={e=>{e.stopPropagation();setCambioId(cambioId===c.id?null:c.id);}}>🔄 Cambio</button>
+                    <button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-secondary)"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>✏️ Editar</button>
                   </PieEnvases>
                   {cambioId===c.id&&(
                     <div style={{...s.card,margin:"8px 0 0",border:"1px solid #818cf8"}} onClick={e=>e.stopPropagation()}>
