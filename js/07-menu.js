@@ -23,8 +23,24 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
   return (
     <div style={s.screen}>
       <HeaderApp onVolver={onVolver}/>
-      
-      
+
+      {(()=>{
+        const ultimo = localStorage.getItem("sr_lc_ultimo_backup");
+        const hoy = new Date().toLocaleDateString("en-CA");
+        const esHoy = ultimo===hoy;
+        return (
+          <div style={{margin:"8px 14px 0",display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,background:"var(--color-background-tertiary)"}}>
+            <span style={{fontSize:12,color:esHoy?"var(--color-text-success)":"var(--color-text-warning)",flex:1}}>
+              💾 {ultimo ? `Último respaldo: ${esHoy?"hoy":ultimo}` : "Todavía no se hizo ningún respaldo"}
+            </span>
+            <button style={{background:"none",border:"none",color:"var(--color-text-info)",fontSize:12,fontWeight:600,cursor:"pointer",padding:"2px 6px"}}
+              onClick={()=>{ if(typeof window._descargarRespaldo==="function") window._descargarRespaldo(); }}>
+              Descargar ahora
+            </button>
+          </div>
+        );
+      })()}
+
       {recordatoriosActivos&&recordatoriosActivos.length>0&&(
         <div style={{margin:"8px 14px 4px"}}>
           <div style={{fontSize:11,fontWeight:500,color:"#5daaff",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔔 Recordatorios pendientes</div>

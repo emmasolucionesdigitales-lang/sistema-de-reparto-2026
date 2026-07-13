@@ -260,6 +260,19 @@ function App() {
     setSyncStatus("loading");
     cloudLoad(negocioId).then(function(data) {
       if(!data) { setSyncStatus("idle"); setCargandoNube(false); return; }
+      // ═══════════════════════════════════════════════════════════════════
+      // LEER ESTO ANTES DE TOCAR CUALQUIER MERGE DE ACÁ ABAJO
+      // ═══════════════════════════════════════════════════════════════════
+      // Patrón que se repite para clientes/ventas/noVisitas: al cargar de la
+      // nube, se compara registro por registro usando `_upd`, y gana el más
+      // nuevo — NUNCA pisar el array local entero con el de la nube.
+      // REGLA DE ORO: comparar con > estricto, nunca con >=. Un empate
+      // significa "ya sincronizado sin cambios" — tratarlo como cambio hace
+      // que se re-suba de nuevo en cada carga. Esto ya pasó de verdad en La
+      // Catalina: un >= en el merge de noVisitas gastó toda la cuota gratis
+      // de Firestore en un día (julio 2026). Si la cuota se agota sin
+      // explicación, ACÁ es el primer lugar para revisar.
+      // ═══════════════════════════════════════════════════════════════════
       if (data.clientes?.length)   {
         // ── Clientes: MERGEAR por id en vez de sobreescribir ──────────────
         // (mismo motivo que ventas: no perder un saldo recién actualizado
@@ -361,6 +374,8 @@ function App() {
   // cartel de confirmación tarda en desaparecer y se vuelve a tocar el botón.
   const ultimoRegistroRef = React.useRef({firma:null, ts:0});
   const ultimoBorradoRef = React.useRef({id:null, ts:0});
+  const [deshacerVenta, setDeshacerVenta] = React.useState(null);
+  const deshacerTimerRef = React.useRef(null);
   const ultimoEditadoRef = React.useRef({firma:null, ts:0});
   const ultimoClienteBorradoRef = React.useRef({id:null, ts:0});
   React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto,cargasDia,perdidas}; });
@@ -535,12 +550,12 @@ function App() {
         } else {
           try { localStorage.setItem("sr_offline_pending", JSON.stringify(data)); } catch {}
           setPendingOfflineSync(true);
-          setSyncStatus("offline_pending");
+          setSyncStatus(navigator.onLine ? "error" : "offline_pending");
         }
       }).catch(function(){
         try { localStorage.setItem("sr_offline_pending", JSON.stringify(data)); } catch {}
         setPendingOfflineSync(true);
-        setSyncStatus("offline_pending");
+        setSyncStatus(navigator.onLine ? "error" : "offline_pending");
       });
     });
   };
@@ -564,7 +579,13 @@ function App() {
     const goOffline = () => { setIsOnline(false); setSyncStatus("offline"); };
     window.addEventListener("online",  goOnline);
     window.addEventListener("offline", goOffline);
-    return ()=>{ window.removeEventListener("online",goOnline); window.removeEventListener("offline",goOffline); };
+    // Reintento periódico: cubre el caso de un guardado que falló ESTANDO
+    // online (permisos, cuota momentánea) — sin esto, solo se reintentaba
+    // al pasar de sin señal a con señal.
+    const reintentoPeriodico = setInterval(()=>{
+      if(navigator.onLine && localStorage.getItem("sr_offline_pending")) goOnline();
+    }, 45000);
+    return ()=>{ window.removeEventListener("online",goOnline); window.removeEventListener("offline",goOffline); clearInterval(reintentoPeriodico); };
   },[]);
 
   // ── NOTIFICACIONES ────────────────────────────────────────────────
@@ -1008,12 +1029,27 @@ function App() {
         if((Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
       }
     });
+    // Guardar lo borrado para poder "Deshacer" — antes de tocar nada
+    const ventasBorradas = ventas.filter(x=>idsABorrar.has(x.id));
+    const ajusteTotal = v.saldoDelta + ajusteSaldoExtra;
+    if(deshacerTimerRef.current) clearTimeout(deshacerTimerRef.current);
+    setDeshacerVenta({ventasBorradas, clienteId:v.clienteId, ajusteTotal, ts:Date.now()});
+    deshacerTimerRef.current = setTimeout(()=>setDeshacerVenta(null), 8000);
     saveVentas(prev => {
       let nv = prev.filter(x=>!idsABorrar.has(x.id));
       nv = nv.filter(x=>!(x._esMixtoTrans && x._mixtoDe!==undefined && !nv.some(y=>y.id===x._mixtoDe)));
       return nv;
     });
     saveClientes(prev => prev.map(x=>x.id===v.clienteId?{...x,saldo:(Number(x.saldo)||0)-v.saldoDelta-ajusteSaldoExtra}:x));
+  };
+
+  const deshacerUltimaVenta = () => {
+    if(!deshacerVenta) return;
+    if(deshacerTimerRef.current) clearTimeout(deshacerTimerRef.current);
+    const {ventasBorradas, clienteId, ajusteTotal} = deshacerVenta;
+    saveVentas(prev => [...prev, ...ventasBorradas]);
+    saveClientes(prev => prev.map(x=>x.id===clienteId?{...x,saldo:(Number(x.saldo)||0)+ajusteTotal}:x));
+    setDeshacerVenta(null);
   };
 
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
@@ -1160,7 +1196,7 @@ function App() {
         onAbrirMapa={()=>irA("mapaClientes")}
         onPlanilla={()=>{ setInitCierre(true); irA("planilla"); }}
         />}
-      {pantalla==="clientesDormidos" && <ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("gestionClientes")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} />}
+      {pantalla==="clientesDormidos" && <ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("gestionClientes")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={eliminarCliente} onPerdida={registrarPerdida} />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
             const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta",_upd:Date.now()}];
@@ -1443,6 +1479,12 @@ function App() {
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} setClientes={saveClientes} ventas={ventas} productos={productos} setProductos={saveProductos} cargasDia={cargasDia} setCargasDia={saveCargasDia} planillas={planillas} perdidas={perdidas} registrarPerdida={registrarPerdida} onVolver={()=>irA("menu")} onResumen={()=>irA("resumen")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} tabInicial={tabConfig} />}
+      {deshacerVenta && (
+        <div style={{position:"fixed",left:14,right:14,bottom:18,zIndex:999,background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:12,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 16px rgba(0,0,0,0.35)"}}>
+          <span style={{fontSize:13,color:"var(--color-text-primary)",flex:1}}>🗑️ Venta eliminada</span>
+          <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={deshacerUltimaVenta}>↩️ Deshacer</button>
+        </div>
+      )}
     </div>
     </div>
   );
