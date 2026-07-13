@@ -432,30 +432,7 @@ function GestionClientes({clientes, onEditar, onEliminar, onNuevo, onVolver, onR
     <>
     <div style={s.screen}>
       <HeaderApp titulo="Clientes" onVolver={onVolver}/>
-
-      {/* ── Barra de tabs ── */}
-      <div style={{display:"flex", borderBottom:"0.5px solid var(--color-border-tertiary)", background:"var(--color-background-secondary)", overflowX:"auto"}}>
-        {[
-          {id:"lista",    ico:"👥", lbl:"Lista"},
-          {id:"fiados",   ico:"💰", lbl:"Fiados",  badge:cantFiados},
-          {id:"dormidos", ico:"😴", lbl:"Dormidos", nav:"clientesDormidos"},
-          {id:"mapa",     ico:"🗺", lbl:"Mapa"},
-        ].map(({id,ico,lbl,badge,nav})=>(
-          <button key={id}
-            style={{
-              flex:1, padding:"10px 6px", border:"none", cursor:"pointer",
-              background:"none", display:"flex", flexDirection:"column", alignItems:"center", gap:2,
-              borderBottom:tab===id?"2px solid #5daaff":"2px solid transparent",
-              color:tab===id?"var(--color-text-info)":"var(--color-text-tertiary)",
-              position:"relative",
-            }}
-            onClick={()=>nav?(onIr&&onIr(nav)):setTab(id)}>
-            <span style={{fontSize:18}}>{ico}</span>
-            <span style={{fontSize:10, fontWeight:tab===id?600:400}}>{lbl}</span>
-            {badge>0&&<span style={{position:"absolute",top:6,right:8,background:"var(--color-text-danger)",color:"#fff",borderRadius:10,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{badge}</span>}
-          </button>
-        ))}
-      </div>
+      {onIr&&<ClientesTabs activo="todos" onIr={onIr}/>}
 
       {/* ── Tab: Lista ── */}
       {tab === "lista" && (
