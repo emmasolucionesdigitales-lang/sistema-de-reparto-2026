@@ -42,7 +42,11 @@
     };
     firebase.initializeApp(firebaseConfig);
     // ── Autenticación anónima — necesaria para las reglas de Firestore ──
-    firebase.auth().signInAnonymously().catch(e=>console.warn("Auth anónima:", e));
+    // window.auth guarda la sesión real (uid) de este dispositivo: sirve
+    // para que las reglas de seguridad sepan "este negocio es tuyo" sin
+    // depender del código de licencia (que cualquiera podría escribir a mano).
+    window.auth = firebase.auth();
+    window.auth.signInAnonymously().catch(e=>console.warn("Auth anónima:", e));
     window.db = firebase.firestore();
     window.db.enablePersistence().catch(()=>{});
     const db = window.db;

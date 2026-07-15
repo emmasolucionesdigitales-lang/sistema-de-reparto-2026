@@ -88,6 +88,17 @@ function App() {
     } catch { return "ind_fallback"; }
   }, []);
 
+  // Vínculo de seguridad: este negocio queda atado a la sesión real de
+  // este dispositivo (no al código de licencia, que cualquiera podría
+  // escribir a mano). La primera vez que se abre la app tras este cambio
+  // queda reclamado; después sólo esta sesión puede leer/escribir sus datos.
+  React.useEffect(()=>{
+    if(!window.db || !window.auth || !window.auth.currentUser || !negocioId) return;
+    window.db.collection("users").doc(negocioId)
+      .set({ownerAuthUid: window.auth.currentUser.uid}, {merge:true})
+      .catch(()=>{});
+  }, [negocioId]);
+
   // ── PIN: se pide cada vez que se abre la app ────────────────────
   const [pinOk, setPinOk] = useState(false);
   const [cargandoNube, setCargandoNube] = useState(true);
@@ -531,32 +542,75 @@ function App() {
   const syncData = (overrides={}) => {
     if(!window.db) return;
     setSyncStatus("saving");
+    // Foto de cómo estaban las cosas ACÁ antes de este cambio puntual —
+    // hace falta para mergear bien más abajo (ver qué se borró de verdad
+    // acá y qué simplemente no se tocó en este guardado).
+    const prevData = estadoRef.current;
     const mantVehActual = (() => { try { return JSON.parse(localStorage.getItem("sr_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
     const histPreciosActual = (() => { try { return JSON.parse(localStorage.getItem("sr_lc_hist_precios")||"[]"); } catch { return []; } })();
-    const data = { ...estadoRef.current, ...overrides, noVisitas: overrides.noVisitas!==undefined ? overrides.noVisitas : (estadoRef.current.noVisitas||[]), prospectos: overrides.prospectos!==undefined ? overrides.prospectos : (estadoRef.current.prospectos||[]), recordatorios: overrides.recordatorios!==undefined ? overrides.recordatorios : (estadoRef.current.recordatorios||[]), mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||estadoRef.current.zonasReparto||{}, horaAvisoCierre: overrides.horaAvisoCierre || localStorage.getItem('sr_hora_notif_cierre') || '18:00', horasAvisoTrans: overrides.horasAvisoTrans || (()=>{try{return JSON.parse(localStorage.getItem('sr_horas_notif_trans')||'["13:00","19:00"]');}catch{return ['13:00','19:00'];}})(), diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('sr_dias_notif_mant')||'3,2,1,0').split(',').map(n=>parseInt(n.trim(),10)).filter(n=>!isNaN(n)) };
+    const data = { ...prevData, ...overrides, noVisitas: overrides.noVisitas!==undefined ? overrides.noVisitas : (prevData.noVisitas||[]), prospectos: overrides.prospectos!==undefined ? overrides.prospectos : (prevData.prospectos||[]), recordatorios: overrides.recordatorios!==undefined ? overrides.recordatorios : (prevData.recordatorios||[]), mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||prevData.zonasReparto||{}, horaAvisoCierre: overrides.horaAvisoCierre || localStorage.getItem('sr_hora_notif_cierre') || '18:00', horasAvisoTrans: overrides.horasAvisoTrans || (()=>{try{return JSON.parse(localStorage.getItem('sr_horas_notif_trans')||'["13:00","19:00"]');}catch{return ['13:00','19:00'];}})(), diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('sr_dias_notif_mant')||'3,2,1,0').split(',').map(n=>parseInt(n.trim(),10)).filter(n=>!isNaN(n)) };
     estadoRef.current = data;
     debounceSave(() => {
+      const guardarFinal = (toSave) => {
+        cloudSave(toSave, negocioId).then(function(ok){
+          if(ok){
+            localStorage.removeItem("sr_offline_pending");
+            setPendingOfflineSync(false);
+            setSyncStatus("saved");
+          } else {
+            try { localStorage.setItem("sr_offline_pending", JSON.stringify(toSave)); } catch {}
+            setPendingOfflineSync(true);
+            setSyncStatus(navigator.onLine ? "error" : "offline_pending");
+          }
+        }).catch(function(){
+          try { localStorage.setItem("sr_offline_pending", JSON.stringify(toSave)); } catch {}
+          setPendingOfflineSync(true);
+          setSyncStatus(navigator.onLine ? "error" : "offline_pending");
+        });
+      };
       if(!navigator.onLine) {
         try { localStorage.setItem("sr_offline_pending", JSON.stringify(data)); } catch {}
         setPendingOfflineSync(true);
         setSyncStatus("offline_pending");
         return;
       }
-      cloudSave(data, negocioId).then(function(ok){
-        if(ok){
-          localStorage.removeItem("sr_offline_pending");
-          setPendingOfflineSync(false);
-          setSyncStatus("saved");
-        } else {
-          try { localStorage.setItem("sr_offline_pending", JSON.stringify(data)); } catch {}
-          setPendingOfflineSync(true);
-          setSyncStatus(navigator.onLine ? "error" : "offline_pending");
+      // Guardado seguro: traer lo último de la nube y pisar SOLO lo que
+      // este guardado puntual cambió — no toda la copia local. La licencia
+      // permite usar la app en 2 aparatos (PC + celular) al mismo tiempo:
+      // sin esto, guardar desde uno podía revertir un cambio de stock o de
+      // cierre de caja hecho segundos antes desde el otro.
+      cloudLoad(negocioId).then(function(fresh){
+        if(!fresh){ guardarFinal(data); return; }
+        const merged = { ...fresh, ...data };
+        if(overrides.ventas !== undefined){
+          merged.ventas = mergeArrayPorClave(prevData.ventas, data.ventas, fresh.ventas, v=>v.id);
         }
-      }).catch(function(){
-        try { localStorage.setItem("sr_offline_pending", JSON.stringify(data)); } catch {}
-        setPendingOfflineSync(true);
-        setSyncStatus(navigator.onLine ? "error" : "offline_pending");
-      });
+        if(overrides.clientes !== undefined){
+          merged.clientes = mergeClientesPorUpd(prevData.clientes, data.clientes, fresh.clientes);
+        }
+        if(overrides.planillas !== undefined){
+          merged.planillas = mergePorClavesCambiadas(prevData.planillas, data.planillas, fresh.planillas);
+        }
+        if(overrides.stock !== undefined){
+          merged.stock = mergeNumericoConDeltas(prevData.stock, data.stock, fresh.stock);
+        }
+        if(overrides.cargasDia !== undefined){
+          merged.cargasDia = mergeNumericoConDeltas(prevData.cargasDia, data.cargasDia, fresh.cargasDia);
+        }
+        if(overrides.recordatorios !== undefined){
+          merged.recordatorios = mergeArrayPorClave(prevData.recordatorios, data.recordatorios, fresh.recordatorios, r=>r.id);
+        }
+        if(overrides.noVisitas !== undefined){
+          merged.noVisitas = mergeArrayPorClave(prevData.noVisitas, data.noVisitas, fresh.noVisitas, v=>`${v.clienteId}|${v.dia}|${v.fecha}`);
+        }
+        if(overrides.prospectos !== undefined){
+          merged.prospectos = mergeArrayPorClave(prevData.prospectos, data.prospectos, fresh.prospectos, p=>p.id);
+        }
+        if(overrides.perdidas !== undefined){
+          merged.perdidas = mergeArrayPorClave(prevData.perdidas, data.perdidas, fresh.perdidas, p=>p.id);
+        }
+        guardarFinal(merged);
+      }).catch(function(){ guardarFinal(data); });
     });
   };
 

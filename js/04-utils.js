@@ -400,3 +400,85 @@ function HeaderApp({titulo, onVolver}) {
     </div>
   );
 }
+
+
+// ════════════════════════════════════════════════════════════════════
+// ◆  Helpers de guardado seguro — evitan que un guardado pise cambios
+//    que llegaron de otro dispositivo (PC/móvil) segundos antes.
+//    Mismo patrón usado en Sistema de Reparto Multi.
+// ════════════════════════════════════════════════════════════════════
+
+// Arrays con "id" (ventas, recordatorios, noVisitas...): conserva altas,
+// ediciones Y borrados hechos en ESTE guardado; para lo que no se tocó,
+// respeta lo que ya estaba en la nube (por si otro dispositivo lo cambió).
+function mergeArrayPorClave(prevLocal, nuevoLocal, cloudArr, claveFn) {
+  const prevIds = new Set((prevLocal||[]).map(claveFn));
+  const nuevoIds = new Set((nuevoLocal||[]).map(claveFn));
+  const borrados = new Set([...prevIds].filter(id => !nuevoIds.has(id)));
+  const porClave = {};
+  (cloudArr||[]).forEach(item => { const k = claveFn(item); if(!borrados.has(k)) porClave[k] = item; });
+  (nuevoLocal||[]).forEach(item => { porClave[claveFn(item)] = item; });
+  return Object.values(porClave);
+}
+
+// Clientes: merge por id + _upd (gana el más nuevo, nunca se pisa un
+// cambio ajeno más reciente con uno local viejo).
+function mergeClientesPorUpd(prevLocal, nuevoLocal, cloudArr) {
+  const porId = {};
+  (cloudArr||[]).forEach(c => { porId[c.id] = c; });
+  (nuevoLocal||[]).forEach(c => {
+    const enNube = porId[c.id];
+    if(!enNube){ porId[c.id] = c; return; }
+    const uL = Number(c._upd)||0, uN = Number(enNube._upd)||0;
+    if(uL >= uN) porId[c.id] = c;
+  });
+  return Object.values(porId);
+}
+
+// Objetos numéricos simples (stock, cargasDia): aplica el DELTA que hizo
+// este guardado sobre la copia local anterior, en vez de reemplazar todo
+// el objeto — así una carga de stock hecha en otro dispositivo no se pierde.
+function mergeNumericoConDeltas(prevLocal, nuevoLocal, cloudObj) {
+  const flat = (obj, prefix="") => {
+    let out = {};
+    Object.keys(obj||{}).forEach(k => {
+      const v = obj[k];
+      const key = prefix ? `${prefix}.${k}` : k;
+      if(v && typeof v === "object" && !Array.isArray(v)) out = {...out, ...flat(v, key)};
+      else out[key] = v;
+    });
+    return out;
+  };
+  const unflat = (flatObj) => {
+    const out = {};
+    Object.keys(flatObj).forEach(key => {
+      const parts = key.split(".");
+      let cur = out;
+      parts.forEach((p,i) => {
+        if(i === parts.length-1) cur[p] = flatObj[key];
+        else { cur[p] = cur[p] || {}; cur = cur[p]; }
+      });
+    });
+    return out;
+  };
+  const fPrev = flat(prevLocal||{}), fNuevo = flat(nuevoLocal||{}), fCloud = flat(cloudObj||{});
+  const resultado = {...fCloud};
+  new Set([...Object.keys(fPrev), ...Object.keys(fNuevo)]).forEach(key => {
+    const antes = Number(fPrev[key])||0, ahora = Number(fNuevo[key])||0;
+    if(antes !== ahora) resultado[key] = (Number(fCloud[key])||0) + (ahora - antes);
+  });
+  return unflat(resultado);
+}
+
+// Objetos por clave (planillas por día): conserva las claves cambiadas en
+// este guardado, respeta el resto tal cual está en la nube.
+function mergePorClavesCambiadas(prevLocal, nuevoLocal, cloudObj) {
+  const resultado = {...(cloudObj||{})};
+  const claves = new Set([...Object.keys(prevLocal||{}), ...Object.keys(nuevoLocal||{})]);
+  claves.forEach(k => {
+    const antes = JSON.stringify((prevLocal||{})[k]);
+    const ahora = JSON.stringify((nuevoLocal||{})[k]);
+    if(antes !== ahora) resultado[k] = (nuevoLocal||{})[k];
+  });
+  return resultado;
+}

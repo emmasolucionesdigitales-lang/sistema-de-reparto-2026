@@ -415,6 +415,16 @@ function PantallaActivacion({onActivado}) {
           }
         } catch(e) { /* sin conexión: la activación local sigue, se reintenta luego */ }
       }
+      // Vínculo de seguridad: este negocio (cod) queda atado a la sesión
+      // real de Firebase de este dispositivo — así nadie más, aunque
+      // consiga el código de licencia, puede leer o escribir estos datos.
+      if(cod && window.db && window.auth && window.auth.currentUser) {
+        try {
+          await window.db.collection("users").doc(cod).set(
+            {ownerAuthUid: window.auth.currentUser.uid}, {merge:true}
+          );
+        } catch(e) { /* sin conexión: se reclama solo más tarde, al abrir la app */ }
+      }
       // Marcar como activado en localStorage
       const licActualizada = {
         ...lic,
