@@ -92,9 +92,14 @@ function App() {
   // este dispositivo (no al código de licencia, que cualquiera podría
   // escribir a mano). La primera vez que se abre la app tras este cambio
   // queda reclamado; después sólo esta sesión puede leer/escribir sus datos.
+  // claimRef guarda la promesa de este reclamo: la carga de datos más abajo
+  // espera a que termine ANTES de pedir nada a Firestore — si no, hay una
+  // carrera (la carga puede llegar primero y encontrar el negocio todavía
+  // sin reclamar, y Firestore la rechaza con "permisos insuficientes").
+  const claimRef = React.useRef(Promise.resolve());
   React.useEffect(()=>{
-    if(!window.db || !window.auth || !window.auth.currentUser || !negocioId) return;
-    window.db.collection("users").doc(negocioId)
+    if(!window.db || !window.auth || !window.auth.currentUser || !negocioId){ claimRef.current = Promise.resolve(); return; }
+    claimRef.current = window.db.collection("users").doc(negocioId)
       .set({ownerAuthUid: window.auth.currentUser.uid}, {merge:true})
       .catch(()=>{});
   }, [negocioId]);
@@ -269,7 +274,7 @@ function App() {
   useEffect(() => {
     if (!apiKey || !binId) { setCargandoNube(false); return; }
     setSyncStatus("loading");
-    cloudLoad(negocioId).then(function(data) {
+    Promise.resolve(claimRef.current).then(()=>cloudLoad(negocioId)).then(function(data) {
       if(!data) { setSyncStatus("idle"); setCargandoNube(false); return; }
       // ═══════════════════════════════════════════════════════════════════
       // LEER ESTO ANTES DE TOCAR CUALQUIER MERGE DE ACÁ ABAJO
@@ -1563,4 +1568,3 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
