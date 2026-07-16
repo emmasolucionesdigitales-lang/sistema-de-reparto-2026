@@ -90,12 +90,11 @@ function App() {
 
   // Vínculo de seguridad: este negocio queda atado a la sesión real de
   // este dispositivo (no al código de licencia, que cualquiera podría
-  // escribir a mano). La primera vez que se abre la app tras este cambio
-  // queda reclamado; después sólo esta sesión puede leer/escribir sus datos.
-  // claimRef guarda la promesa de este reclamo: la carga de datos más abajo
-  // espera a que termine ANTES de pedir nada a Firestore — si no, hay una
-  // carrera (la carga puede llegar primero y encontrar el negocio todavía
-  // sin reclamar, y Firestore la rechaza con "permisos insuficientes").
+  // escribir a mano). claimRef guarda la promesa de este reclamo: la
+  // carga de datos más abajo espera a que termine ANTES de pedir nada a
+  // Firestore — si no, hay una carrera (la carga puede llegar primero y
+  // encontrar el negocio todavía sin reclamar, y Firestore la rechaza
+  // con "permisos insuficientes").
   const claimRef = React.useRef(Promise.resolve());
   React.useEffect(()=>{
     if(!window.db || !window.auth || !window.auth.currentUser || !negocioId){ claimRef.current = Promise.resolve(); return; }
@@ -580,10 +579,11 @@ function App() {
         return;
       }
       // Guardado seguro: traer lo último de la nube y pisar SOLO lo que
-      // este guardado puntual cambió — no toda la copia local. La licencia
-      // permite usar la app en 2 aparatos (PC + celular) al mismo tiempo:
-      // sin esto, guardar desde uno podía revertir un cambio de stock o de
-      // cierre de caja hecho segundos antes desde el otro.
+      // este guardado puntual cambió — no toda la copia local. La
+      // licencia permite usar la app en 2 aparatos (PC + celular) al
+      // mismo tiempo: sin esto, guardar desde uno podía revertir un
+      // cambio de stock o de cierre de caja hecho segundos antes desde
+      // el otro.
       cloudLoad(negocioId).then(function(fresh){
         if(!fresh){ guardarFinal(data); return; }
         const merged = { ...fresh, ...data };
@@ -1568,3 +1568,4 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+

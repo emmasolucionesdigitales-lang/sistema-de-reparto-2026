@@ -66,6 +66,13 @@
       appId:             "1:761424199819:web:513eeaf0e54f4e1401d48e"
     }, "control");
     window.dbLicencias = firebase.app("control").firestore();
+    // Sesión anónima propia de este proyecto (aparte del proyecto principal) —
+    // sin esto, las reglas nuevas de app-control-de-apps no dejan ni leer ni
+    // activar ninguna licencia.
+    window.dbLicenciasReady = new Promise(function(resolve){
+      firebase.app("control").auth().onAuthStateChanged(function(u){ if(u) resolve(u.uid); });
+      firebase.app("control").auth().signInAnonymously().catch(function(){ resolve(null); });
+    });
 
     // ── Device ID permanente (para atar la licencia a este dispositivo) ──
     (function(){

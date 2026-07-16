@@ -403,6 +403,7 @@ function PantallaActivacion({onActivado}) {
             }
             // Marcar como usado + reservar el casillero de este tipo de aparato
             dispositivos[miTipo] = deviceId;
+            const licUid = window.dbLicenciasReady ? await window.dbLicenciasReady : null;
             await window.dbLicencias.collection("licencias").doc(cod).update({
               estado: "usado",
               dispositivos,
@@ -410,7 +411,8 @@ function PantallaActivacion({onActivado}) {
               email: email.trim(),
               negocio: negocio.trim(),
               aceptoTerminos: true,
-              activadoEn: new Date().toISOString()
+              activadoEn: new Date().toISOString(),
+              activadoPorUid: licUid
             });
           }
         } catch(e) { /* sin conexión: la activación local sigue, se reintenta luego */ }
