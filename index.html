@@ -48,7 +48,19 @@
     window.auth = firebase.auth();
     window.auth.signInAnonymously().catch(e=>console.warn("Auth anónima:", e));
     window.db = firebase.firestore();
-    window.db.enablePersistence().catch(()=>{});
+    // enablePersistence() está deprecado por Firebase; la reemplazamos por la
+    // forma nueva (FirestoreSettings.cache) para sacar el aviso de la consola,
+    // con el mismo comportamiento de antes (funciona offline, con soporte
+    // multi-pestaña) y sin romper nada si el SDK cargado fuera más viejo.
+    try {
+      window.db.settings({
+        localCache: firebase.firestore.persistentLocalCache({
+          tabManager: firebase.firestore.persistentMultipleTabManager()
+        })
+      });
+    } catch (e) {
+      window.db.enablePersistence().catch(()=>{});
+    }
     const db = window.db;
 
     // Cloud Messaging — para las notificaciones push (15-app.js pide el
@@ -169,34 +181,32 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
 
   <!-- ════ JS de la app — en orden ════ -->
-  <script type="text/babel" src="js/01-temas.js?v=20260708"></script>
-  <script type="text/babel" src="js/02-constantes.js?v=20260708"></script>
-  <script type="text/babel" src="js/03-tags.js?v=20260708"></script>
-  <script type="text/babel" src="js/04-utils.js?v=20260708"></script>
-  <script type="text/babel" src="js/05-portada.js?v=20260708"></script>
-  <script type="text/babel" src="js/06-stock.js?v=20260708"></script>
-  <script type="text/babel" src="js/07-menu.js?v=20260708"></script>
-  <script type="text/babel" src="js/08-clientes.js?v=20260708"></script>
-  <script type="text/babel" src="js/09-ventas.js?v=20260708"></script>
-  <script type="text/babel" src="js/10-promocion.js?v=20260708"></script>
-  <script type="text/babel" src="js/11-gestion.js?v=20260708"></script>
-  <script type="text/babel" src="js/12-resumen.js?v=20260708"></script>
-  <script type="text/babel" src="js/13-config.js?v=20260708"></script>
-  <script type="text/babel" src="js/14-agenda.js?v=20260708"></script>
-  <script type="text/babel" src="js/15-app.js?v=20260708"></script>
+  <script src="js/01-temas.js?v=20260718precompiled"></script>
+  <script src="js/02-constantes.js?v=20260718precompiled"></script>
+  <script src="js/03-tags.js?v=20260718precompiled"></script>
+  <script src="js/04-utils.js?v=20260718precompiled"></script>
+  <script src="js/05-portada.js?v=20260718precompiled"></script>
+  <script src="js/06-stock.js?v=20260718precompiled"></script>
+  <script src="js/07-menu.js?v=20260718precompiled"></script>
+  <script src="js/08-clientes.js?v=20260718precompiled"></script>
+  <script src="js/09-ventas.js?v=20260718precompiled"></script>
+  <script src="js/10-promocion.js?v=20260718precompiled"></script>
+  <script src="js/11-gestion.js?v=20260718precompiled"></script>
+  <script src="js/12-resumen.js?v=20260718precompiled"></script>
+  <script src="js/13-config.js?v=20260718precompiled"></script>
+  <script src="js/14-agenda.js?v=20260718precompiled"></script>
+  <script src="js/15-app.js?v=20260718precompiled"></script>
 
   <!-- Render -->
-  <script type="text/babel">
-    const rootEl = document.getElementById("root");
-    const root = ReactDOM.createRoot ? ReactDOM.createRoot(rootEl) : null;
-    if(root) root.render(<App />);
-    else ReactDOM.render(<App />, rootEl);
+  <script>
+const rootEl = document.getElementById("root");
+const root = ReactDOM.createRoot ? ReactDOM.createRoot(rootEl) : null;
+if (root) root.render(/*#__PURE__*/React.createElement(App, null));else ReactDOM.render(/*#__PURE__*/React.createElement(App, null), rootEl);
   </script>
   <!-- ════ Notificaciones push ════ -->
   <script>
