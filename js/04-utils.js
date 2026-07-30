@@ -960,9 +960,16 @@ function mergeArrayPorClave(prevLocal, nuevoLocal, cloudArr, claveFn) {
 // Clientes: merge por id + _upd (gana el más nuevo, nunca se pisa un
 // cambio ajeno más reciente con uno local viejo).
 function mergeClientesPorUpd(prevLocal, nuevoLocal, cloudArr) {
+  // Mismo criterio de borrado que mergeArrayPorClave: si un id estaba
+  // ANTES de este guardado puntual (prevLocal) y ya no está en lo que se
+  // está guardando ahora (nuevoLocal), es que se borró a propósito acá —
+  // no revivirlo solo porque la nube todavía lo tenga.
+  const prevIds = new Set((prevLocal || []).map(c => c.id));
+  const nuevoIds = new Set((nuevoLocal || []).map(c => c.id));
+  const borrados = new Set([...prevIds].filter(id => !nuevoIds.has(id)));
   const porId = {};
   (cloudArr || []).forEach(c => {
-    porId[c.id] = c;
+    if (!borrados.has(c.id)) porId[c.id] = c;
   });
   (nuevoLocal || []).forEach(c => {
     const enNube = porId[c.id];
