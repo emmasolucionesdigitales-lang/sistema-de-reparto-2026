@@ -141,20 +141,136 @@
       } catch(e) { console.error("verificarLicencia:", e); return null; }
     };
 
-    // Funciones de Firestore — fallback a "firebase" si no hay código de licencia
-    async function cloudSave(data, id) {
+    // ════════════════════════════════════════════════════════════════
+    // Persistencia por colección — cada tipo de dato (clientes, ventas,
+    // stock, etc.) vive en su propia colección/doc dentro de
+    // users/{negocio}/..., en vez de un único documento gigante que se
+    // reescribía ENTERO en cada guardado. Así, guardar una venta ya no
+    // vuelve a subir todo el negocio — más rápido y gasta menos cuota
+    // gratis de Firestore a medida que crece el negocio. El doc viejo
+    // (datos/main) se deja de escribir, pero se lee UNA vez para migrar
+    // solo, si un negocio todavía no tiene nada en el formato nuevo.
+    // ════════════════════════════════════════════════════════════════
+    const SR_LISTAS = ["clientes","ventas","productos","prospectos","recordatorios","noVisitas","perdidas"];
+    const SR_MAPAS  = { planillas:"planillas", stock:"stock", cargasDia:"cargasDia", zonasReparto:"zonasReparto", mantVeh:"mantVeh", histPrecios:"histPrecios" };
+    const SR_CONFIG_KEYS = ["horaAvisoCierre","horasAvisoTrans","diasAvisoMant"];
+    const SR_ID_FN = { noVisitas: v => `${v.clienteId}_${v.dia}_${v.fecha}` };
+
+    function _srBase(id) { return db.collection("users").doc(id); }
+    function _srItemId(key, item, idx) {
+      if (item && item.id != null) return String(item.id);
+      if (SR_ID_FN[key]) return String(SR_ID_FN[key](item)).replace(/\//g, "-");
+      return `auto_${idx}_${(item && item._upd) || Date.now()}`;
+    }
+    async function _srCommit(ops) {
+      for (let i = 0; i < ops.length; i += 450) {
+        const batch = db.batch();
+        ops.slice(i, i + 450).forEach(op => op.del ? batch.delete(op.ref) : batch.set(op.ref, op.data));
+        await batch.commit();
+      }
+    }
+    async function _srIdsActuales(col) {
+      const snap = await col.get();
+      return snap.docs.map(d => d.id);
+    }
+
+    // data: objeto con TODO el estado local (igual que antes). id: código
+    // de negocio. opts.keys: qué claves de "data" hace falta persistir en
+    // este guardado puntual (si se omite, se persiste todo — usado para
+    // migración, restaurar respaldo y el reintento offline). opts.fresh:
+    // lo que había en la nube en cada colección tocada, momentos antes de
+    // este guardado (para poder borrar lo que ya no está sin tener que
+    // releer todo de nuevo acá adentro).
+    async function cloudSave(data, id, opts) {
       const safeId = (id && id !== "") ? id : "firebase";
+      const base = _srBase(safeId);
+      const keys = (opts && opts.keys) || [...SR_LISTAS, ...Object.keys(SR_MAPAS), "_config"];
+      const fresh = (opts && opts.fresh) || null;
       try {
-        await db.collection("users").doc(safeId).collection("datos").doc("main").set(data);
+        let ops = [];
+        for (const key of SR_LISTAS) {
+          if (!keys.includes(key) || data[key] === undefined) continue;
+          const col = base.collection(key);
+          const arr = data[key] || [];
+          const idsNuevos = new Set();
+          arr.forEach((item, idx) => {
+            if (item == null) return;
+            const iid = _srItemId(key, item, idx);
+            idsNuevos.add(iid);
+            ops.push({ ref: col.doc(iid), data: item });
+          });
+          if (fresh && fresh[key]) {
+            fresh[key].forEach((item, idx) => {
+              if (item == null) return;
+              const iid = _srItemId(key, item, idx);
+              if (!idsNuevos.has(iid)) ops.push({ ref: col.doc(iid), del: true });
+            });
+          } else if (!fresh) {
+            const idsCloud = await _srIdsActuales(col);
+            idsCloud.forEach(iid => { if (!idsNuevos.has(iid)) ops.push({ ref: col.doc(iid), del: true }); });
+          }
+        }
+        for (const key of Object.keys(SR_MAPAS)) {
+          if (!keys.includes(key) || data[key] === undefined) continue;
+          const esArraySimple = key === "mantVeh" || key === "histPrecios";
+          ops.push({ ref: base.collection("meta").doc(SR_MAPAS[key]), data: esArraySimple ? { d: data[key] || [] } : (data[key] || {}) });
+        }
+        if (keys.includes("_config") || SR_CONFIG_KEYS.some(k => keys.includes(k))) {
+          const cfg = {}; let hay = false;
+          SR_CONFIG_KEYS.forEach(k => { if (data[k] !== undefined) { cfg[k] = data[k]; hay = true; } });
+          if (hay) ops.push({ ref: base.collection("meta").doc("config"), data: cfg, merge: true });
+        }
+        await _srCommit(ops);
         return true;
       } catch(e) { console.error("cloudSave error:", e); return false; }
     }
+
+    async function _srCargarClaves(id, keys) {
+      const base = _srBase(id);
+      const out = {};
+      await Promise.all(keys.map(async key => {
+        if (SR_LISTAS.includes(key)) {
+          const snap = await base.collection(key).get();
+          out[key] = snap.docs.map(d => d.data());
+        } else if (SR_MAPAS[key]) {
+          const doc = await base.collection("meta").doc(SR_MAPAS[key]).get();
+          if (key === "mantVeh" || key === "histPrecios") out[key] = doc.exists ? (doc.data().d || []) : [];
+          else out[key] = doc.exists ? doc.data() : {};
+        }
+      }));
+      return out;
+    }
+
     async function cloudLoad(id) {
       const safeId = (id && id !== "") ? id : "firebase";
       try {
-        const doc = await db.collection("users").doc(safeId).collection("datos").doc("main").get();
-        return doc.exists ? doc.data() : null;
+        const out = await _srCargarClaves(safeId, [...SR_LISTAS, ...Object.keys(SR_MAPAS)]);
+        const cfgDoc = await _srBase(safeId).collection("meta").doc("config").get();
+        if (cfgDoc.exists) Object.assign(out, cfgDoc.data());
+
+        const hayAlgoNuevo = SR_LISTAS.some(k => (out[k]||[]).length) ||
+          Object.keys(out.stock||{}).length || Object.keys(out.planillas||{}).length;
+        if (!hayAlgoNuevo) {
+          const viejo = await _srBase(safeId).collection("datos").doc("main").get();
+          if (viejo.exists) {
+            const d = viejo.data();
+            await cloudSave(d, safeId); // migra al formato nuevo (guardado completo, una sola vez)
+            return d;
+          }
+        }
+        return out;
       } catch(e) { console.error("cloudLoad error:", e); return null; }
+    }
+
+    // Versión parcial: solo trae las colecciones/mapas pedidos — la usa
+    // syncData para no releer TODO el negocio antes de cada guardado
+    // puntual (sería caro de cuota a medida que crece el negocio).
+    async function cloudLoadKeys(id, keys) {
+      const safeId = (id && id !== "") ? id : "firebase";
+      const claves = (keys||[]).filter(k => SR_LISTAS.includes(k) || SR_MAPAS[k]);
+      if (!claves.length) return {};
+      try { return await _srCargarClaves(safeId, claves); }
+      catch(e) { console.error("cloudLoadKeys error:", e); return null; }
     }
 
     // ── Email vía Google Apps Script ────────────────────────────────────
