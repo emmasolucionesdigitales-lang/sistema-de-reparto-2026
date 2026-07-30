@@ -1435,9 +1435,9 @@ function Config({
       padding: "10px",
       fontSize: 13
     },
-    onClick: () => {
+   onClick: () => {
       if (window.confirm("¿Subir todos los datos a la nube?")) {
-        cloudSave({
+        syncData({
           clientes,
           ventas,
           planillas,
@@ -1445,7 +1445,8 @@ function Config({
           productos,
           noVisitas: noVisitas || [],
           prospectos: prospectos || []
-        }).then(() => alert("✅ Datos sincronizados.")).catch(() => alert("❌ Error. Verificá tu conexión."));
+        });
+        alert("✅ Sincronización enviada.");
       }
     }
   }, "🔄 Forzar sincronización"))), /*#__PURE__*/React.createElement("div", {
