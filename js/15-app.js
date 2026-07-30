@@ -1047,8 +1047,9 @@ function App() {
     };
     estadoRef.current = data;
     debounceSave(() => {
-      const guardarFinal = toSave => {
-        cloudSave(toSave, negocioId).then(function (ok) {
+      const clavesTocadas = Object.keys(overrides);
+      const guardarFinal = (toSave, freshParaDiff) => {
+        cloudSave(toSave, negocioId, { keys: clavesTocadas, fresh: freshParaDiff || null }).then(function (ok) {
           if (ok) {
             localStorage.removeItem("sr_offline_pending");
             setPendingOfflineSync(false);
@@ -1076,15 +1077,15 @@ function App() {
         setSyncStatus("offline_pending");
         return;
       }
-      // Guardado seguro: traer lo último de la nube y pisar SOLO lo que
-      // este guardado puntual cambió — no toda la copia local. La
-      // licencia permite usar la app en 2 aparatos (PC + celular) al
-      // mismo tiempo: sin esto, guardar desde uno podía revertir un
-      // cambio de stock o de cierre de caja hecho segundos antes desde
-      // el otro.
-      cloudLoad(negocioId).then(function (fresh) {
+      // Guardado seguro: traer de la nube SOLO lo que este guardado puntual
+      // va a tocar (no todo el negocio — así no se paga el costo de leer
+      // miles de documentos en cada guardado) y pisar SOLO eso. La
+      // licencia permite usar la app en 2 aparatos (PC + celular) al mismo
+      // tiempo: sin esto, guardar desde uno podía revertir un cambio de
+      // stock o de cierre de caja hecho segundos antes desde el otro.
+      cloudLoadKeys(negocioId, clavesTocadas).then(function (fresh) {
         if (!fresh) {
-          guardarFinal(data);
+          guardarFinal(data, null);
           return;
         }
         const merged = {
@@ -1118,9 +1119,9 @@ function App() {
         if (overrides.perdidas !== undefined) {
           merged.perdidas = mergeArrayPorClave(prevData.perdidas, data.perdidas, fresh.perdidas, p => p.id);
         }
-        guardarFinal(merged);
+        guardarFinal(merged, fresh);
       }).catch(function () {
-        guardarFinal(data);
+        guardarFinal(data, null);
       });
     });
   };
@@ -1974,17 +1975,14 @@ function App() {
       });
       if (!window.db || !negocioId) return false;
       const deviceId = getDeviceIdRM();
-      // Se guarda ADENTRO del mismo documento "main" que ya usa toda la app
-      // (users/{negocio}/datos/main) — ese camino ya tiene permiso de
-      // escritura. Una colección nueva (push_subs) las reglas de Firestore
-      // todavía no la conocen y la rechazan.
-      const ref = window.db.collection('users').doc(negocioId).collection('datos').doc('main');
+      // Doc propio (users/{negocio}/datos/push_subs), separado del resto
+      // de los datos del negocio — mismo lugar donde index.html guarda la
+      // suscripción del otro mecanismo de notificaciones (PushManager).
+      const ref = window.db.collection('users').doc(negocioId).collection('datos').doc('push_subs');
       await ref.set({
-        pushSubs: {
-          [deviceId]: {
-            token,
-            ts: Date.now()
-          }
+        [deviceId]: {
+          token,
+          ts: Date.now()
         }
       }, {
         merge: true
