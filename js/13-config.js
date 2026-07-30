@@ -424,6 +424,7 @@ function Config({
   const [abiertoHuella, setAbiertoHuella] = useState(false);
   const [abiertoRespaldo, setAbiertoRespaldo] = useState(false);
   const [abiertoMant, setAbiertoMant] = useState(false);
+  const [abiertoSeguridad, setAbiertoSeguridad] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   // Exportar ventas a CSV — para llevarle algo armado a un contador, o
   // simplemente tener el historial en una planilla aparte de la app.
@@ -1435,7 +1436,7 @@ function Config({
       padding: "10px",
       fontSize: 13
     },
-   onClick: () => {
+    onClick: () => {
       if (window.confirm("¿Subir todos los datos a la nube?")) {
         syncData({
           clientes,
@@ -1450,6 +1451,75 @@ function Config({
       }
     }
   }, "🔄 Forzar sincronización"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      background: "none",
+      border: "none",
+      padding: "14px 16px",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer",
+      textAlign: "left"
+    },
+    onClick: () => setAbiertoSeguridad(!abiertoSeguridad)
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 18 }
+  }, "🔒"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      flex: 1
+    }
+  }, "Seguridad de la cuenta"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 26,
+      height: 26,
+      borderRadius: "50%",
+      background: "var(--color-background-primary)",
+      color: "var(--color-text-info)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 13,
+      flexShrink: 0
+    }
+  }, abiertoSeguridad ? "▲" : "▼")), abiertoSeguridad && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 10, padding: "0 16px 14px" }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 10, lineHeight: 1.4 }
+  }, "Si perdés el celular o borrás los datos del navegador, podés perder el acceso a esta cuenta para siempre. Protegela con un email y una contraseña — después vas a poder recuperar el acceso desde cualquier dispositivo con esos mismos datos."), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      width: "100%",
+      padding: "10px",
+      fontSize: 13
+    },
+    onClick: async () => {
+      if (!window.vincularCuentaReal) {
+        alert("⚠️ Función no disponible. Actualizá index.html.");
+        return;
+      }
+      const emailDefault = (() => {
+        try { return JSON.parse(localStorage.getItem("sr_licencia") || "{}").email || ""; } catch { return ""; }
+      })();
+      const email = window.prompt("Email para proteger el acceso a esta cuenta:", emailDefault);
+      if (!email || !email.trim()) return;
+      const pass = window.prompt("Contraseña (mínimo 6 caracteres):");
+      if (!pass || pass.length < 6) {
+        alert("La contraseña tiene que tener al menos 6 caracteres.");
+        return;
+      }
+      const r = await window.vincularCuentaReal(email.trim(), pass);
+      if (r.ok) alert(r.recuperado ? "✅ Acceso recuperado con tu cuenta." : "✅ Cuenta protegida. Guardá el email y la contraseña en un lugar seguro.");else alert("❌ " + r.error);
+    }
+  }, "🔒 Proteger cuenta con email y contraseña"))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: 0
