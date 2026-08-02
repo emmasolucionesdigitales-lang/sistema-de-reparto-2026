@@ -945,19 +945,49 @@ function HeaderApp({
 // Arrays con "id" (ventas, recordatorios, noVisitas...): conserva altas,
 // ediciones Y borrados hechos en ESTE guardado; para lo que no se tocó,
 // respeta lo que ya estaba en la nube (por si otro dispositivo lo cambió).
+// Antes esta versión, para un id presente en los dos lados, siempre se
+// quedaba con "nuevoLocal" sin mirar cuál es más nuevo — si este
+// dispositivo tenía una copia vieja de una venta (sin haberla vuelto a
+// cargar) y guardaba por CUALQUIER otro motivo, esa copia vieja pisaba en
+// silencio una edición más reciente hecha desde otro aparato. Ahora
+// compara _upd igual que mergeClientesPorUpd, y gana el más nuevo.
 function mergeArrayPorClave(prevLocal, nuevoLocal, cloudArr, claveFn) {
-  const prevIds = new Set((prevLocal || []).map(claveFn));
-  const nuevoIds = new Set((nuevoLocal || []).map(claveFn));
-  const borrados = new Set([...prevIds].filter(id => !nuevoIds.has(id)));
-  const porClave = {};
-  (cloudArr || []).forEach(item => {
-    const k = claveFn(item);
-    if (!borrados.has(k)) porClave[k] = item;
+  const prevMap = {};
+  (prevLocal || []).forEach(x => {
+    try {
+      prevMap[claveFn(x)] = x;
+    } catch {}
   });
-  (nuevoLocal || []).forEach(item => {
-    porClave[claveFn(item)] = item;
+  const localMap = {};
+  (nuevoLocal || []).forEach(x => {
+    try {
+      localMap[claveFn(x)] = x;
+    } catch {}
   });
-  return Object.values(porClave);
+  const freshMap = {};
+  (cloudArr || []).forEach(x => {
+    try {
+      freshMap[claveFn(x)] = x;
+    } catch {}
+  });
+  const keys = new Set([...Object.keys(prevMap), ...Object.keys(localMap), ...Object.keys(freshMap)]);
+  const out = [];
+  keys.forEach(k => {
+    const inLocal = Object.prototype.hasOwnProperty.call(localMap, k);
+    const inFresh = Object.prototype.hasOwnProperty.call(freshMap, k);
+    const inPrev = Object.prototype.hasOwnProperty.call(prevMap, k);
+    if (inLocal && inFresh) {
+      const uL = Number(localMap[k]._upd) || 0,
+        uF = Number(freshMap[k]._upd) || 0;
+      out.push(uF > uL ? freshMap[k] : localMap[k]);
+    } else if (inLocal && !inFresh) {
+      out.push(localMap[k]);
+    } else if (!inLocal && inFresh) {
+      if (!inPrev) out.push(freshMap[k]); // lo agregó otro dispositivo -> conservar
+      // si estaba en prev y ya no en local -> se borró acá a propósito, no se restaura
+    }
+  });
+  return out;
 }
 
 // Clientes: merge por id + _upd (gana el más nuevo, nunca se pisa un

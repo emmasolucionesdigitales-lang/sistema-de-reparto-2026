@@ -46,9 +46,14 @@ function usarInformes({
       const planEf = plan.efectivo !== "" && plan.efectivo !== undefined ? Number(plan.efectivo || 0) : null;
       const planRet = plan.retenciones !== "" && plan.retenciones !== undefined ? Number(plan.retenciones || 0) : null;
       const planFi = plan.fiado !== "" && plan.fiado !== undefined ? Number(plan.fiado || 0) : null;
-      const todasFecha = (ventas || []).filter(v => v.fechaKey === fecha);
-      const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
-      const todasVentasDia = [...todasFecha.filter(v => clientesDia.has(v.clienteId)), ...todasFecha.filter(v => !clientesDia.has(v.clienteId))];
+      // Antes esto partía todasFecha en "clientesDia" / "no clientesDia" y
+      // concatenaba las dos mitades — el conjunto completo sin filtrar
+      // nada. Si había una venta suelta de un cliente de OTRO día en esa
+      // misma fecha, se colaba en el informe de este día. Se filtra por
+      // v.dia directamente, que ya queda grabado en cada venta al
+      // registrarla (mismo criterio que usa el resto de la app, ej.
+      // ListaClientes).
+      const todasVentasDia = (ventas || []).filter(v => v.fechaKey === fecha && v.dia === dia);
       const calcEf = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoEfec) || 0 : v.pagadoNum || v.neto || 0), 0);
       const calcTr = todasVentasDia.filter(v => v.pago === "transferencia" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoTrans) || 0 : v.pagadoNum || v.neto || 0), 0);
       const calcFi = todasVentasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
