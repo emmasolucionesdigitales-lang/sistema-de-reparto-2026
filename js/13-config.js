@@ -1444,8 +1444,7 @@ function Config({
           planillas,
           stock,
           productos,
-          noVisitas: noVisitas || [],
-          prospectos: prospectos || []
+          noVisitas: noVisitas || []
         });
         alert("✅ Sincronización enviada.");
       }
@@ -1719,7 +1718,6 @@ function Config({
         ventas: [],
         planillas: {},
         noVisitas: [],
-        prospectos: [],
         recordatorios: [],
         histPrecios: [],
         mantVeh: []

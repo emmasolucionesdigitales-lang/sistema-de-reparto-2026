@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-// Barra de pestañas del hub de Clientes (Todos · Prospectos · Fiados · Dormidos · Mapa)
+// Barra de pestañas del hub de Clientes (Todos · Fiados · Dormidos · Mapa)
 function ClientesTabs({
   activo,
   onIr
@@ -51,7 +51,6 @@ function ListaClientes({
   ventas,
   todasVentas,
   noVisitas,
-  prospectos,
   recordatorios,
   onSeleccionar,
   onEntregar,
@@ -61,14 +60,9 @@ function ListaClientes({
   onEditarCliente,
   onRegistrarNoVisita,
   onQuitarNoVisita,
-  onVentaProspecto,
-  onNoEstaProspecto,
-  onNoQuiereProspecto,
   onConfirmarTransfer,
-  onVerProspecto,
   onAbrirMapa,
   onPlanilla,
-  onEliminarProspecto,
   onDormidos
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -82,13 +76,6 @@ function ListaClientes({
   // visitados = ventas + noesta2 + noquiso (noesta 1ra vez NO cuenta)
   const visitadosSinVenta = new Set(Object.entries(noVMap).filter(([, m]) => m === "noesta2" || m === "noquiso").map(([id]) => Number(id)));
   const visitados = new Set([...atendidos, ...visitadosSinVenta]);
-  const prospectosDelDia = (prospectos || []).filter(p => p.dia === dia && p.estado === "activo");
-  const noVMapProspectos = {};
-  (noVisitas || []).filter(v => v.fecha === fecha).forEach(v => {
-    noVMapProspectos[v.clienteId] = v.motivo;
-  });
-  const ventasProspectos = new Set(ventas.filter(v => v.fechaKey === fecha && prospectosDelDia.some(p => p.id === v.clienteId) && !v._esCobro && !v._esAjuste).map(v => v.clienteId));
-  const visitadosProspectos = new Set([...ventasProspectos, ...prospectosDelDia.filter(p => noVMapProspectos[p.id] === "noquiso").map(p => p.id)]);
   const marcarNoVisita = (id, motivo) => {
     const prev = noVMap[id];
     if (motivo === "noesta" && prev === "noesta") onRegistrarNoVisita(id, "noesta2");else if (prev === motivo) onQuitarNoVisita(id);else onRegistrarNoVisita(id, motivo);

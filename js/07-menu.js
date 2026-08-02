@@ -8,7 +8,6 @@ function MenuDias({
   onResumen,
   onConfig,
   onGestionClientes,
-  onPromocion,
   onStock,
   onAgenda,
   onVolver,
@@ -30,7 +29,6 @@ function MenuDias({
   onDiaResumen,
   noVisitas,
   onFiados,
-  prospectos,
   onDormidos
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
@@ -246,8 +244,7 @@ function MenuDias({
   }, dias.map((d, idx) => {
     const deudas = (clientes || []).filter(c => c.dia === d && c.saldo < 0);
     const totalDeuda = deudas.reduce((a, c) => a + Math.abs(c.saldo), 0);
-    const totalClientes = (clientes || []).filter(c => c.dia === d && !c._esProspecto).length;
-    const totalProspectos = (prospectos || []).filter(p => p.dia === d && p.estado === "activo").length;
+    const totalClientes = (clientes || []).filter(c => c.dia === d).length;
     const totalDia = totalClientes;
     const zona = (zonasReparto || {})[d] || "";
     let noCargado = false,
@@ -1044,30 +1041,20 @@ function DetalleTransferencias({
 function DetalleVentasDia({
   ventas,
   clientes,
-  prospectos,
   noVisitas,
   fecha
 }) {
   const [abierto, setAbierto] = React.useState(false);
   const todosMap = React.useMemo(() => {
     const m = {};
-    (prospectos || []).forEach(p => {
-      m[p.id] = {
-        ...p,
-        _tipo: "prospecto"
-      };
-    });
     (clientes || []).forEach(c => {
-      if (c._esProspecto) m[c.id] = {
-        ...c,
-        _tipo: "prospecto"
-      };else m[c.id] = {
+      m[c.id] = {
         ...c,
         _tipo: "cliente"
       };
     });
     return m;
-  }, [clientes, prospectos]);
+  }, [clientes]);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "0 0 8px",
@@ -1124,7 +1111,6 @@ function DetalleVentasDia({
     }
   }, ventas.map((v, idx) => {
     const persona = todosMap[v.clienteId];
-    const esProspecto = persona?._tipo === "prospecto";
     const esCobro = v._esCobro;
     const dir = persona ? (persona.calle ? `${persona.calle} ${persona.nro || ""}` : persona.manzana ? `Mz ${persona.manzana} L ${persona.lote}` : "") + (persona.barrio ? ` · ${persona.barrio}` : "") : "";
     const deudaPagada = Math.max(0, (v.pagadoNum || 0) - (v.neto || 0));
@@ -1132,7 +1118,7 @@ function DetalleVentasDia({
     const prestStr = fmtEnv(v.envPrest);
     const devStr = fmtEnv(v.envDev);
     const esMixto = v.pago === "mixto";
-    const esOtroDia = persona && persona.dia && !esProspecto && persona.dia !== ventas[0]?.dia;
+    const esOtroDia = persona && persona.dia && persona.dia !== ventas[0]?.dia;
     const pagoBadge = esCobro ? {
       bg: "var(--color-background-success)",
       color: "var(--color-text-success)",
@@ -1189,16 +1175,7 @@ function DetalleVentasDia({
         fontWeight: 500,
         color: "var(--color-text-primary)"
       }
-    }, v.cliente || persona?.nombre || "Cliente"), esProspecto && /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        padding: "1px 6px",
-        borderRadius: 4,
-        background: "rgba(245,185,66,0.2)",
-        color: "#f5b942",
-        fontWeight: 600
-      }
-    }, "Prospecto"), persona?.dia && /*#__PURE__*/React.createElement("span", {
+    }, v.cliente || persona?.nombre || "Cliente"), persona?.dia && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
         color: "var(--color-text-tertiary)"
@@ -1365,7 +1342,6 @@ function PlanillaDelDia({
   fecha,
   ventas,
   clientes,
-  prospectos,
   planilla,
   productos,
   stock,
@@ -1385,7 +1361,7 @@ function PlanillaDelDia({
   // Propias del día = clientes cuyo día es este
   const ventasPropias = todasFecha.filter(v => clientesDia.has(v.clienteId));
   // Extras = cualquier venta de ese fecha que NO sea de un cliente del día
-  //   incluye: prospectos, clientes de otros días, cobros de deuda de cualquier día
+  //   incluye: clientes de otros días, cobros de deuda de cualquier día
   const ventasExtraDia = todasFecha.filter(v => !clientesDia.has(v.clienteId));
   const CAJON_SODA = 6;
   const getProdCosto = nombre => {
@@ -2413,7 +2389,6 @@ function PlanillaDelDia({
   }, "Resumen del día"), todasVentasDia.length > 0 ? /*#__PURE__*/React.createElement(DetalleVentasDia, {
     ventas: todasVentasDia,
     clientes: clientes,
-    prospectos: prospectos,
     noVisitas: noVisitas,
     fecha: fecha
   }) : /*#__PURE__*/React.createElement("div", {

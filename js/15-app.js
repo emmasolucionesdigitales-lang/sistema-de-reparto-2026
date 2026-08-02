@@ -216,7 +216,6 @@ function App() {
   const [fechaActual, setFechaActual] = useLS("sr_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj] = useState(null);
   const [clienteId, setClienteId] = useState(null);
-  const [prospectoId, setProspectoId] = useState(null);
   const [initCierre, setInitCierre] = useState(false);
   const [noVisitas, setNoVisitas] = useLS("sr_novisitas_v1", []);
   // Registro de envases perdidos — rotos durante el reparto, o no
@@ -239,7 +238,6 @@ function App() {
       return next;
     });
   };
-  const [prospectos, setProspectos] = useLS("sr_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("sr_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   const saveRecordatorios = r => {
@@ -657,12 +655,6 @@ function App() {
           }), 2000);
         }
       }
-      if (data.prospectos?.length) {
-        setProspectos(data.prospectos);
-        try {
-          localStorage.setItem("sr_prospectos_v1", JSON.stringify(data.prospectos));
-        } catch {}
-      }
       if (data.recordatorios?.length) {
         setRecordatorios(data.recordatorios);
         try {
@@ -699,7 +691,6 @@ function App() {
     productos,
     noVisitas,
     recordatorios,
-    prospectos,
     cargasDia
   });
   // Guards anti doble-tap: evitan sumar/restar el saldo dos veces si el
@@ -731,7 +722,6 @@ function App() {
       productos,
       noVisitas,
       recordatorios,
-      prospectos,
       zonasReparto,
       cargasDia,
       perdidas
@@ -951,12 +941,6 @@ function App() {
             localStorage.setItem("sr_perdidas_v1", JSON.stringify(data.perdidas || []));
           } catch {}
         }
-        if (data.prospectos !== undefined) {
-          setProspectos(data.prospectos || []);
-          try {
-            localStorage.setItem("sr_prospectos_v1", JSON.stringify(data.prospectos || []));
-          } catch {}
-        }
         if (data.recordatorios !== undefined) {
           setRecordatorios(data.recordatorios || []);
           try {
@@ -1035,7 +1019,6 @@ function App() {
       ...prevData,
       ...overrides,
       noVisitas: overrides.noVisitas !== undefined ? overrides.noVisitas : prevData.noVisitas || [],
-      prospectos: overrides.prospectos !== undefined ? overrides.prospectos : prevData.prospectos || [],
       recordatorios: overrides.recordatorios !== undefined ? overrides.recordatorios : prevData.recordatorios || [],
       mantVeh: overrides.mantVeh || mantVehActual,
       histPrecios: overrides.histPrecios || histPreciosActual,
@@ -1117,9 +1100,6 @@ function App() {
         }
         if (overrides.noVisitas !== undefined) {
           merged.noVisitas = mergeArrayPorClave(prevData.noVisitas, data.noVisitas, fresh.noVisitas, v => `${v.clienteId}|${v.dia}|${v.fecha}`);
-        }
-        if (overrides.prospectos !== undefined) {
-          merged.prospectos = mergeArrayPorClave(prevData.prospectos, data.prospectos, fresh.prospectos, p => p.id);
         }
         if (overrides.perdidas !== undefined) {
           merged.perdidas = mergeArrayPorClave(prevData.perdidas, data.perdidas, fresh.perdidas, p => p.id);
@@ -1280,23 +1260,14 @@ function App() {
     return ok;
   };
 
-  // ── Helper: siguiente pendiente (clientes + prospectos del día) ──
+  // ── Helper: siguiente pendiente del día ──
   const getSiguienteDelDia = (nvActual, excludeId) => {
     const clientesDia = clientes.filter(cc => cc.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-    const prospDelDia = (prospectos || []).filter(p => p.dia === diaActual && p.estado === "activo");
     const visitadosIds = new Set([...ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste).map(v => v.clienteId), ...(nvActual || noVisitas || []).filter(v => v.dia === diaActual && v.fecha === fechaActual).map(v => v.clienteId)]);
     if (excludeId) visitadosIds.add(excludeId);
-    // Primero clientes regulares
-    const sigCl = clientesDia.find(cc => !visitadosIds.has(cc.id) && !cc._esProspecto);
+    const sigCl = clientesDia.find(cc => !visitadosIds.has(cc.id));
     if (sigCl) return {
-      item: sigCl,
-      esProspecto: false
-    };
-    // Luego prospectos
-    const sigPr = prospDelDia.find(p => !visitadosIds.has(p.id));
-    if (sigPr) return {
-      item: sigPr,
-      esProspecto: true
+      item: sigCl
     };
     return null;
   };
@@ -1305,20 +1276,8 @@ function App() {
       irA("clientes");
       return;
     }
-    if (sig.esProspecto) {
-      // Agregar prospecto como cliente temporal si no existe todavía
-      saveClientes(prev => prev.find(cc => cc.id === sig.item.id) ? prev : [...prev, {
-        ...sig.item,
-        saldo: 0,
-        _esProspecto: true
-      }]);
-      setProspectoId(sig.item.id);
-      setClienteId(sig.item.id);
-      irA("venta"); // directo a registrar entrega, sin pasar por detalleProspecto
-    } else {
-      setClienteId(sig.item.id);
-      irA("venta");
-    }
+    setClienteId(sig.item.id);
+    irA("venta");
   };
   const saveStock = v => {
     setStock(prev => {
@@ -1368,17 +1327,7 @@ function App() {
       return next;
     });
   };
-  const saveProspectos = v => {
-    setProspectos(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
-      syncData({
-        prospectos: next
-      });
-      return next;
-    });
-  };
   const cliente = clientes.find(c => c.id === clienteId) || null;
-  const prospecto = (prospectos || []).find(p => p.id === prospectoId) || null;
   const irA = p => {
     const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
     if (needsDia.includes(p) && !diaActual) {
@@ -2025,7 +1974,6 @@ function App() {
       irA("config");
     },
     onGestionClientes: () => irA("gestionClientes"),
-    onPromocion: () => irA("promocion"),
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
     onVolver: () => irA("portada"),
@@ -2086,7 +2034,6 @@ function App() {
       irA("planilla");
     },
     noVisitas: noVisitas || [],
-    prospectos: prospectos || [],
     onFiados: () => irA("fiadosPendientes"),
     onDormidos: () => irA("clientesDormidos")
   }), pantalla === "confirmacionesDia" && /*#__PURE__*/React.createElement(ConfirmacionesDia, {
@@ -2127,7 +2074,6 @@ function App() {
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual),
     clientes: clientes,
-    prospectos: prospectos || [],
     planilla: planillas[`${diaActual}_${fechaActual}`] || planillaDiaVacia(),
     productos: productos,
     stock: stockNorm,
@@ -2236,42 +2182,7 @@ function App() {
         _upd: Date.now()
       } : v));
     },
-    prospectos: (prospectos || []).filter(p => p.dia === diaActual && p.estado === "activo"),
     recordatorios: recordatorios,
-    onVentaProspecto: p => {
-      saveClientes(prev => prev.find(c => c.id === p.id) ? prev : [...prev, {
-        ...p,
-        saldo: 0,
-        _esProspecto: true
-      }]);
-      setClienteId(p.id);
-      irA("venta");
-    },
-    onNoEstaProspecto: id => {
-      saveNoVisitas(prev => [...(prev || []).filter(v => !(v.clienteId === id && v.dia === diaActual && v.fecha === fechaActual)), {
-        clienteId: id,
-        dia: diaActual,
-        fecha: fechaActual,
-        motivo: "noesta",
-        _upd: Date.now()
-      }]);
-    },
-    onNoQuiereProspecto: id => {
-      saveNoVisitas(prev => [...(prev || []).filter(v => !(v.clienteId === id && v.dia === diaActual && v.fecha === fechaActual)), {
-        clienteId: id,
-        dia: diaActual,
-        fecha: fechaActual,
-        motivo: "noquiso",
-        _upd: Date.now()
-      }]);
-    },
-    onVerProspecto: p => {
-      setProspectoId(p.id);
-      irA("detalleProspecto");
-    },
-    onEliminarProspecto: id => {
-      if (window.confirm("¿Eliminar este prospecto?")) saveProspectos(prev => (prev || []).filter(x => x.id !== id));
-    },
     onAbrirMapa: () => irA("mapaClientes"),
     onPlanilla: () => {
       setInitCierre(true);
@@ -2416,13 +2327,11 @@ function App() {
     fecha: fechaActual,
     ventasCliente: ventas.filter(v => v.clienteId === cliente.id),
     progressData: (() => {
-      const clientesDia = clientes.filter(c => c.dia === diaActual && !c._esProspecto);
-      const prospDelDia = [...(prospectos || []).filter(p => p.dia === diaActual && p.estado === "activo"), ...clientes.filter(c => c.dia === diaActual && c._esProspecto)];
+      const clientesDia = clientes.filter(c => c.dia === diaActual);
       // IDs de todos los del día
       const idsClientes = new Set(clientesDia.map(c => c.id));
-      const idsProsp = new Set(prospDelDia.map(p => p.id));
-      const idsTodos = new Set([...idsClientes, ...idsProsp]);
-      const totalDia = idsClientes.size + idsProsp.size;
+      const idsTodos = idsClientes;
+      const totalDia = idsClientes.size;
       const ventasHoy = ventas.filter(v => v.fechaKey === fechaActual && !v._esCobro && !v._esAjuste && idsTodos.has(v.clienteId));
       const noVHoy = (noVisitas || []).filter(v => v.fecha === fechaActual && idsTodos.has(v.clienteId));
       const visitadosIds = new Set([...ventasHoy.map(v => v.clienteId), ...noVHoy.map(v => v.clienteId)]);
@@ -2483,13 +2392,7 @@ function App() {
       saveNoVisitas(nv);
       irAlSiguiente(getSiguienteDelDia(nv, clienteId));
     },
-    onVolver: () => {
-      const esProsp = (prospectos || []).some(p => p.id === clienteId);
-      if (esProsp) {
-        setProspectoId(clienteId);
-        irA("detalleProspecto");
-      } else irA("detalleCliente");
-    }
+    onVolver: () => irA("detalleCliente")
   }), pantalla === "nuevoCliente" && /*#__PURE__*/React.createElement(NuevoCliente, {
     diaActual: diaActual,
     onGuardar: datos => {
@@ -2512,123 +2415,7 @@ function App() {
       irA("clientes");
     },
     onVolver: () => irA("clientes")
-  }), pantalla === "promocion" && /*#__PURE__*/React.createElement(Promocion, {
-    prospectos: prospectos,
-    clientes: clientes,
-    onSave: saveProspectos,
-    onConvertir: p => {
-      const nuevo = {
-        ...p,
-        id: Date.now(),
-        saldo: 0,
-        sifon: 0,
-        bidon10: 1,
-        bidon20: 0
-      };
-      saveClientes(prev => [...prev, nuevo]);
-      saveProspectos(prev => (prev || []).map(x => x.id === p.id ? {
-        ...x,
-        estado: "convertido"
-      } : x));
-      irA("promocion");
-    },
-    onVolver: () => irA("gestionClientes")
-  }), pantalla === "detalleProspecto" && prospecto && (() => {
-    const vProsp = ventas.filter(v => v.clienteId === prospecto.id);
-    const noVProsp = (noVisitas || []).filter(v => v.clienteId === prospecto.id);
-    const ventaHoyProsp = vProsp.find(v => v.fechaKey === fechaActual && !v._esCobro && !v._esAjuste);
-    const visitadoHoy = !!(noVProsp.find(v => v.fecha === fechaActual) || ventaHoyProsp);
-    // comprasCount = ventas reales registradas (no cobros ni ajustes)
-    const comprasCount = vProsp.filter(v => !v._esCobro && !v._esAjuste).length;
-    // semanasCount = días únicos con algún registro
-    const fechasVisita = [...new Set([...vProsp.map(x => x.fechaKey).filter(Boolean), ...noVProsp.map(x => x.fecha).filter(Boolean), ...(prospecto.visitas || []).map(x => x.fecha).filter(Boolean)])];
-    const semanasCount = fechasVisita.length;
-    // listo = 4 o más compras reales
-    const listo = comprasCount >= 4;
-    return /*#__PURE__*/React.createElement(PromoDetalle, {
-      prospecto: prospecto,
-      ventas: vProsp,
-      noVisitas: noVProsp,
-      productos: productos,
-      listo: listo,
-      comprasCount: comprasCount,
-      semanasCount: semanasCount,
-      visitadoHoy: visitadoHoy,
-      ventaHoy: ventaHoyProsp,
-      fecha: fechaActual,
-      onRegistrar: () => {
-        // Agregar prospecto como cliente temporal si no existe
-        saveClientes(prev => prev.find(cc => cc.id === prospecto.id) ? prev : [...prev, {
-          ...prospecto,
-          saldo: 0,
-          _esProspecto: true
-        }]);
-        setClienteId(prospecto.id);
-        irA("venta");
-      },
-      onNoEsta: () => {
-        saveNoVisitas(prev => [...(prev || []).filter(v => !(v.clienteId === prospecto.id && v.dia === diaActual && v.fecha === fechaActual)), {
-          clienteId: prospecto.id,
-          dia: diaActual,
-          fecha: fechaActual,
-          motivo: "noesta",
-          _upd: Date.now()
-        }]);
-      },
-      onNoQuiere: () => {
-        saveNoVisitas(prev => [...(prev || []).filter(v => !(v.clienteId === prospecto.id && v.dia === diaActual && v.fecha === fechaActual)), {
-          clienteId: prospecto.id,
-          dia: diaActual,
-          fecha: fechaActual,
-          motivo: "noquiso",
-          _upd: Date.now()
-        }]);
-      },
-      onEliminarVenta: ventaId => {
-        saveVentas(prev => prev.filter(x => x.id !== ventaId));
-      },
-      onComodato: () => {},
-      onConvertir: p => {
-        const base = p || prospecto;
-        const nuevo = {
-          ...base,
-          id: Date.now(),
-          saldo: 0,
-          _esProspecto: undefined
-        };
-        saveClientes(prev => [...prev.filter(c => c.id !== prospecto.id), nuevo]);
-        saveProspectos(prev => (prev || []).map(x => x.id === base.id ? {
-          ...x,
-          estado: "convertido"
-        } : x));
-        irA("clientes");
-      },
-      onEliminar: () => {
-        if (window.confirm("¿Eliminar prospecto?")) {
-          saveProspectos(prev => (prev || []).filter(x => x.id !== prospecto.id));
-          saveClientes(prev => prev.filter(c => c.id !== prospecto.id));
-          setProspectoId(null);
-          irA("clientes");
-        }
-      },
-      onEditar: cambios => {
-        saveProspectos(prev => (prev || []).map(x => x.id === prospecto.id ? {
-          ...x,
-          ...cambios
-        } : x));
-      },
-      onActualizarEnvases: (pid, cambios) => {
-        saveProspectos(prev => (prev || []).map(x => x.id === pid ? {
-          ...x,
-          ...cambios
-        } : x));
-      },
-      onVolver: () => {
-        setProspectoId(null);
-        irA("clientes");
-      }
-    });
-  })(), pantalla === "gestionClientes" && /*#__PURE__*/React.createElement(GestionClientes, {
+  }), pantalla === "gestionClientes" && /*#__PURE__*/React.createElement(GestionClientes, {
     clientes: clientes,
     onIr: irA,
     onReordenarTodo: lista => saveClientes(lista),
@@ -2684,13 +2471,12 @@ function App() {
     onHistorial: undefined,
     onBackup: undefined,
     ventas: ventas,
-    prospectos: prospectos || [],
     recordatorios: recordatorios || [],
     onConfirmarRecordatorio: id => saveRecordatorios(prev => (prev || []).map(r => r.id === id ? {
       ...r,
       confirmado: true
     } : r)),
-    onImportar: (nuevosClientes, nuevosProspectos) => {
+    onImportar: nuevosClientes => {
       if (nuevosClientes.length) {
         saveClientes(prev => {
           const merged = [...prev];
@@ -2707,20 +2493,6 @@ function App() {
             }
           });
           return merged;
-        });
-      }
-      if (nuevosProspectos.length) {
-        saveProspectos(prev => {
-          const mergedP = [...(prev || [])];
-          nuevosProspectos.forEach(np => {
-            const idx = mergedP.findIndex(p => p.nombre.toLowerCase() === np.nombre.toLowerCase());
-            if (idx >= 0) mergedP[idx] = {
-              ...mergedP[idx],
-              ...np,
-              id: mergedP[idx].id
-            };else mergedP.push(np);
-          });
-          return mergedP;
         });
       }
     },
