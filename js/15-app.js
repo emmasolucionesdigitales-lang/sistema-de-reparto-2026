@@ -1390,6 +1390,7 @@ function App() {
       pantalla: p
     }, '', `#${p}`);
   };
+  window._lcIrInicio = () => irA("menu");
 
   // Handle back button
   React.useEffect(() => {
@@ -2097,7 +2098,10 @@ function App() {
     onVolver: () => irA("menu")
   }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
     dia: diaActual,
-    onIrClientes: () => irA("selectorFechaClientes"),
+    onIrClientes: () => {
+      const yaIniciado = fechaActual && planillas[`${diaActual}_${fechaActual}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+    },
     onIrPlanilla: () => irA("selectorFechaPlanilla"),
     onVolver: () => irA("menu"),
     onVerConfirmaciones: () => irA("confirmacionesDia"),
@@ -2140,7 +2144,8 @@ function App() {
     onSeleccionar: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
-      irA("inicioReparto");
+      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "inicioReparto");
     },
     onVolver: () => irA("diaPrincipal")
   }), pantalla === "inicioReparto" && /*#__PURE__*/React.createElement(InicioReparto, {
