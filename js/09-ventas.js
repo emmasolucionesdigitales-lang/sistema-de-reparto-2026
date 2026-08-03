@@ -1839,7 +1839,7 @@ function NuevaVenta({
       fontWeight: 500,
       cursor: "pointer"
     },
-    onClick: onNoQuiere
+    onClick: () => onNoQuiere(envPrest, envDev)
   }, "🚫 No quiere"), onSaltar && /*#__PURE__*/React.createElement("button", {
     style: {
       flex: 1,

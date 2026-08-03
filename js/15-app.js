@@ -305,7 +305,7 @@ function App() {
         soderia: pick(s.soderia),
         soderia_vacios: pick(s.soderia_vacios),
         casa: pick(s.casa),
-        camion: pick(s.camion)
+        camion: e() /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
       };
     }
     return {
@@ -2365,7 +2365,7 @@ function App() {
       saveNoVisitas(nv);
       irAlSiguiente(getSiguienteDelDia(nv, clienteId));
     },
-    onNoQuiere: () => {
+    onNoQuiere: (envPrest, envDev) => {
       const nv = [...(noVisitas || []).filter(v => !(v.clienteId === clienteId && v.dia === diaActual && v.fecha === fechaActual)), {
         clienteId,
         dia: diaActual,
@@ -2374,6 +2374,37 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
+      const _ep = (envPrest || []).filter(e => e.prod && Number(e.cant) > 0);
+      const _ed = (envDev || []).filter(e => e.prod && Number(e.cant) > 0);
+      if (_ep.length || _ed.length) {
+        const fk = new Date().toLocaleDateString("en-CA");
+        saveVentas(prev => [...prev, {
+          id: Date.now(),
+          clienteId,
+          cliente: cliente ? cliente.nombre : "",
+          dia: diaActual,
+          fechaKey: fk,
+          fecha: new Date().toLocaleString("es-AR"),
+          detalle: [{
+            nombre: "Movimiento de envases (No quiere)",
+            cantidad: 1,
+            precio: 0,
+            total: 0
+          }],
+          pago: "-",
+          obs: "Envases marcados al no comprar",
+          neto: 0,
+          bruto: 0,
+          desc: 0,
+          costo: 0,
+          ganancia: 0,
+          pagadoNum: 0,
+          saldoDelta: 0,
+          envPrest: _ep,
+          envDev: _ed,
+          _esAjuste: true
+        }]);
+      }
       irAlSiguiente(getSiguienteDelDia(nv, clienteId));
     },
     onGuardar: (d, p, m, sa, ep, ed, obs, op, mt2, sd, tc) => {
