@@ -1371,17 +1371,35 @@ function NuevaVenta({
         textAlign: "center",
         color: dispDelta > 0 ? "var(--color-text-info)" : dispDelta < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
       }
-    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), dispenser && !mostrarRotoCompacto ? /*#__PURE__*/React.createElement("button", {
+    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginBottom: 8
+      }
+    }, dispenser && /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
-        width: "100%",
-        marginBottom: 8,
+        flex: 1,
         fontSize: 11,
         padding: "7px",
-        color: "var(--color-text-danger)"
+        color: mostrarRotoCompacto ? "#fff" : "var(--color-text-danger)",
+        background: mostrarRotoCompacto ? "#a32d2d" : undefined,
+        border: mostrarRotoCompacto ? "none" : undefined
       },
-      onClick: () => setMostrarRotoCompacto(true)
-    }, "💔 Dispenser roto (cobrar reposición)") : dispenser && /*#__PURE__*/React.createElement("div", {
+      onClick: () => setMostrarRotoCompacto(r => !r)
+    }, "💔 Dispenser roto"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        padding: "7px",
+        background: mostrarCambio ? "#185FA5" : undefined,
+        color: mostrarCambio ? "#fff" : undefined,
+        border: mostrarCambio ? "none" : undefined
+      },
+      onClick: () => setMostrarCambio(m => !m)
+    }, "🔄 Cambio de envase")), mostrarRotoCompacto && dispenser && /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
         margin: "0 0 8px",
@@ -1408,16 +1426,7 @@ function NuevaVenta({
         setDispRotoPrecio("");
         setMostrarRotoCompacto(false);
       }
-    }, "Cancelar")), !mostrarCambio ? /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.btn,
-        width: "100%",
-        marginBottom: 8,
-        fontSize: 11,
-        padding: "7px"
-      },
-      onClick: () => setMostrarCambio(true)
-    }, "🔄 Cambio de envase (sin cobrar)") : /*#__PURE__*/React.createElement("div", {
+    }, "Cancelar")), mostrarCambio && /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
         margin: "0 0 8px",
