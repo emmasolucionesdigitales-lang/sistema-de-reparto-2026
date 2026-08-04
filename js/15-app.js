@@ -1805,9 +1805,18 @@ function App() {
       }
     });
   }
-  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, transConfirmadaInicial) => {
+  const registrarVenta = (ventaClienteId, detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, transConfirmadaInicial) => {
     montoTrans2 = Number(montoTrans2) || 0; // defensa: el desglose mixto depende de esto
-    const c = cliente;
+    // Resolver el cliente por id explícito en vez de depender del estado
+    // global `cliente` — así funciona también desde la tarjeta inline en
+    // ListaClientes, donde nunca se navegó a la pantalla "venta" y por lo
+    // tanto `cliente`/`clienteId` globales podrían no corresponder a este
+    // cliente (o estar vacíos).
+    const c = clientes.find(cl => cl.id === ventaClienteId);
+    if (!c) {
+      console.warn("registrarVenta: cliente no encontrado", ventaClienteId);
+      return;
+    }
     // Guard anti doble-tap: ignora una llamada idéntica al mismo cliente
     // dentro de 1.5s (botón sin lock + toque duplicado en el celular)
     const firmaReg = JSON.stringify({
@@ -2311,6 +2320,14 @@ function App() {
     ventas: ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual),
     todasVentas: ventas,
     noVisitas: (noVisitas || []).filter(v => v.dia === diaActual && v.fecha === fechaActual),
+    productos: productos,
+    onGuardarVenta: (clienteIdVenta, ...args) => registrarVenta(clienteIdVenta, ...args),
+    onCambiarDispenserCliente: (id, delta) => {
+      saveClientes(prev => prev.map(c => c.id === id ? {
+        ...c,
+        dispenser: Math.max(0, (Number(c.dispenser) || 0) + delta)
+      } : c));
+    },
     onEditarCliente: (id, cambios) => {
       saveClientes(prev => prev.map(c => c.id === id ? {
         ...c,
@@ -2575,7 +2592,7 @@ function App() {
       irAlSiguiente(getSiguienteDelDia(nv, clienteId));
     },
     onGuardar: (d, p, m, sa, ep, ed, obs, op, mt2, sd, tc) => {
-      registrarVenta(d, p, m, sa, ep, ed, obs, op, mt2, sd, tc);
+      registrarVenta(clienteId, d, p, m, sa, ep, ed, obs, op, mt2, sd, tc);
       // Usar noVisitas actual (sin cambios) — la venta ya marca al cliente como visitado
       irAlSiguiente(getSiguienteDelDia(noVisitas, clienteId));
     },

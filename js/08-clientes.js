@@ -52,6 +52,7 @@ function ListaClientes({
   todasVentas,
   noVisitas,
   recordatorios,
+  productos,
   onSeleccionar,
   onEntregar,
   onNuevoCliente,
@@ -63,9 +64,12 @@ function ListaClientes({
   onConfirmarTransfer,
   onAbrirMapa,
   onPlanilla,
-  onDormidos
+  onDormidos,
+  onGuardarVenta,
+  onCambiarDispenserCliente
 }) {
   const [busqueda, setBusqueda] = useState("");
+  const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
   // ventas y noVisitas ya filtradas por fecha+dia desde App
   const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
@@ -122,6 +126,13 @@ function ListaClientes({
     const atendido = atendidos.has(c.id),
       est = noVMap[c.id];
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
+    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido;
+    const expandido = clienteExpandidoId === c.id;
+    const irAlSiguientePendiente = () => {
+      const idx = pendientes.findIndex(x => x.id === c.id);
+      const siguiente = pendientes.find((x, i) => x.id !== c.id && (idx === -1 || i > idx));
+      setClienteExpandidoId(siguiente ? siguiente.id : null);
+    };
     // Envases extra que tiene el cliente (historial completo, no solo hoy)
     const envExtra = {
       sifon: 0,
@@ -376,8 +387,35 @@ function ListaClientes({
         fontWeight: 600,
         flex: 2
       },
-      onClick: () => (onEntregar || onSeleccionar)(c)
-    }, "Entregar →")), (est === "noesta2" || est === "noquiso") && !atendido && /*#__PURE__*/React.createElement("div", {
+      onClick: () => setClienteExpandidoId(c.id)
+    }, "Entregar →")), puedeEntregar && expandido && onGuardarVenta && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: "0.5px solid var(--color-border-tertiary)"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: "100%",
+        marginBottom: 10,
+        fontSize: 13,
+        fontWeight: 500
+      },
+      onClick: () => setClienteExpandidoId(null)
+    }, "▲ Cerrar"), /*#__PURE__*/React.createElement(NuevaVenta, {
+      key: `${c.id}-${(todasVentas || ventas).filter(v => v.clienteId === c.id).length}`,
+      compacto: true,
+      cliente: c,
+      productos: productos,
+      fecha: fecha,
+      ventasCliente: (todasVentas || ventas).filter(v => v.clienteId === c.id),
+      onGuardar: (...args) => {
+        onGuardarVenta(c.id, ...args);
+        irAlSiguientePendiente();
+      },
+      onCambiarDispenser: delta => onCambiarDispenserCliente && onCambiarDispenserCliente(c.id, delta)
+    })), (est === "noesta2" || est === "noquiso") && !atendido && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "flex-end",
@@ -390,15 +428,7 @@ function ListaClientes({
         padding: "4px 10px"
       },
       onClick: () => onQuitarNoVisita(c.id)
-    }, "Desmarcar"), onEditarCliente && /*#__PURE__*/React.createElement(PieEnvases, {
-      c: c,
-      ventas: todasVentas || ventas,
-      onEditar: onEditarCliente
-    })), onEditarCliente && /*#__PURE__*/React.createElement(PieEnvases, {
-      c: c,
-      ventas: todasVentas || ventas,
-      onEditar: onEditarCliente
-    })), fotoOpen && /*#__PURE__*/React.createElement("div", {
+    }, "Desmarcar"), null), null), fotoOpen && /*#__PURE__*/React.createElement("div", {
       style: {
         position: "fixed",
         top: 0,
