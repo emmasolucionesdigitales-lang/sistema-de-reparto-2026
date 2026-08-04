@@ -151,7 +151,7 @@
     // (datos/main) se deja de escribir, pero se lee UNA vez para migrar
     // solo, si un negocio todavía no tiene nada en el formato nuevo.
     // ════════════════════════════════════════════════════════════════
-    const SR_LISTAS = ["clientes","ventas","productos","prospectos","recordatorios","noVisitas","perdidas"];
+    const SR_LISTAS = ["clientes","ventas","productos","recordatorios","noVisitas","perdidas"];
     const SR_MAPAS  = { planillas:"planillas", stock:"stock", cargasDia:"cargasDia", zonasReparto:"zonasReparto", mantVeh:"mantVeh", histPrecios:"histPrecios" };
     const SR_CONFIG_KEYS = ["horaAvisoCierre","horasAvisoTrans","diasAvisoMant"];
     const SR_ID_FN = { noVisitas: v => `${v.clienteId}_${v.dia}_${v.fecha}` };

@@ -230,7 +230,8 @@ function App() {
         clienteNombre: clienteNombre || null,
         sifon: items.sifon || 0,
         bidon10: items.bidon10 || 0,
-        bidon20: items.bidon20 || 0
+        bidon20: items.bidon20 || 0,
+        _upd: Date.now()
       }];
       syncData({
         perdidas: next
@@ -242,7 +243,12 @@ function App() {
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   const saveRecordatorios = r => {
     setRecordatorios(prev => {
-      const next = typeof r === "function" ? r(prev) : r;
+      const base = typeof r === "function" ? r(prev) : r;
+      const _t = Date.now();
+      const next = base.map(it => ({
+        ...it,
+        _upd: _t
+      }));
       syncData({
         recordatorios: next
       });
@@ -602,16 +608,72 @@ function App() {
             bidon20: 0
           }
         };
-        setStock(normStock);
-        try {
-          localStorage.setItem("sr_stock_v4", JSON.stringify(normStock));
-        } catch {}
+        // Guarda por _upd: si el stock local (todavía no subido, ej. recién
+        // cerrado el día unos segundos antes de recargar la app) es más
+        // nuevo que el de la nube, no lo pisamos con la copia vieja. Si
+        // alguno de los dos no tiene _upd todavía (dato de antes de este
+        // arreglo), se comporta como antes (gana la nube).
+        const stockLocal = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("sr_stock_v4") || "null");
+          } catch {
+            return null;
+          }
+        })();
+        const uL = Number(stockLocal?._upd) || 0,
+          uN = Number(normStock?._upd) || 0;
+        if (stockLocal && uL > uN) {
+          console.log("Merge: stock local más nuevo que la nube, sincronizando");
+          setStock(stockLocal);
+          setTimeout(() => syncData({
+            stock: stockLocal
+          }), 2000);
+        } else {
+          setStock(normStock);
+          try {
+            localStorage.setItem("sr_stock_v4", JSON.stringify(normStock));
+          } catch {}
+        }
       }
       if (data.productos?.length) {
-        setProductos(data.productos);
+        // ── Productos: MERGEAR por id + _upd (antes se pisaba entero) ────
+        const productosLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("sr_productos_v3") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdProd = {};
+        (data.productos || []).forEach(p => {
+          porIdProd[p.id] = p;
+        });
+        let cambiosLocalesProd = 0;
+        productosLocales.forEach(p => {
+          const enNube = porIdProd[p.id];
+          if (!enNube) {
+            porIdProd[p.id] = p;
+            cambiosLocalesProd++;
+            return;
+          }
+          const uL = Number(p._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdProd[p.id] = p;
+            cambiosLocalesProd++;
+          }
+        });
+        const mergedProd = Object.values(porIdProd);
+        setProductos(mergedProd);
         try {
-          localStorage.setItem("sr_productos_v3", JSON.stringify(data.productos));
+          localStorage.setItem("sr_productos_v3", JSON.stringify(mergedProd));
         } catch {}
+        if (cambiosLocalesProd > 0) {
+          console.log("Merge: " + cambiosLocalesProd + " productos locales más nuevos, sincronizando");
+          setTimeout(() => syncData({
+            productos: mergedProd
+          }), 2000);
+        }
       }
       if (data.noVisitas?.length) {
         // ── noVisitas: MERGEAR por clave (cliente+día+fecha) ──────────────
@@ -656,10 +718,86 @@ function App() {
         }
       }
       if (data.recordatorios?.length) {
-        setRecordatorios(data.recordatorios);
+        // ── Recordatorios: MERGEAR por id + _upd (antes se pisaba entero) ─
+        const recordatoriosLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("sr_recordatorios_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdRec = {};
+        (data.recordatorios || []).forEach(r => {
+          porIdRec[r.id] = r;
+        });
+        let cambiosLocalesRec = 0;
+        recordatoriosLocales.forEach(r => {
+          const enNube = porIdRec[r.id];
+          if (!enNube) {
+            porIdRec[r.id] = r;
+            cambiosLocalesRec++;
+            return;
+          }
+          const uL = Number(r._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdRec[r.id] = r;
+            cambiosLocalesRec++;
+          }
+        });
+        const mergedRec = Object.values(porIdRec);
+        setRecordatorios(mergedRec);
         try {
-          localStorage.setItem("sr_recordatorios_v1", JSON.stringify(data.recordatorios));
+          localStorage.setItem("sr_recordatorios_v1", JSON.stringify(mergedRec));
         } catch {}
+        if (cambiosLocalesRec > 0) {
+          console.log("Merge: " + cambiosLocalesRec + " recordatorios locales más nuevos, sincronizando");
+          setTimeout(() => syncData({
+            recordatorios: mergedRec
+          }), 2000);
+        }
+      }
+      if (data.perdidas?.length) {
+        // ── Pérdidas: nunca se traían de la nube al arrancar (solo vivían
+        // en localStorage) — un dispositivo nuevo no veía las pérdidas
+        // registradas desde otro. Igual patrón: merge por id + _upd.
+        const perdidasLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("sr_perdidas_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdPerd = {};
+        (data.perdidas || []).forEach(p => {
+          porIdPerd[p.id] = p;
+        });
+        let cambiosLocalesPerd = 0;
+        perdidasLocales.forEach(p => {
+          const enNube = porIdPerd[p.id];
+          if (!enNube) {
+            porIdPerd[p.id] = p;
+            cambiosLocalesPerd++;
+            return;
+          }
+          const uL = Number(p._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdPerd[p.id] = p;
+            cambiosLocalesPerd++;
+          }
+        });
+        const mergedPerd = Object.values(porIdPerd);
+        setPerdidas(mergedPerd);
+        try {
+          localStorage.setItem("sr_perdidas_v1", JSON.stringify(mergedPerd));
+        } catch {}
+        if (cambiosLocalesPerd > 0) {
+          console.log("Merge: " + cambiosLocalesPerd + " pérdidas locales más nuevas, sincronizando");
+          setTimeout(() => syncData({
+            perdidas: mergedPerd
+          }), 2000);
+        }
       }
       if (data.mantVeh?.length) localStorage.setItem("sr_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("sr_lc_hist_precios", JSON.stringify(data.histPrecios));
@@ -1031,7 +1169,15 @@ function App() {
           return ['13:00', '19:00'];
         }
       })(),
-      diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('sr_dias_notif_mant') || '3,2,1,0').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n))
+      diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('sr_dias_notif_mant') || '3,2,1,0').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n)),
+      // Estampar _upd en stock — lo usa la carga inicial para no pisar un
+      // cambio local reciente con una copia vieja de la nube (mismo bug
+      // que tuvo La Catalina; acá el riesgo es más chico porque solo se
+      // carga una vez al abrir la app, pero mejor prevenir).
+      stock: overrides.stock !== undefined ? {
+        ...overrides.stock,
+        _upd: Date.now()
+      } : prevData.stock
     };
     estadoRef.current = data;
     debounceSave(() => {
@@ -1095,6 +1241,9 @@ function App() {
         if (overrides.cargasDia !== undefined) {
           merged.cargasDia = mergeNumericoConDeltas(prevData.cargasDia, data.cargasDia, fresh.cargasDia);
         }
+        if (overrides.productos !== undefined) {
+          merged.productos = mergeArrayPorClave(prevData.productos, data.productos, fresh.productos, p => p.id);
+        }
         if (overrides.recordatorios !== undefined) {
           merged.recordatorios = mergeArrayPorClave(prevData.recordatorios, data.recordatorios, fresh.recordatorios, r => r.id);
         }
@@ -1119,7 +1268,17 @@ function App() {
       if (pending) {
         setSyncStatus("saving");
         try {
-          const data = JSON.parse(pending);
+          // OJO: antes acá se hacía JSON.parse(pending) y se reenviaba ESA
+          // foto vieja. El problema: "pending" es una foto de cómo estaban
+          // las cosas en el momento en que falló el guardado — si pasó
+          // rato (o hubo más cambios mientras tanto, incluso ya con
+          // señal), reenviarla pisaba TODAS las colecciones (clientes,
+          // ventas, stock, todo) con datos viejos, sin pasar por ningún
+          // merge. Usar estadoRef.current en cambio: es el estado más
+          // actualizado que existe en memoria en cualquier momento (se
+          // mantiene al día en cada cambio), así que el reintento siempre
+          // manda lo más nuevo, nunca una foto vieja.
+          const data = estadoRef.current;
           cloudSave(data, negocioId).then(ok => {
             if (ok) {
               localStorage.removeItem("sr_offline_pending");
@@ -1290,7 +1449,15 @@ function App() {
   };
   const saveProductos = v => {
     setProductos(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
+      const base = typeof v === "function" ? v(prev) : v;
+      // Estampar _upd en cada producto — sin esto el merge por id+_upd
+      // (carga inicial y guardado) no puede saber cuál versión es más
+      // nueva y termina tratando todo como "sin cambios".
+      const _t = Date.now();
+      const next = base.map(p => ({
+        ...p,
+        _upd: _t
+      }));
       // Registrar cambio de precio en historial
       const hoy = new Date().toISOString().slice(0, 16);
       const histPrecios = JSON.parse(localStorage.getItem("sr_lc_hist_precios") || "[]");
