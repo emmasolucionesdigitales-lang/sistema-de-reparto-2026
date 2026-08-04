@@ -1355,6 +1355,7 @@ function PlanillaDelDia({
   cargasDia
 }) {
   const [enviosInforme, setEnviosInforme] = React.useState(() => Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`) || 0));
+  const [enviandoCierre, setEnviandoCierre] = React.useState(false);
   const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
   // Todas las ventas registradas con fechaKey === fecha (sin importar el día del cliente)
   const todasFecha = ventas.filter(v => v.fechaKey === fecha);
@@ -1605,7 +1606,8 @@ function PlanillaDelDia({
     paraLlenarCalc[pk] = Math.min(falta, vaciosHoy);
     vaciosRestoCalc[pk] = Math.max(0, vaciosHoy - paraLlenarCalc[pk]);
   });
-  const confirmarCierre = () => {
+  const confirmarCierre = async () => {
+    if (enviandoCierre) return;
     localStorage.setItem(cierreKey, "1"); // marcar como confirmado
     const s = JSON.parse(JSON.stringify(stock));
     if (!s.soderia_vacios) s.soderia_vacios = {
@@ -1645,8 +1647,43 @@ function PlanillaDelDia({
         _cierreDiffs: diffs
       } : {})
     });
-    setMostrarCierre(false);
-    if (onCerrarDia) setTimeout(() => onCerrarDia(), 800);
+    // Capturar la planilla como imagen y mandar el informe en el MISMO paso
+    // que se cierra el día — antes eran dos acciones separadas.
+    if (onCerrarDia) {
+      setEnviandoCierre(true);
+      let imgData = null;
+      try {
+        const el = document.getElementById("planilla-capture");
+        if (el && window.html2canvas) {
+          const canvas = await window.html2canvas(el, {
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--color-background-primary").trim() || "#0f1923",
+            scrollY: 0,
+            scrollX: 0,
+            width: el.offsetWidth,
+            height: el.scrollHeight,
+            windowWidth: el.offsetWidth,
+            windowHeight: el.scrollHeight
+          });
+          imgData = canvas.toDataURL("image/jpeg", 0.78);
+        }
+      } catch (e) {
+        console.warn("Captura falló:", e);
+      }
+      const ok = await onCerrarDia(imgData);
+      setEnviandoCierre(false);
+      setMostrarCierre(false);
+      if (ok) {
+        setEnviosInforme(Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`) || 1));
+        alert("✅ Día cerrado, stock actualizado e informe enviado a tu email.");
+      } else {
+        alert("✅ Día cerrado y stock actualizado.\n❌ No se pudo enviar el informe por email — podés reintentarlo con el botón \"Reenviar informe\" de abajo.");
+      }
+    } else {
+      setMostrarCierre(false);
+    }
   };
   if (mostrarCierre) {
     return /*#__PURE__*/React.createElement("div", {
@@ -1910,10 +1947,12 @@ function PlanillaDelDia({
         color: "#4dd9a0",
         fontSize: 13,
         fontWeight: 700,
-        cursor: "pointer"
+        cursor: enviandoCierre ? "default" : "pointer",
+        opacity: enviandoCierre ? 0.7 : 1
       },
+      disabled: enviandoCierre,
       onClick: confirmarCierre
-    }, "✓ Confirmar — actualizar stock"))));
+    }, enviandoCierre ? "⏳ Cerrando y enviando..." : "✓ Confirmar — stock e informe"))));
   }
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
@@ -2779,7 +2818,32 @@ function PlanillaDelDia({
   }, fmt(ganancia))))), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => onGuardar(datos)
-  }, "Guardar planilla"), onCerrarDia && ventas.length > 0 && (() => {
+  }, "Guardar planilla"), !yaCerrado ? /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      padding: "14px",
+      borderRadius: 10,
+      border: "none",
+      background: "#4c1d95",
+      color: "#e9d5ff",
+      fontSize: 15,
+      fontWeight: 600,
+      cursor: "pointer",
+      marginTop: 10
+    },
+    onClick: () => setMostrarCierre(true)
+  }, "🔒 Cerrar el día, actualizar stock y enviar informe") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "12px",
+      borderRadius: 10,
+      background: "rgba(29,158,117,0.15)",
+      color: "#4dd9a0",
+      fontSize: 13,
+      fontWeight: 500,
+      marginTop: 10
+    }
+  }, "✅ Día cerrado · Stock actualizado"), onCerrarDia && ventas.length > 0 && (() => {
     const MAX_ENVIOS = 3;
     const envios = enviosInforme;
     const quedan = MAX_ENVIOS - envios;
@@ -2787,15 +2851,15 @@ function PlanillaDelDia({
     return /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",
-        padding: "14px",
+        padding: "10px",
         borderRadius: 10,
         border: "none",
-        background: agotado ? "#555" : envios > 0 ? "#0F6E56" : "#4c1d95",
-        color: agotado ? "#ccc" : envios > 0 ? "#d1fae5" : "#e9d5ff",
-        fontSize: 15,
+        background: agotado ? "#555" : "#0F6E56",
+        color: agotado ? "#ccc" : "#d1fae5",
+        fontSize: 12,
         fontWeight: 600,
         cursor: agotado ? "default" : "pointer",
-        marginTop: 10,
+        marginTop: 8,
         opacity: agotado ? 0.7 : 1
       },
       onClick: async () => {
@@ -2832,19 +2896,8 @@ function PlanillaDelDia({
           alert("❌ No se pudo enviar el informe. Verificá tu conexión e intentá de nuevo.");
         }
       }
-    }, agotado ? "📊 Informe enviado (máximo alcanzado)" : envios > 0 ? `🔄 Reenviar informe (${quedan} ${quedan === 1 ? "envío" : "envíos"} restante${quedan === 1 ? "" : "s"})` : "📊 Cerrar día y enviar informe");
-  })(), yaCerrado && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      padding: "12px",
-      borderRadius: 10,
-      background: "rgba(29,158,117,0.15)",
-      color: "#4dd9a0",
-      fontSize: 13,
-      fontWeight: 500,
-      marginTop: 10
-    }
-  }, "✅ Día cerrado · Stock actualizado")));
+    }, agotado ? "✓ Informe enviado (máximo alcanzado)" : `🔄 Reenviar informe (${quedan} ${quedan === 1 ? "envío" : "envíos"} restante${quedan === 1 ? "" : "s"})`);
+  })())));
 }
 function InicioReparto({
   dia,
