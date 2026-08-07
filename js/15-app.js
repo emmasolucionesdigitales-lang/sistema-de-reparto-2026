@@ -2230,6 +2230,7 @@ function App() {
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
     onPromociones: () => irA("prospectos"),
+    onNuevoCliente: () => irA("nuevoCliente"),
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),
