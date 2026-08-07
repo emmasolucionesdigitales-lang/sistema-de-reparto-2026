@@ -241,14 +241,37 @@ function App() {
   };
   const [recordatorios, setRecordatorios] = useLS("sr_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
+  // BUG: clientes (y productos/recordatorios) borrados podían volver a
+  // aparecer solos después de unos días. Causa: el patrón de guardado de
+  // acá abajo le ponía un _upd (marca de "última modificación") NUEVO a
+  // TODOS los registros en CADA guardado, hubieran cambiado o no. Como el
+  // borrado usa un "tombstone" (fecha del borrado) que solo gana si es más
+  // nuevo que el _upd que tenga la nube, bastaba con que OTRO dispositivo
+  // (uno que todavía no se había enterado del borrado, ej. un celular con
+  // una pestaña vieja abierta) guardara CUALQUIER cosa — aunque fuera un
+  // cambio en un cliente totalmente distinto — para que ese guardado le
+  // pisara la fecha al cliente ya borrado con la hora actual, "ganándole"
+  // al tombstone y resucitándolo para todos. Esta función solo renueva el
+  // _upd de los registros que realmente cambiaron.
+  const _soloUpdCambiados = (prevArr, baseArr, _t) => {
+    const porId = {};
+    (prevArr || []).forEach(x => {
+      if (x && x.id != null) porId[x.id] = x;
+    });
+    return (baseArr || []).map(x => {
+      if (!x || x.id == null) return { ...x, _upd: _t }; // sin id: no se puede comparar, se estampa
+      const antes = porId[x.id];
+      if (!antes) return { ...x, _upd: _t }; // nuevo
+      const sinUpdAntes = JSON.stringify({ ...antes, _upd: undefined });
+      const sinUpdAhora = JSON.stringify({ ...x, _upd: undefined });
+      return sinUpdAntes !== sinUpdAhora ? { ...x, _upd: _t } : x; // solo si cambió algo más que _upd
+    });
+  };
   const saveRecordatorios = r => {
     setRecordatorios(prev => {
       const base = typeof r === "function" ? r(prev) : r;
       const _t = Date.now();
-      const next = base.map(it => ({
-        ...it,
-        _upd: _t
-      }));
+      const next = _soloUpdCambiados(prev, base, _t);
       syncData({
         recordatorios: next
       });
@@ -256,6 +279,24 @@ function App() {
     });
   };
   const recordatoriosActivos = (recordatorios || []).filter(r => !r.confirmado); // [{clienteId,dia,fecha,motivo}]
+  // ── Prospectos: gente visitada en una promoción que todavía no es
+  // cliente. Se guarda nombre/teléfono/dirección para seguimiento y para
+  // precargar el alta cuando se convierte en cliente real.
+  const [prospectos, setProspectos] = useLS("sr_prospectos_v1", []);
+  const saveProspectos = r => {
+    setProspectos(prev => {
+      const base = typeof r === "function" ? r(prev) : r;
+      const _t = Date.now();
+      const next = _soloUpdCambiados(prev, base, _t);
+      syncData({
+        prospectos: next
+      });
+      return next;
+    });
+  };
+  // Cuando se toca "Convertir en cliente" en un prospecto, se guarda acá
+  // para precargar el formulario de Nuevo Cliente con nombre/teléfono/dirección.
+  const [prospectoAConvertir, setProspectoAConvertir] = useState(null);
   const [clientes, setClientes] = useLS("sr_clientes_v3", CLIENTES_INICIALES);
   const [ventasRaw, setVentasRaw] = useLS("sr_ventas_v3", []);
   const normalizarFechaKey = v => {
@@ -757,6 +798,46 @@ function App() {
           }), 2000);
         }
       }
+      if (data.prospectos?.length) {
+        // ── Prospectos: mismo patrón de merge por id + _upd ──────────────
+        const prospectosLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("sr_prospectos_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdPro = {};
+        (data.prospectos || []).forEach(p => {
+          porIdPro[p.id] = p;
+        });
+        let cambiosLocalesPro = 0;
+        prospectosLocales.forEach(p => {
+          const enNube = porIdPro[p.id];
+          if (!enNube) {
+            porIdPro[p.id] = p;
+            cambiosLocalesPro++;
+            return;
+          }
+          const uL = Number(p._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdPro[p.id] = p;
+            cambiosLocalesPro++;
+          }
+        });
+        const mergedPro = Object.values(porIdPro);
+        setProspectos(mergedPro);
+        try {
+          localStorage.setItem("sr_prospectos_v1", JSON.stringify(mergedPro));
+        } catch {}
+        if (cambiosLocalesPro > 0) {
+          console.log("Merge: " + cambiosLocalesPro + " prospectos locales más nuevos, sincronizando");
+          setTimeout(() => syncData({
+            prospectos: mergedPro
+          }), 2000);
+        }
+      }
       if (data.perdidas?.length) {
         // ── Pérdidas: nunca se traían de la nube al arrancar (solo vivían
         // en localStorage) — un dispositivo nuevo no veía las pérdidas
@@ -829,7 +910,8 @@ function App() {
     productos,
     noVisitas,
     recordatorios,
-    cargasDia
+    cargasDia,
+    prospectos
   });
   // Guards anti doble-tap: evitan sumar/restar el saldo dos veces si el
   // cartel de confirmación tarda en desaparecer y se vuelve a tocar el botón.
@@ -862,7 +944,8 @@ function App() {
       recordatorios,
       zonasReparto,
       cargasDia,
-      perdidas
+      perdidas,
+      prospectos
     };
   });
 
@@ -1335,10 +1418,7 @@ function App() {
     setClientes(prev => {
       const base = typeof v === "function" ? v(prev) : v;
       const _t = Date.now();
-      const vv = base.map(c => ({
-        ...c,
-        _upd: _t
-      }));
+      const vv = _soloUpdCambiados(prev, base, _t);
       syncData({
         clientes: vv
       });
@@ -1450,14 +1530,11 @@ function App() {
   const saveProductos = v => {
     setProductos(prev => {
       const base = typeof v === "function" ? v(prev) : v;
-      // Estampar _upd en cada producto — sin esto el merge por id+_upd
-      // (carga inicial y guardado) no puede saber cuál versión es más
-      // nueva y termina tratando todo como "sin cambios".
+      // Estampar _upd solo en los productos que cambiaron de verdad (ver
+      // _soloUpdCambiados más arriba) — estampar TODOS pisaba tombstones de
+      // borrado en otros dispositivos y resucitaba productos eliminados.
       const _t = Date.now();
-      const next = base.map(p => ({
-        ...p,
-        _upd: _t
-      }));
+      const next = _soloUpdCambiados(prev, base, _t);
       // Registrar cambio de precio en historial
       const hoy = new Date().toISOString().slice(0, 16);
       const histPrecios = JSON.parse(localStorage.getItem("sr_lc_hist_precios") || "[]");
@@ -2152,6 +2229,7 @@ function App() {
     onGestionClientes: () => irA("gestionClientes"),
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
+    onPromociones: () => irA("prospectos"),
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),
@@ -2610,6 +2688,12 @@ function App() {
     onVolver: () => irA("detalleCliente")
   }), pantalla === "nuevoCliente" && /*#__PURE__*/React.createElement(NuevoCliente, {
     diaActual: diaActual,
+    prefill: prospectoAConvertir ? {
+      nombre: prospectoAConvertir.nombre,
+      telefono: prospectoAConvertir.telefono,
+      calle: prospectoAConvertir.calle,
+      barrio: prospectoAConvertir.barrio
+    } : null,
     onGuardar: datos => {
       const orden = datos.orden;
       saveClientes(prevC => {
@@ -2627,9 +2711,28 @@ function App() {
           dispenser: datos.dispenser || 0
         }].sort((a, b) => DIAS.indexOf(a.dia) - DIAS.indexOf(b.dia) || (a.orden || 9999) - (b.orden || 9999));
       });
-      irA("clientes");
+      if (prospectoAConvertir) {
+        const pid = prospectoAConvertir.id;
+        saveProspectos(prev => prev.map(p => p.id === pid ? { ...p, estado: "convertido" } : p));
+        setProspectoAConvertir(null);
+        irA("prospectos");
+      } else {
+        irA("clientes");
+      }
     },
-    onVolver: () => irA("clientes")
+    onVolver: () => {
+      setProspectoAConvertir(null);
+      irA(prospectoAConvertir ? "prospectos" : "clientes");
+    }
+  }), pantalla === "prospectos" && /*#__PURE__*/React.createElement(Prospectos, {
+    prospectos: prospectos,
+    onGuardar: p => saveProspectos(prev => [...(prev || []), p]),
+    onEliminar: id => saveProspectos(prev => (prev || []).filter(p => p.id !== id)),
+    onConvertir: p => {
+      setProspectoAConvertir(p);
+      irA("nuevoCliente");
+    },
+    onVolver: () => irA("menu")
   }), pantalla === "gestionClientes" && /*#__PURE__*/React.createElement(GestionClientes, {
     clientes: clientes,
     onIr: irA,

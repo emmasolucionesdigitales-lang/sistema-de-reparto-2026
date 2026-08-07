@@ -10,6 +10,7 @@ function MenuDias({
   onGestionClientes,
   onStock,
   onAgenda,
+  onPromociones,
   onVolver,
   darkMode,
   onToggleDark,
@@ -678,9 +679,9 @@ function MenuDias({
       padding: "4px 0 8px"
     }
   }, [{
-    ico: "🛒",
-    lbl: "Venta extra",
-    fn: () => onGestionClientes && onGestionClientes()
+    ico: "📣",
+    lbl: "Promociones",
+    fn: () => onPromociones && onPromociones()
   }, {
     ico: "📅",
     lbl: "Agenda",
@@ -1506,6 +1507,38 @@ function PlanillaDelDia({
   const cierreKey = `cierre_${dia}_${fecha}`;
   const yaConfirmado = !!localStorage.getItem(cierreKey) || !!planilla._diaCerrado;
   const [mostrarCierre, setMostrarCierre] = useState(!!(initCierre && !yaConfirmado));
+  // BUG: el botón "Confirmar — stock e informe" (adentro de la pantalla de
+  // Cierre) intentaba sacarle una foto a #planilla-capture recién ahí — pero
+  // ese elemento vive en la vista NORMAL de la planilla, que ya no está
+  // montada (React cambió de rama de render en cuanto se tocó "Cerrar el
+  // día..."). document.getElementById devolvía null, no tiraba error, y el
+  // mail salía sin la foto y sin ningún aviso. Ahora la foto se saca ANTES
+  // de cambiar a la pantalla de cierre (mientras el elemento todavía está
+  // visible) y se guarda acá para usarla al confirmar.
+  const [capturaPreCierre, setCapturaPreCierre] = useState(null);
+  const [capturandoParaCierre, setCapturandoParaCierre] = useState(false);
+  const capturarPlanillaImg = async () => {
+    try {
+      const el = document.getElementById("planilla-capture");
+      if (!el || !window.html2canvas) return null;
+      const canvas = await window.html2canvas(el, {
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--color-background-primary").trim() || "#0f1923",
+        scrollY: 0,
+        scrollX: 0,
+        width: el.offsetWidth,
+        height: el.scrollHeight,
+        windowWidth: el.offsetWidth,
+        windowHeight: el.scrollHeight
+      });
+      return canvas.toDataURL("image/jpeg", 0.78);
+    } catch (e) {
+      console.warn("Captura falló:", e);
+      return null;
+    }
+  };
   const [realesLlenos, setRealesLlenos] = useState({
     soda: "",
     b10: "",
@@ -1651,27 +1684,12 @@ function PlanillaDelDia({
     // que se cierra el día — antes eran dos acciones separadas.
     if (onCerrarDia) {
       setEnviandoCierre(true);
-      let imgData = null;
-      try {
-        const el = document.getElementById("planilla-capture");
-        if (el && window.html2canvas) {
-          const canvas = await window.html2canvas(el, {
-            scale: 1.5,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--color-background-primary").trim() || "#0f1923",
-            scrollY: 0,
-            scrollX: 0,
-            width: el.offsetWidth,
-            height: el.scrollHeight,
-            windowWidth: el.offsetWidth,
-            windowHeight: el.scrollHeight
-          });
-          imgData = canvas.toDataURL("image/jpeg", 0.78);
-        }
-      } catch (e) {
-        console.warn("Captura falló:", e);
-      }
+      // La foto YA se sacó antes de entrar a esta pantalla (ver
+      // capturarPlanillaImg / capturaPreCierre) porque acá #planilla-capture
+      // ya no existe en el DOM. Si por algún motivo no se guardó (ej.
+      // volvieron para atrás sin pasar por el botón), la intentamos sacar
+      // igual como respaldo, aunque lo más probable es que dé null.
+      const imgData = capturaPreCierre || await capturarPlanillaImg();
       const ok = await onCerrarDia(imgData);
       setEnviandoCierre(false);
       setMostrarCierre(false);
@@ -2828,11 +2846,23 @@ function PlanillaDelDia({
       color: "#e9d5ff",
       fontSize: 15,
       fontWeight: 600,
-      cursor: "pointer",
-      marginTop: 10
+      cursor: capturandoParaCierre ? "default" : "pointer",
+      marginTop: 10,
+      opacity: capturandoParaCierre ? 0.7 : 1
     },
-    onClick: () => setMostrarCierre(true)
-  }, "🔒 Cerrar el día, actualizar stock y enviar informe") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    disabled: capturandoParaCierre,
+    onClick: async () => {
+      if (capturandoParaCierre) return;
+      // Sacamos la foto de la planilla ACÁ, mientras todavía está en
+      // pantalla — si esperamos a que se abra "Cierre del día" ya es tarde,
+      // el elemento no existe más.
+      setCapturandoParaCierre(true);
+      const img = await capturarPlanillaImg();
+      setCapturaPreCierre(img);
+      setCapturandoParaCierre(false);
+      setMostrarCierre(true);
+    }
+  }, capturandoParaCierre ? "Preparando informe…" : "🔒 Cerrar el día, actualizar stock y enviar informe") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "12px",
