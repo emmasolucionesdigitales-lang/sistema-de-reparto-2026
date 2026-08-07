@@ -1191,7 +1191,12 @@ function DetalleVentasDia({
         color: pagoBadge.color,
         fontWeight: 600
       }
-    }, pagoBadge.txt)), /*#__PURE__*/React.createElement("span", {
+    }, pagoBadge.txt), v.hora && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "var(--color-text-tertiary)"
+      }
+    }, "🕐 ", v.hora)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 14,
         fontWeight: 500,
