@@ -71,6 +71,9 @@ function ListaClientes({
   const [busqueda, setBusqueda] = useState("");
   const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
+  // Auto-scroll al botón "Ver planilla del día" apenas se termina de
+  // registrar el último cliente pendiente.
+  const btnPlanillaRef = React.useRef(null);
   // ventas y noVisitas ya filtradas por fecha+dia desde App
   const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
   const noVMap = {};
@@ -91,6 +94,15 @@ function ListaClientes({
   const pendientes = [...pendientesNormales, ...volverAlFinal];
   const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
   const listos = filtrados.filter(c => atendidos.has(c.id));
+  const todosListos = pendientesNormales.length === 0 && visitados.size > 0;
+  React.useEffect(() => {
+    if (todosListos && btnPlanillaRef.current) {
+      btnPlanillaRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }
+  }, [todosListos]);
   const abrirRuta = () => {
     const cp = pendientes.filter(c => c.maps).slice(0, 9);
     if (!cp.length) {
@@ -633,7 +645,8 @@ function ListaClientes({
   }, "Sin entrega (", sinEntrega.length, ")"), sinEntrega.map(c => /*#__PURE__*/React.createElement(Card, {
     key: c.id,
     c: c
-  }))), pendientesNormales.length === 0 && visitados.size > 0 && /*#__PURE__*/React.createElement("div", {
+  }))), todosListos && /*#__PURE__*/React.createElement("div", {
+    ref: btnPlanillaRef,
     style: {
       padding: "20px 14px 8px"
     }
