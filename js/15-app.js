@@ -2222,6 +2222,7 @@ function App() {
       setDiaActual(d);
       irA("diaPrincipal");
     },
+    onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onResumen: () => irA("resumen"),
     onConfig: tab => {
       setTabConfig(tab || "precios");
@@ -2302,6 +2303,16 @@ function App() {
         transConfirmada: !v.transConfirmada,
         _upd: Date.now()
       } : v));
+    },
+    onVolver: () => irA("menu")
+  }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
+    planillas: planillas,
+    ventas: ventas,
+    clientes: clientes,
+    onSeleccionar: (fk, dia) => {
+      setDiaActual(dia);
+      setFechaActual(fk);
+      irA("planilla");
     },
     onVolver: () => irA("menu")
   }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
