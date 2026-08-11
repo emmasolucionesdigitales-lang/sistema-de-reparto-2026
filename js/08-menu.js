@@ -11,7 +11,9 @@ function MenuDias({
   onStock,
   onAgenda,
   onPromociones,
+  onPlanillaAtajo,
   onNuevoCliente,
+  planillas,
   onVolver,
   darkMode,
   onToggleDark,
@@ -675,18 +677,22 @@ function MenuDias({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: 8,
+      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      gap: 6,
       padding: "4px 0 8px"
     }
   }, [{
-    ico: "📣",
-    lbl: "Promociones",
-    fn: () => onPromociones && onPromociones()
-  }, {
     ico: "📅",
     lbl: "Agenda",
     fn: () => onAgenda && onAgenda()
+  }, {
+    ico: "📋",
+    lbl: "Planilla",
+    fn: () => onPlanillaAtajo && onPlanillaAtajo()
+  }, {
+    ico: "📣",
+    lbl: "Promociones",
+    fn: () => onPromociones && onPromociones()
   }, {
     ico: "➕",
     lbl: "Nuevo cliente",
@@ -725,22 +731,28 @@ function MenuDias({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 10,
-      paddingBottom: 4
+      gridTemplateColumns: "1fr 1fr 1fr",
+      gap: 8,
+      paddingBottom: 8
     }
   }, [{
     ico: "👥",
     lbl: "Clientes",
     fn: onGestionClientes,
     bg: "#185FA5",
-    desc: "Lista · Fiados · Agenda"
+    desc: "Lista · Fiados"
   }, {
     ico: "📦",
     lbl: "Stock",
     fn: onStock,
     bg: "#1a5e35",
-    desc: "Inventario · Resumen"
+    desc: "Inventario"
+  }, {
+    ico: "⚙️",
+    lbl: "Config",
+    fn: () => onConfig && onConfig("precios"),
+    bg: "#3a3f4b",
+    desc: "Ajustes"
   }].map(({
     ico,
     lbl,
@@ -780,49 +792,7 @@ function MenuDias({
       textAlign: "center",
       lineHeight: 1.4
     }
-  }, desc)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr",
-      gap: 10,
-      paddingBottom: 8
-    }
-  }, [{
-    ico: "⚙️",
-    lbl: "Config",
-    fn: () => onConfig && onConfig("precios")
-  }].map(({
-    ico,
-    lbl,
-    fn
-  }) => /*#__PURE__*/React.createElement("button", {
-    key: lbl,
-    onClick: fn,
-    style: {
-      display: "flex",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      padding: "12px 10px",
-      borderRadius: 12,
-      cursor: "pointer",
-      border: "none",
-      background: "var(--color-background-tertiary)",
-      color: "var(--color-text-secondary)",
-      boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 20
-    }
-  }, ico), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "var(--color-text-primary)"
-    }
-  }, lbl))))));
+  }, desc))))));
 }
 function DiaPrincipal({
   dia,
@@ -1674,9 +1644,6 @@ const guardarCapacidadFija = (pk, valorStr) => {
     b10: stock?.casa?.bidon10 || 0,
     b20: stock?.casa?.bidon20 || 0
   };
-  // Envases PRESTADOS en poder de clientes: se lee directo de c.prestado por
-  // cliente (se mantiene solo en cada venta — ver aplicarMovimientoEnvases en
-  // 16-app.js), con el cálculo por historial completo como referencia inicial.
   const enClientesActual = { soda: 0, b10: 0, b20: 0 };
   clientesReales.forEach(c => {
     ["soda", "b10", "b20"].forEach(pk => {
@@ -3289,4 +3256,129 @@ function InicioReparto({
       color: v > 0 ? "var(--color-text-primary)" : "var(--color-text-danger)"
     }
   }, v || 0))))));
+}
+
+function AtajoPlanillaSemana({
+  planillas,
+  ventas,
+  clientes,
+  onSeleccionar,
+  onVolver
+}) {
+  const DIAS_NOMBRE = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const dias5 = [];
+  const cur = new Date();
+  cur.setHours(0, 0, 0, 0);
+  while (dias5.length < 5) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) {
+      const fechaKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+      dias5.push({
+        fecha: new Date(cur),
+        fechaKey,
+        dia: DIAS_NOMBRE[dow]
+      });
+    }
+    cur.setDate(cur.getDate() - 1);
+  }
+  const ORDEN_DIA = {
+    "Lunes": 1,
+    "Martes": 2,
+    "Miércoles": 3,
+    "Jueves": 4,
+    "Viernes": 5
+  };
+  dias5.sort((a, b) => ORDEN_DIA[a.dia] - ORDEN_DIA[b.dia]);
+  return /*#__PURE__*/React.createElement("div", {
+    style: s.screen
+  }, /*#__PURE__*/React.createElement(HeaderApp, {
+    titulo: "Planilla · Últimos días",
+    onVolver: onVolver
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 4px",
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Tocá una fecha para ir directo a su planilla."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, dias5.map(({
+    fecha,
+    fechaKey,
+    dia
+  }) => {
+    const pl = (planillas || {})[`${dia}_${fechaKey}`];
+    const cerrada = !!(pl && pl._diaCerrado);
+    const iniciada = !!(pl && pl.iniciado);
+    const totalClientes = (clientes || []).filter(c => c.dia === dia).length;
+    const entregas = (ventas || []).filter(v => v.fechaKey === fechaKey).length;
+    const label = fecha.toLocaleDateString("es-AR", {
+      weekday: "short",
+      day: "numeric",
+      month: "short"
+    });
+    return /*#__PURE__*/React.createElement("button", {
+      key: fechaKey + "_" + dia,
+      onClick: () => onSeleccionar(fechaKey, dia),
+      style: {
+        ...s.card,
+        margin: 0,
+        textAlign: "left",
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "13px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 15,
+        fontWeight: 500,
+        color: "var(--color-text-primary)"
+      }
+    }, dia), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--color-text-tertiary)",
+        marginTop: 2,
+        textTransform: "capitalize"
+      }
+    }, label, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : "")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8
+      }
+    }, cerrada ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "3px 8px",
+        borderRadius: 20,
+        background: "var(--color-background-success)",
+        color: "var(--color-text-success)"
+      }
+    }, "Cerrada ✓") : iniciada ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "3px 8px",
+        borderRadius: 20,
+        background: "var(--color-background-warning)",
+        color: "var(--color-text-warning)"
+      }
+    }, "En curso") : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)"
+      }
+    }, "Sin iniciar"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--color-text-tertiary)"
+      }
+    }, "→")));
+  })));
 }

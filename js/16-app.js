@@ -2320,7 +2320,9 @@ function App() {
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
     onPromociones: () => irA("prospectos"),
+    onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onNuevoCliente: () => irA("nuevoCliente"),
+    planillas: planillas,
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),
@@ -2381,6 +2383,16 @@ function App() {
     noVisitas: noVisitas || [],
     onFiados: () => irA("fiadosPendientes"),
     onDormidos: () => irA("clientesDormidos")
+  }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
+    planillas: planillas,
+    ventas: ventas,
+    clientes: clientes,
+    onSeleccionar: (fk, dia) => {
+      setDiaActual(dia);
+      setFechaActual(fk);
+      irA("planilla");
+    },
+    onVolver: () => irA("menu")
   }), pantalla === "confirmacionesDia" && /*#__PURE__*/React.createElement(ConfirmacionesDia, {
     dia: diaActual || "todos los días",
     ventas: ventas.filter(v => v.pago === "transferencia" && (!diaActual || v.dia === diaActual)),
