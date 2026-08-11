@@ -1,3 +1,43 @@
+// Al cobrar una deuda, marca las ventas fiado más viejas del cliente como
+// pagadas (o parcialmente pagadas) en orden FIFO, hasta agotar el monto
+// cobrado. No toca ventas que no sean fiado, ni cobros/ajustes/cambios.
+function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
+  let restante = Number(monto) || 0;
+  const idsAfectados = [];
+  const cambios = {};
+  const pendientes = ventasPrev.filter(v => v.clienteId === clienteId && v.pago === "fiado" && !v._esCobro && !v._esAjuste && !v._esCambio && !v._pagada).sort((a, b) => (a.id || 0) - (b.id || 0));
+  for (const v of pendientes) {
+    if (restante <= 0) break;
+    const yaPagado = Number(v._montoPagadoAcum) || 0;
+    const debe = (Number(v.neto) || 0) - yaPagado;
+    if (debe <= 0) continue;
+    if (restante >= debe) {
+      cambios[v.id] = {
+        _pagada: true,
+        _montoPagadoAcum: Number(v.neto) || 0,
+        _upd: Date.now()
+      };
+      restante -= debe;
+    } else {
+      cambios[v.id] = {
+        _pagada: false,
+        _montoPagadoAcum: yaPagado + restante,
+        _upd: Date.now()
+      };
+      restante = 0;
+    }
+    idsAfectados.push(v.id);
+  }
+  const ventasActualizadas = ventasPrev.map(v => cambios[v.id] ? {
+    ...v,
+    ...cambios[v.id]
+  } : v);
+  return {
+    ventasActualizadas,
+    idsAfectados
+  };
+}
+
 // ════════════════════════════════════════════════════════════════════
 // ◆  usarInformes — Envío de resúmenes por email
 // ════════════════════════════════════════════════════════════════════
@@ -2222,7 +2262,6 @@ function App() {
       setDiaActual(d);
       irA("diaPrincipal");
     },
-    onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onResumen: () => irA("resumen"),
     onConfig: tab => {
       setTabConfig(tab || "precios");
@@ -2233,6 +2272,7 @@ function App() {
     onAgenda: () => irA("agenda"),
     onPromociones: () => irA("prospectos"),
     onNuevoCliente: () => irA("nuevoCliente"),
+    onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),
@@ -2305,16 +2345,6 @@ function App() {
       } : v));
     },
     onVolver: () => irA("menu")
-  }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
-    planillas: planillas,
-    ventas: ventas,
-    clientes: clientes,
-    onSeleccionar: (fk, dia) => {
-      setDiaActual(dia);
-      setFechaActual(fk);
-      irA("planilla");
-    },
-    onVolver: () => irA("menu")
   }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
     dia: diaActual,
     onIrClientes: () => {
@@ -2325,6 +2355,18 @@ function App() {
     onVolver: () => irA("menu"),
     onVerConfirmaciones: () => irA("confirmacionesDia"),
     ventasPendientesTransfer: ventas.filter(v => v.dia === diaActual && v.pago === "transferencia" && !v.transConfirmada).length
+  }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
+    planillas: planillas,
+    onSeleccionar: (fk, diaSel) => {
+      setDiaActual(diaSel);
+      setFechaActual(fk);
+      setFechaObj(new Date(fk + "T12:00:00"));
+      const plan = planillas[`${diaSel}_${fk}`];
+      const yaConfirmado = !!plan?._diaCerrado || !!localStorage.getItem(`cierre_${diaSel}_${fk}`);
+      setInitCierre(!yaConfirmado);
+      irA("planilla");
+    },
+    onVolver: () => irA("menu")
   }), pantalla === "selectorFechaPlanilla" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
@@ -2584,7 +2626,10 @@ function App() {
         _esCobro: true,
         _upd: Date.now()
       };
-      saveVentas(prev => [...prev, vt]);
+      saveVentas(prev => {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cl.id, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+      });
       saveClientes(prev => prev.map(x => x.id === cl.id ? {
         ...x,
         saldo: (Number(x.saldo) || 0) + monto
@@ -2918,7 +2963,10 @@ function App() {
           _esCobro: true,
           _upd: Date.now()
         };
-        saveVentas(prev => [...prev, vt]);
+        saveVentas(prev => {
+          const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cliente.id, monto);
+          return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+        });
         saveClientes(prev => prev.map(x => x.id === cliente.id ? {
           ...x,
           saldo: (Number(x.saldo) || 0) + monto
@@ -3008,7 +3056,10 @@ function App() {
         _esCobro: true,
         _upd: Date.now()
       };
-      saveVentas(prev => [...prev, vt]);
+      saveVentas(prev => {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, c.id, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+      });
       saveClientes(prev => prev.map(x => x.id === c.id ? {
         ...x,
         saldo: (Number(x.saldo) || 0) + monto
