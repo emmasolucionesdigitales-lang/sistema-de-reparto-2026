@@ -1,5 +1,10 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  04-utils.js — debounceSave · useLS · calcVenta · comprimirFoto
+// ◆  04-utils.js — funciones puras / helpers de datos (SIN JSX):
+//    direccionCliente, KEY_PROD_ENV, prestadoClienteDe, debounceSave, useLS,
+//    s (estilos), calcVenta, comprimirFoto, buscarCliente, helpers de merge
+//    para sync en la nube, extraerCoordsDeURL.
+//    Los componentes de UI compartidos (PieEnvases, FormCliente, HeaderApp,
+//    CambioEnvasePanel, FotoClienteModal, etc.) están en 05-componentes.js.
 // ════════════════════════════════════════════════════════════════════
 
 // cloudSave and cloudLoad are defined in the <script> tag above via Firebase SDK
@@ -26,10 +31,39 @@ function direccionCliente(c) {
   return partes.join(" · ");
 }
 
+const KEY_PROD_ENV = {
+  "Sifón 1.5L": "sifon",
+  "Bidón 10L": "bidon10",
+  "Bidón 20L": "bidon20",
+  "Dispenser": "dispenser"
+};
+// ── Cuánto tiene PRESTADO un cliente de un producto ("sifon"|"bidon10"|
+//    "bidon20"|"dispenser"). Para sifón/bidón10/bidón20 se lee directo de
+//    c.prestado (campo que se mantiene solo, sumando/restando en cada venta
+//    — ver aplicarMovimientoEnvases en 16-app.js). Si el cliente todavía no
+//    tiene ese campo, o es dispenser (que no tiene campo directo), se
+//    calcula del historial de ventas de ese cliente + el ajuste manual
+//    (c.envAjuste). Usar SIEMPRE esta función en vez de recalcular a mano
+//    — así todas las pantallas muestran el mismo número.
+function prestadoClienteDe(c, k, ventasHistoricas) {
+  if (k !== "dispenser" && c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
+  let n = 0;
+  (ventasHistoricas || []).forEach(v => {
+    if (v.clienteId !== c.id) return;
+    (v.envPrest || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n += Number(e.cant) || 0;
+    });
+    (v.envDev || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n -= Number(e.cant) || 0;
+    });
+  });
+  return Math.max(0, n + (Number(c.envAjuste?.[k]) || 0));
+}
 
-// Debounce save — espera 1.5s después del último cambio antes de guardar
-let _saveTimer = null;
-let _saveQueue = null;
+// Debounce save — espera 1.5s después del último cambio antes de guardar.
+// _saveTimer/_saveQueue están declarados en 02-constantes.js (se comparten,
+// mismo alcance global; declararlos también acá tiraba SyntaxError de
+// identificador duplicado).
 function debounceSave(fn) {
   _saveQueue = fn;
   if (_saveTimer) clearTimeout(_saveTimer);
@@ -316,7 +350,6 @@ function comprimirFoto(file, maxW = 800, quality = 0.75) {
     r.readAsDataURL(file);
   });
 }
-
 // ════════════════════════════════════════════════════════════════════
 // ◆  buscarCliente — búsqueda UNIFICADA priorizando el DOMICILIO
 //    2 = coincide el domicilio · 1 = nombre/tel/notas · 0 = no coincide
@@ -331,590 +364,6 @@ function buscarCliente(c, q) {
   if ((c.notas || "").toLowerCase().includes(t)) return 1;
   return 0;
 }
-
-// ════════════════════════════════════════════════════════════════════
-// ◆  PieEnvases — pie de tarjeta de cliente UNIFICADO (todas las listas)
-//    Botón ♻️ Envases + botones propios de cada pantalla + panel con Confirmar.
-//    Guarda SIEMPRE en c.envAjuste (mecanismo único).
-//    Uso: <PieEnvases c={c} ventas={ventas} onEditar={(id,cambios)=>...}
-//           izquierda={<botón opcional/>}> {botones derecha opcionales} </PieEnvases>
-// ════════════════════════════════════════════════════════════════════
-function PieEnvases({
-  c,
-  ventas,
-  onEditar,
-  izquierda,
-  children
-}) {
-  const KEYS = ["sifon", "bidon10", "bidon20", "dispenser"];
-  const KP = {
-    "Sifón 1.5L": "sifon",
-    "Bidón 10L": "bidon10",
-    "Bidón 20L": "bidon20",
-    "Dispenser": "dispenser"
-  };
-  const [draft, setDraft] = React.useState(null); // null = panel cerrado
-  const calcExtra = () => {
-    const ex = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
-    };
-    (ventas || []).filter(v => v.clienteId === c.id).forEach(v => {
-      (v.envPrest || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) ex[k] += Number(e.cant) || 0;
-      });
-      (v.envDev || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) ex[k] -= Number(e.cant) || 0;
-      });
-    });
-    return ex;
-  };
-  const abrir = () => {
-    const ex = calcExtra(),
-      aj = c.envAjuste || {};
-    setDraft({
-      fijos: Object.fromEntries(KEYS.map(k => [k, Number(c[k]) || 0])),
-      prest: Object.fromEntries(KEYS.map(k => [k, (ex[k] || 0) + (aj[k] || 0)]))
-    });
-  };
-  const confirmar = () => {
-    const ex = calcExtra();
-    onEditar(c.id, {
-      ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.fijos[k])])),
-      envAjuste: Object.fromEntries(KEYS.map(k => [k, draft.prest[k] - (ex[k] || 0)]))
-    });
-    setDraft(null);
-  };
-  const abierto = !!draft;
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexWrap: "wrap",
-      alignItems: "center",
-      gap: 6,
-      marginTop: 10,
-      borderTop: "0.5px solid var(--color-border-tertiary)",
-      paddingTop: 8
-    }
-  }, izquierda || null, /*#__PURE__*/React.createElement("button", {
-    style: {
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "5px 12px",
-      borderRadius: 20,
-      cursor: "pointer",
-      background: abierto ? "var(--color-background-warning)" : "var(--color-background-tertiary)",
-      color: abierto ? "var(--color-text-warning)" : "var(--color-text-secondary)",
-      border: abierto ? "1px solid var(--color-border-warning)" : "0.5px solid var(--color-border-secondary)"
-    },
-    onClick: e => {
-      e.stopPropagation();
-      abierto ? setDraft(null) : abrir();
-    }
-  }, "♻️ Envases"), children), abierto && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 8,
-      background: "var(--color-background-tertiary)",
-      borderRadius: 8,
-      padding: "8px 10px"
-    },
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "82px 1fr 1fr 1fr 1fr",
-      gap: 4,
-      fontSize: 10,
-      color: "var(--color-text-tertiary)",
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Sifón"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "10L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "20L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Disp")), [["fijos", "🏠 Fijos"], ["prest", "📦 Prestados"]].map(([t, l]) => /*#__PURE__*/React.createElement("div", {
-    key: t,
-    style: {
-      display: "grid",
-      gridTemplateColumns: "82px 1fr 1fr 1fr 1fr",
-      gap: 4,
-      alignItems: "center",
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: t === "prest" ? "var(--color-text-warning)" : "var(--color-text-secondary)"
-    }
-  }, l), KEYS.map(k => /*#__PURE__*/React.createElement("input", {
-    key: k,
-    type: "number",
-    value: draft[t][k],
-    onChange: e => {
-      const n = Math.round(Number(e.target.value) || 0);
-      setDraft(d => ({
-        ...d,
-        [t]: {
-          ...d[t],
-          [k]: n
-        }
-      }));
-    },
-    style: {
-      ...s.inputNum,
-      padding: "6px 2px",
-      fontSize: 14,
-      textAlign: "center",
-      fontWeight: t === "prest" && draft[t][k] !== 0 ? 600 : 400,
-      color: t === "prest" ? draft[t][k] > 0 ? "var(--color-text-warning)" : draft[t][k] < 0 ? "var(--color-text-success)" : "var(--color-text-primary)" : "var(--color-text-primary)"
-    }
-  })))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "var(--color-text-tertiary)",
-      margin: "2px 0 6px"
-    }
-  }, "Prestados = total extra que tiene hoy · 0 = devolvió todo"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      flex: 1,
-      fontSize: 12
-    },
-    onClick: e => {
-      e.stopPropagation();
-      setDraft(null);
-    }
-  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      flex: 2,
-      background: "#1d9e75",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "9px",
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer"
-    },
-    onClick: e => {
-      e.stopPropagation();
-      confirmar();
-    }
-  }, "✓ Confirmar"))));
-}
-
-// ════════════════════════════════════════════════════════════════════
-// ◆  FormCliente — formulario de cliente UNIFICADO (crear y editar)
-//    Usado en: Nuevo cliente, Editar desde el perfil, Editar en Gestión.
-//    Los envases prestados NO van acá: se editan con ♻️ Envases (PieEnvases).
-// ════════════════════════════════════════════════════════════════════
-function FormCliente({
-  inicial,
-  onGuardar,
-  onEliminarCliente,
-  textoGuardar
-}) {
-  const [datos, setDatos] = React.useState({
-    ...(inicial || {})
-  });
-  const set = (k, v) => setDatos(d => ({
-    ...d,
-    [k]: v
-  }));
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: s.grid2
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Día de reparto"), /*#__PURE__*/React.createElement("select", {
-    style: s.select,
-    value: datos.dia || "Martes",
-    onChange: e => set("dia", e.target.value)
-  }, DIAS.map(d => /*#__PURE__*/React.createElement("option", {
-    key: d,
-    value: d
-  }, d)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Número de orden"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    type: "number",
-    min: 1,
-    placeholder: "ej: 5",
-    value: datos.orden || "",
-    onChange: e => set("orden", Number(e.target.value) || "")
-  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Nombre y apellido *"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Nombre completo",
-    value: datos.nombre || "",
-    onChange: e => set("nombre", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", {
-    style: s.grid2
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Barrio"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Barrio",
-    value: datos.barrio || "",
-    onChange: e => set("barrio", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Sector"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Sector",
-    value: datos.sector || "",
-    onChange: e => set("sector", e.target.value)
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: s.grid3
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Manzana"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Mz",
-    value: datos.manzana || "",
-    onChange: e => set("manzana", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Lote"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Lote",
-    value: datos.lote || "",
-    onChange: e => set("lote", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Casa/Dpto"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Casa",
-    value: datos.aclaracion || "",
-    onChange: e => set("aclaracion", e.target.value)
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: s.grid2
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Calle"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Calle",
-    value: datos.calle || "",
-    onChange: e => set("calle", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Número"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Nro",
-    value: datos.nro || "",
-    onChange: e => set("nro", e.target.value)
-  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Teléfono (sin 0 ni 15)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "3816559000",
-    value: datos.telefono || "",
-    onChange: e => set("telefono", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Link Google Maps"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "https://maps.app.goo.gl/...",
-    value: datos.maps || "",
-    onChange: e => set("maps", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Link foto del domicilio (Google Drive, etc)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "https://...",
-    value: datos.foto || "",
-    onChange: e => set("foto", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Notas rápidas (timbre roto, perro, cobrar deuda, etc.)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "ej: timbre roto, cobrar $2000...",
-    value: datos.notas || "",
-    onChange: e => set("notas", e.target.value)
-  })), /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      marginTop: 4
-    }
-  }, "Envases habituales asignados"), /*#__PURE__*/React.createElement("div", {
-    style: s.grid3
-  }, [["sifon", "Sifón"], ["bidon10", "Bidón 10L"], ["bidon20", "Bidón 20L"]].map(([k, l]) => /*#__PURE__*/React.createElement("div", {
-    key: k
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      textAlign: "center"
-    }
-  }, l), /*#__PURE__*/React.createElement("input", {
-    style: {
-      ...s.input,
-      textAlign: "center"
-    },
-    type: "number",
-    min: 0,
-    value: datos[k] || 0,
-    onChange: e => set(k, Number(e.target.value))
-  })))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Dispenser en comodato"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      padding: "5px 14px",
-      fontSize: 18,
-      lineHeight: 1
-    },
-    onClick: () => set("dispenser", Math.max(0, (datos.dispenser || 0) - 1))
-  }, "−"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18,
-      fontWeight: 500,
-      minWidth: 28,
-      textAlign: "center",
-      color: "var(--color-text-primary)"
-    }
-  }, datos.dispenser || 0), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      padding: "5px 14px",
-      fontSize: 18,
-      lineHeight: 1
-    },
-    onClick: () => set("dispenser", (datos.dispenser || 0) + 1)
-  }, "+"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-secondary)"
-    }
-  }, "unidades"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-tertiary)"
-    }
-  }, "💡 Los envases prestados (extra) se ajustan con el botón ♻️ Envases."), /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...s.card,
-      margin: "4px 0",
-      background: "var(--color-background-tertiary)",
-      padding: "10px 12px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 500,
-      color: "var(--color-text-secondary)",
-      marginBottom: 8
-    }
-  }, "Saldo del cliente"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 6
-    }
-  }, [["favor", "A favor"], ["deuda", "Debe"], ["cero", "Sin saldo"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
-    key: v,
-    style: {
-      flex: 1,
-      fontSize: 11,
-      padding: "6px 4px",
-      borderRadius: 8,
-      border: "0.5px solid var(--color-border-secondary)",
-      cursor: "pointer",
-      background: datos._tipoSaldo === v ? "#185FA5" : "var(--color-background-secondary)",
-      color: datos._tipoSaldo === v ? "#e2eaf4" : "var(--color-text-secondary)"
-    },
-    onClick: () => set("_tipoSaldo", v)
-  }, l))), datos._tipoSaldo && datos._tipoSaldo !== "cero" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, datos._tipoSaldo === "favor" ? "Monto a favor ($)" : "Monto que debe ($)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    type: "number",
-    min: 0,
-    placeholder: "0",
-    value: datos._montoSaldo || "",
-    onChange: e => set("_montoSaldo", e.target.value)
-  })), (datos.saldo || 0) !== 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: datos.saldo < 0 ? "var(--color-text-danger)" : "var(--color-text-success)",
-      marginTop: 4
-    }
-  }, "Saldo actual: ", fmt(datos.saldo), " · ", datos.saldo < 0 ? "Debe" : "A favor"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 6
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "O ingresá el saldo directamente (−negativo = debe · +positivo = a favor)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    type: "number",
-    placeholder: "ej: -2500 o 1800",
-    value: datos._saldoDirecto ?? "",
-    onChange: e => set("_saldoDirecto", e.target.value)
-  }))), datos.foto && /*#__PURE__*/React.createElement("img", {
-    src: datos.foto,
-    alt: "Domicilio",
-    style: {
-      width: "100%",
-      borderRadius: 8,
-      maxHeight: 160,
-      objectFit: "cover"
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btnPrimary,
-      marginTop: 4,
-      opacity: !datos.nombre ? 0.45 : 1
-    },
-    disabled: !datos.nombre,
-    onClick: () => {
-      let saldo = datos.saldo || 0;
-      if (datos._tipoSaldo === "favor") saldo = Math.abs(Number(datos._montoSaldo) || 0);
-      if (datos._tipoSaldo === "deuda") saldo = -Math.abs(Number(datos._montoSaldo) || 0);
-      if (datos._tipoSaldo === "cero") saldo = 0;
-      if (datos._saldoDirecto !== undefined && datos._saldoDirecto !== "") saldo = Number(datos._saldoDirecto);
-      onGuardar({
-        ...datos,
-        saldo
-      });
-    }
-  }, textoGuardar || "Guardar cliente"), onEliminarCliente && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 16,
-      paddingTop: 12,
-      borderTop: "0.5px solid var(--color-border-tertiary)"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btnDanger,
-      width: "100%",
-      padding: "10px",
-      fontSize: 13
-    },
-    onClick: () => {
-      if (window.confirm(`¿Eliminar a ${datos.nombre}? Se borrarán también todas sus ventas.`)) onEliminarCliente();
-    }
-  }, "Eliminar cliente permanentemente")));
-}
-
-// ════════════════════════════════════════════════════════════════════
-// ◆  HeaderBotones / HeaderApp — encabezado estándar: "Empresa · Pantalla"
-//    + sol/M adentro del recuadro, sin pedir props de tema (usa window._setDarkModeLC/_setScaleIdxLC)
-// ════════════════════════════════════════════════════════════════════
-const SCALE_LABELS_LC = ["S", "M", "L", "XL"];
-function HeaderBotones() {
-  const [darkMode, setDarkModeLocal] = React.useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("sr_darkmode") || "false");
-    } catch {
-      return false;
-    }
-  });
-  const [scaleIdx, setScaleIdxLocal] = React.useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("sr_scale_v1") || "1");
-    } catch {
-      return 1;
-    }
-  });
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      const nv = !darkMode;
-      setDarkModeLocal(nv);
-      if (window._setDarkModeLC) window._setDarkModeLC(nv);
-    },
-    style: {
-      padding: "6px 10px",
-      borderRadius: 8,
-      border: "none",
-      background: "var(--color-background-tertiary)",
-      color: "var(--color-text-secondary)",
-      fontSize: 14,
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0
-    },
-    title: "Cambiar tema"
-  }, darkMode ? "☀️" : "🌙"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      const nv = (scaleIdx + 1) % 4;
-      setScaleIdxLocal(nv);
-      if (window._setScaleIdxLC) window._setScaleIdxLC(nv);
-    },
-    style: {
-      padding: "6px 10px",
-      borderRadius: 8,
-      border: "none",
-      background: "var(--color-background-tertiary)",
-      color: "var(--color-text-secondary)",
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0
-    },
-    title: "Tamaño de texto"
-  }, SCALE_LABELS_LC[scaleIdx]));
-}
-function HeaderApp({
-  titulo,
-  onVolver
-}) {
-  const negocio = localStorage.getItem("sr_negocio_nombre") || "Sistema de Reparto";
-  return /*#__PURE__*/React.createElement("div", {
-    style: s.header
-  }, /*#__PURE__*/React.createElement("button", {
-    style: s.backBtn,
-    onClick: onVolver
-  }, "← Volver"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      ...s.headerTitle,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      cursor: "pointer"
-    },
-    onClick: () => window._lcIrInicio && window._lcIrInicio(),
-    title: "Ir al inicio"
-  }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(HeaderBotones, null));
-}
-
 // ════════════════════════════════════════════════════════════════════
 // ◆  Helpers de guardado seguro — evitan que un guardado pise cambios
 //    que llegaron de otro dispositivo (PC/móvil) segundos antes.
@@ -1054,3 +503,32 @@ function mergePorClavesCambiadas(prevLocal, nuevoLocal, cloudObj) {
   });
   return resultado;
 }
+// ── Extrae coordenadas {lat,lng} de un link de Google Maps (varios formatos
+//    posibles: @lat,lng · !3dlat!4dlng · ?q=/?ll=/?destination= · lat,lng
+//    sueltos). Usar SIEMPRE esta función en vez de parsear el link a mano.
+function extraerCoordsDeURL(url) {
+  if (!url || typeof url !== "string") return null;
+  let m;
+  m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return {
+    lat: +m[1],
+    lng: +m[2]
+  };
+  m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (m) return {
+    lat: +m[1],
+    lng: +m[2]
+  };
+  m = url.match(/[?&](?:q|ll|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return {
+    lat: +m[1],
+    lng: +m[2]
+  };
+  m = url.match(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})/);
+  if (m) return {
+    lat: +m[1],
+    lng: +m[2]
+  };
+  return null;
+}
+

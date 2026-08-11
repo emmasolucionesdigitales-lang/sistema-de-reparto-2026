@@ -48,28 +48,6 @@ function TagsCliente({
     fontWeight: 700,
     display: "inline-block"
   };
-  const ex = {
-    sifon: 0,
-    b10: 0,
-    b20: 0
-  };
-  (ventas || []).filter(v => v.clienteId === cl.id).forEach(v => {
-    (v.envPrest || []).forEach(e => {
-      if (e.prod === "Sifón 1.5L") ex.sifon += Number(e.cant) || 0;
-      if (e.prod === "Bidón 10L") ex.b10 += Number(e.cant) || 0;
-      if (e.prod === "Bidón 20L") ex.b20 += Number(e.cant) || 0;
-    });
-    (v.envDev || []).forEach(e => {
-      if (e.prod === "Sifón 1.5L") ex.sifon -= Number(e.cant) || 0;
-      if (e.prod === "Bidón 10L") ex.b10 -= Number(e.cant) || 0;
-      if (e.prod === "Bidón 20L") ex.b20 -= Number(e.cant) || 0;
-    });
-  });
-  // Sumar el ajuste manual (editor rápido ♻️ Envases) para que la etiqueta refleje el total real
-  const aj = cl.envAjuste || {};
-  ex.sifon += Number(aj.sifon) || 0;
-  ex.b10 += Number(aj.bidon10) || 0;
-  ex.b20 += Number(aj.bidon20) || 0;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -79,9 +57,9 @@ function TagsCliente({
     }
   }, (() => {
     const real = {
-      sifon: Math.max(0, (Number(cl.sifon) || 0) + ex.sifon),
-      b10: Math.max(0, (Number(cl.bidon10) || 0) + ex.b10),
-      b20: Math.max(0, (Number(cl.bidon20) || 0) + ex.b20)
+      sifon: Math.max(0, (Number(cl.sifon) || 0) + prestadoClienteDe(cl, "sifon", ventas)),
+      b10: Math.max(0, (Number(cl.bidon10) || 0) + prestadoClienteDe(cl, "bidon10", ventas)),
+      b20: Math.max(0, (Number(cl.bidon20) || 0) + prestadoClienteDe(cl, "bidon20", ventas))
     };
     return /*#__PURE__*/React.createElement(React.Fragment, null, real.sifon > 0 && /*#__PURE__*/React.createElement("span", {
       style: TH

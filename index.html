@@ -151,7 +151,7 @@
     // (datos/main) se deja de escribir, pero se lee UNA vez para migrar
     // solo, si un negocio todavía no tiene nada en el formato nuevo.
     // ════════════════════════════════════════════════════════════════
-    const SR_LISTAS = ["clientes","ventas","productos","recordatorios","noVisitas","perdidas","prospectos"];
+    const SR_LISTAS = ["clientes","ventas","productos","recordatorios","noVisitas","perdidas"];
     const SR_MAPAS  = { planillas:"planillas", stock:"stock", cargasDia:"cargasDia", zonasReparto:"zonasReparto", mantVeh:"mantVeh", histPrecios:"histPrecios" };
     const SR_CONFIG_KEYS = ["horaAvisoCierre","horasAvisoTrans","diasAvisoMant"];
     const SR_ID_FN = { noVisitas: v => `${v.clienteId}_${v.dia}_${v.fecha}` };
@@ -306,17 +306,18 @@
   <script src="js/02-constantes.js?v=20260718precompiled"></script>
   <script src="js/03-tags.js?v=20260718precompiled"></script>
   <script src="js/04-utils.js?v=20260718precompiled"></script>
-  <script src="js/05-portada.js?v=20260718precompiled"></script>
-  <script src="js/06-stock.js?v=20260718precompiled"></script>
-  <script src="js/07-menu.js?v=20260718precompiled"></script>
-  <script src="js/08-clientes.js?v=20260718precompiled"></script>
-  <script src="js/09-ventas.js?v=20260718precompiled"></script>
-  <script src="js/10-promocion.js?v=20260718precompiled"></script>
-  <script src="js/11-gestion.js?v=20260718precompiled"></script>
-  <script src="js/12-resumen.js?v=20260718precompiled"></script>
-  <script src="js/13-config.js?v=20260718precompiled"></script>
-  <script src="js/14-agenda.js?v=20260718precompiled"></script>
-  <script src="js/15-app.js?v=20260718precompiled"></script>
+  <script src="js/05-componentes.js?v=20260718precompiled"></script>
+  <script src="js/06-portada.js?v=20260718precompiled"></script>
+  <script src="js/07-stock.js?v=20260718precompiled"></script>
+  <script src="js/08-menu.js?v=20260718precompiled"></script>
+  <script src="js/09-clientes.js?v=20260718precompiled"></script>
+  <script src="js/10-ventas.js?v=20260718precompiled"></script>
+  <script src="js/11-promocion.js?v=20260718precompiled"></script>
+  <script src="js/12-gestion.js?v=20260718precompiled"></script>
+  <script src="js/13-resumen.js?v=20260718precompiled"></script>
+  <script src="js/14-config.js?v=20260718precompiled"></script>
+  <script src="js/15-agenda.js?v=20260718precompiled"></script>
+  <script src="js/16-app.js?v=20260718precompiled"></script>
 
   <!-- Render -->
   <script>
