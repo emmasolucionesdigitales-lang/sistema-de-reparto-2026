@@ -146,7 +146,7 @@ function usarInformes({
 }
 
 // ════════════════════════════════════════════════════════════════════
-// ◆  16-app.js — Componente App principal
+// ◆  15-app.js — Componente App principal
 // ════════════════════════════════════════════════════════════════════
 
 // KEY_PROD_ENV y prestadoClienteDe están definidos en 04-utils.js (se

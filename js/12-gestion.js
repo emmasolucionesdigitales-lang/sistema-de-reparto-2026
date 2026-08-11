@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  12-gestion.js — GestionClientes · FormCliente
+// ◆  11-gestion.js — GestionClientes · FormCliente
 //    TABS: Lista · Fiados · Agenda · Importar Excel
 // ════════════════════════════════════════════════════════════════════
 

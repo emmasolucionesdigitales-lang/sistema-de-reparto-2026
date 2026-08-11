@@ -1,9 +1,9 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  14-config.js — Config · EnviarResumenEC
+// ◆  13-config.js — Config · EnviarResumenEC
 // ════════════════════════════════════════════════════════════════════
 
 // ── Tarjeta de seguridad: activar/desactivar acceso con huella ──
-// Usa las funciones que ya viven en 06-portada.js (bioSoportado, bioRegistrar, etc.)
+// Usa las funciones que ya viven en 05-portada.js (bioSoportado, bioRegistrar, etc.)
 function SeguridadHuella() {
   const soportado = typeof bioSoportado === "function" ? bioSoportado() : false;
   const [enrolado, setEnrolado] = React.useState(typeof bioEnrolado === "function" ? bioEnrolado() : false);
@@ -22,7 +22,7 @@ function SeguridadHuella() {
     setTrabajando(false);
   };
   const desactivar = () => {
-    // "sr_bio_cred" es la misma clave que usa 06-portada.js (SR_BIO_KEY)
+    // "sr_bio_cred" es la misma clave que usa 05-portada.js (SR_BIO_KEY)
     try {
       localStorage.removeItem("sr_bio_cred");
       localStorage.removeItem("sr_bio_no");

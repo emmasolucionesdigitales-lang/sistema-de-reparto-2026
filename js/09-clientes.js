@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  09-clientes.js — ListaClientes, DetalleCliente, EditCliente
+// ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
 // Barra de pestañas del hub de Clientes (Todos · Fiados · Dormidos · Mapa)

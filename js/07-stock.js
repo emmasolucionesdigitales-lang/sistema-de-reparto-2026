@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  07-stock.js — StockGeneral · ConfirmacionesDia
+// ◆  06-stock.js — StockGeneral · ConfirmacionesDia
 // ════════════════════════════════════════════════════════════════════
 
 function StockGeneral({
@@ -106,7 +106,7 @@ function StockGeneral({
 
   // Prestado EXTRA (más allá de lo fijo) — para sifón/bidón10/bidón20 se lee
   // directo de c.prestado (se mantiene solo, ver aplicarMovimientoEnvases en
-  // 16-app.js); dispenser sigue calculándose del historial + ajuste manual.
+  // 15-app.js); dispenser sigue calculándose del historial + ajuste manual.
   const totPrestados = {
     sifon: 0,
     bidon10: 0,

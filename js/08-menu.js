@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  08-menu.js — MenuDias · DiaPrincipal · PlanillaDelDia · InicioReparto
+// ◆  07-menu.js — MenuDias · DiaPrincipal · PlanillaDelDia · InicioReparto
 // ════════════════════════════════════════════════════════════════════
 
 function MenuDias({
@@ -1656,7 +1656,6 @@ const guardarCapacidadFija = (pk, valorStr) => {
     paraLlenarCalc[pk] = Math.min(falta, vaciosHoy);
     vaciosRestoCalc[pk] = Math.max(0, vaciosHoy - paraLlenarCalc[pk]);
   });
-
   // ── Checksum "cuadra con el fijo": el stock TOTAL de la empresa (sodería +
   //    camión + depósito + clientes fijos + clientes prestados) tiene que
   //    dar siempre la misma capacidad fija — si no cuadra, algo se perdió o
@@ -1664,11 +1663,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
   //    (con el total actual) la primera vez que se usa esta pantalla, y de
   //    ahí en más queda fija — se puede corregir a mano desde Config.
   const clientesReales = clientes || [];
-  const totClientesFijos = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
+  const totClientesFijos = { soda: 0, b10: 0, b20: 0 };
   clientesReales.forEach(c => {
     totClientesFijos.soda += Number(c.sifon) || 0;
     totClientesFijos.b10 += Number(c.bidon10) || 0;
@@ -1682,11 +1677,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
   // Envases PRESTADOS en poder de clientes: se lee directo de c.prestado por
   // cliente (se mantiene solo en cada venta — ver aplicarMovimientoEnvases en
   // 16-app.js), con el cálculo por historial completo como referencia inicial.
-  const enClientesActual = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
+  const enClientesActual = { soda: 0, b10: 0, b20: 0 };
   clientesReales.forEach(c => {
     ["soda", "b10", "b20"].forEach(pk => {
       const sk = planKeyToStockKey[pk];

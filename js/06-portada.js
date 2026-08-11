@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  06-portada.js — Portada · fechas · SelectorFecha · SyncBar · SetupNube
+// ◆  05-portada.js — Portada · fechas · SelectorFecha · SyncBar · SetupNube
 // ════════════════════════════════════════════════════════════════════
 
 function Portada({

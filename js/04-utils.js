@@ -40,7 +40,7 @@ const KEY_PROD_ENV = {
 // ── Cuánto tiene PRESTADO un cliente de un producto ("sifon"|"bidon10"|
 //    "bidon20"|"dispenser"). Para sifón/bidón10/bidón20 se lee directo de
 //    c.prestado (campo que se mantiene solo, sumando/restando en cada venta
-//    — ver aplicarMovimientoEnvases en 16-app.js). Si el cliente todavía no
+//    — ver aplicarMovimientoEnvases en 15-app.js). Si el cliente todavía no
 //    tiene ese campo, o es dispenser (que no tiene campo directo), se
 //    calcula del historial de ventas de ese cliente + el ajuste manual
 //    (c.envAjuste). Usar SIEMPRE esta función en vez de recalcular a mano
@@ -60,10 +60,9 @@ function prestadoClienteDe(c, k, ventasHistoricas) {
   return Math.max(0, n + (Number(c.envAjuste?.[k]) || 0));
 }
 
-// Debounce save — espera 1.5s después del último cambio antes de guardar.
-// _saveTimer/_saveQueue están declarados en 02-constantes.js (se comparten,
-// mismo alcance global; declararlos también acá tiraba SyntaxError de
-// identificador duplicado).
+// Debounce save — espera 1.5s después del último cambio antes de guardar
+// (_saveTimer/_saveQueue ya están declarados en 02-constantes.js, que carga
+// antes; declararlos de nuevo acá duplica el identificador y rompe el load).
 function debounceSave(fn) {
   _saveQueue = fn;
   if (_saveTimer) clearTimeout(_saveTimer);

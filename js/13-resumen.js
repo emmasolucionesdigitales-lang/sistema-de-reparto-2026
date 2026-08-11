@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  13-resumen.js — Resumen · exportar · importar · CalculadoraCostoReal
+// ◆  12-resumen.js — Resumen · exportar · importar · CalculadoraCostoReal
 // ════════════════════════════════════════════════════════════════════
 
 function Resumen({
