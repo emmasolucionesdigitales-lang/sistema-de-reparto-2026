@@ -2041,7 +2041,50 @@ const guardarCapacidadFija = (pk, valorStr) => {
     style: { border: "none", background: "none", color: "var(--color-text-info)", fontSize: 10, textDecoration: "underline", cursor: "pointer", padding: 0 },
     onClick: () => setEditandoCapFija(pk)
   }, `${div(CAPACIDAD_FIJA[pk])} ${unidad} (editar)`)));
-})), /*#__PURE__*/React.createElement("div", {
+})), (() => {
+  // La sodería NO tiene una capacidad fija propia — lo único que importa acá
+  // es si lo que va a quedar disponible alcanza para la salida de MAÑANA
+  // (según lo que realmente se cargó ese día la última vez, ver cargasDia).
+  // Esto es un aviso aparte, no reemplaza los checksums de arriba.
+  const filasManana = ["soda", "b10", "b20"].map((pk, i) => {
+    const label = ["Soda", "Bidón 10L", "Bidón 20L"][i];
+    const cajon = pk === "soda" ? CAJON_SODA : 1;
+    const unidad = pk === "soda" ? "cajones" : "unidades";
+    const div = n => pk === "soda" ? Math.floor(n / cajon) : n;
+    const sk = planKeyToStockKey[pk];
+    const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon : sobrantes[pk];
+    const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
+    const quedaLleno = (soderiaActual[sk] || 0) + llenReal;
+    const disponibleManana = quedaLleno + paraLlenarReal;
+    const necesario = necesarioManana[pk] || 0;
+    const alcanza = disponibleManana >= necesario;
+    return { pk, label, div, unidad, disponibleManana, necesario, alcanza };
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 4 }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { ...s.sectionTitle, padding: "0 0 8px" }
+  }, "¿ALCANZA PARA SALIR MAÑANA?"), /*#__PURE__*/React.createElement("div", {
+    style: { ...s.card, margin: "0 0 8px", padding: "10px 12px" }
+  }, filasManana.map(f => /*#__PURE__*/React.createElement("div", {
+    key: f.pk,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "5px 0",
+      borderTop: f.pk !== "soda" ? "0.5px solid var(--color-border-tertiary)" : "none"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 12, color: "var(--color-text-primary)" }
+  }, f.label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: f.alcanza ? "var(--color-text-success)" : "var(--color-text-danger)"
+    }
+  }, f.alcanza ? `✓ Alcanza (${f.div(f.disponibleManana)} de ${f.div(f.necesario)} ${f.unidad})` : `⚠ Faltan ${f.div(f.necesario - f.disponibleManana)} ${f.unidad}`)))));
+})(), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8,
