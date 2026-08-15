@@ -1674,7 +1674,12 @@ const guardarCapacidadFija = (pk, valorStr) => {
     ["soda", "b10", "b20"].forEach(pk => {
       const sk = planKeyToStockKey[pk];
       const CAJON_F = pk === "soda" ? CAJON_SODA : 1;
-      const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * CAJON_F : sobrantes[pk];
+      // Si el cajón de soda quedó a medio vender, los sifones sueltos que le
+      // quedan siguen llenos — no se pierden solo porque no llenan un cajón
+      // entero. Se suman siempre, tanto si el usuario dejó el cálculo como
+      // si tipeó la cantidad de cajones a mano.
+      const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON_SODA : 0;
+      const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * CAJON_F + sueltosLL : sobrantes[pk];
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * CAJON_F : paraLlenarCalc[pk] * CAJON_F;
       const vacReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * CAJON_F : vaciosRestoCalc[pk] * CAJON_F;
       // "Para llenar" se llena antes de salir mañana — para el stock ya
@@ -1940,7 +1945,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
             textAlign: "center",
             marginBottom: 3
           }
-        }, "calc. ", calc), /*#__PURE__*/React.createElement("input", {
+        }, "calc. ", calc, tipo === "llenos" && pk === "soda" && sobrantes[pk] % CAJON_SODA > 0 ? ` (+${sobrantes[pk] % CAJON_SODA} suelto lleno)` : ""), /*#__PURE__*/React.createElement("input", {
           type: "number",
           min: 0,
           value: stateObj[pk],
@@ -1983,7 +1988,8 @@ const guardarCapacidadFija = (pk, valorStr) => {
   const div = n => pk === "soda" ? Math.floor(n / cajon) : n;
   const sk = planKeyToStockKey[pk];
   const AZUL = "#5daaff", AMBAR = "#f5b942", VIOLETA = "#b794f6";
-  const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon : sobrantes[pk];
+  const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON_SODA : 0;
+  const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : sobrantes[pk];
   const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
   const vacReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : vaciosRestoCalc[pk] * cajon;
   const esperado = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
@@ -2052,7 +2058,8 @@ const guardarCapacidadFija = (pk, valorStr) => {
     const unidad = pk === "soda" ? "cajones" : "unidades";
     const div = n => pk === "soda" ? Math.floor(n / cajon) : n;
     const sk = planKeyToStockKey[pk];
-    const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon : sobrantes[pk];
+    const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON_SODA : 0;
+  const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : sobrantes[pk];
     const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
     const quedaLleno = (soderiaActual[sk] || 0) + llenReal;
     const disponibleManana = quedaLleno + paraLlenarReal;
