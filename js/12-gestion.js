@@ -266,7 +266,9 @@ function GestionClientes({
   onImportar,
   onIr,
   productos,
-  onGuardarCambio
+  onGuardarCambio,
+  onPerdida,
+  onPerdidaCliente
 }) {
   const [tab, setTab] = React.useState("lista"); // lista | fiados | agenda | importar
   const [fotoClienteId, setFotoClienteId] = React.useState(null);
@@ -601,6 +603,8 @@ function GestionClientes({
     c: c,
     ventas: ventas,
     onEditar: onEditar,
+    onPerdida: onPerdida,
+    onPerdidaCliente: onPerdidaCliente,
     izquierda: /*#__PURE__*/React.createElement("button", {
       style: {
         width: 28,

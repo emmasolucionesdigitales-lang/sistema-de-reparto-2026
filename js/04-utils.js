@@ -38,15 +38,15 @@ const KEY_PROD_ENV = {
   "Dispenser": "dispenser"
 };
 // ── Cuánto tiene PRESTADO un cliente de un producto ("sifon"|"bidon10"|
-//    "bidon20"|"dispenser"). Para sifón/bidón10/bidón20 se lee directo de
-//    c.prestado (campo que se mantiene solo, sumando/restando en cada venta
-//    — ver aplicarMovimientoEnvases en 15-app.js). Si el cliente todavía no
-//    tiene ese campo, o es dispenser (que no tiene campo directo), se
-//    calcula del historial de ventas de ese cliente + el ajuste manual
-//    (c.envAjuste). Usar SIEMPRE esta función en vez de recalcular a mano
-//    — así todas las pantallas muestran el mismo número.
+//    "bidon20"|"dispenser"). Se lee directo de c.prestado (campo que se
+//    mantiene solo, sumando/restando en cada venta — ver
+//    aplicarMovimientoEnvases en 16-app.js). Si el cliente todavía no tiene
+//    ese campo (no tuvo ventas con envases desde que se agregó este modelo),
+//    se calcula del historial de ventas de ese cliente + el ajuste manual
+//    (c.envAjuste) como referencia inicial. Usar SIEMPRE esta función en vez
+//    de recalcular a mano — así todas las pantallas muestran el mismo número.
 function prestadoClienteDe(c, k, ventasHistoricas) {
-  if (k !== "dispenser" && c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
+  if (c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
   let n = 0;
   (ventasHistoricas || []).forEach(v => {
     if (v.clienteId !== c.id) return;
@@ -352,15 +352,21 @@ function comprimirFoto(file, maxW = 800, quality = 0.75) {
 // ════════════════════════════════════════════════════════════════════
 // ◆  buscarCliente — búsqueda UNIFICADA priorizando el DOMICILIO
 //    2 = coincide el domicilio · 1 = nombre/tel/notas · 0 = no coincide
+//    Ignora tildes/ñ tanto en lo buscado como en lo guardado: antes
+//    buscar "maria" NO encontraba a "María" — muy común al tipear rápido
+//    desde el celular, sin tildes.
 // ════════════════════════════════════════════════════════════════════
+function _normalizarBusqueda(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
 function buscarCliente(c, q) {
-  const t = (q || "").trim().toLowerCase();
+  const t = _normalizarBusqueda(q).trim();
   if (!t) return 1;
-  const domicilio = [c.calle, c.nro, c.calle && c.nro ? `${c.calle} ${c.nro}` : "", c.barrio, c.sector, c.aclaracion, c.manzana, c.lote, c.manzana ? `mz ${c.manzana}` : "", c.lote ? `l ${c.lote}` : "", c.manzana && c.lote ? `mz ${c.manzana} l ${c.lote}` : "", c.manzana && c.lote ? `manzana ${c.manzana} lote ${c.lote}` : ""].filter(Boolean).join(" · ").toLowerCase();
+  const domicilio = _normalizarBusqueda([c.calle, c.nro, c.calle && c.nro ? `${c.calle} ${c.nro}` : "", c.barrio, c.sector, c.aclaracion, c.manzana, c.lote, c.manzana ? `mz ${c.manzana}` : "", c.lote ? `l ${c.lote}` : "", c.manzana && c.lote ? `mz ${c.manzana} l ${c.lote}` : "", c.manzana && c.lote ? `manzana ${c.manzana} lote ${c.lote}` : ""].filter(Boolean).join(" · "));
   if (domicilio.includes(t)) return 2;
-  if ((c.nombre || "").toLowerCase().includes(t)) return 1;
+  if (_normalizarBusqueda(c.nombre).includes(t)) return 1;
   if (String(c.telefono || "").includes(t)) return 1;
-  if ((c.notas || "").toLowerCase().includes(t)) return 1;
+  if (_normalizarBusqueda(c.notas).includes(t)) return 1;
   return 0;
 }
 // ════════════════════════════════════════════════════════════════════

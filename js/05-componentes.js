@@ -12,6 +12,8 @@
 //           izquierda={<botón opcional/>}> {botones derecha opcionales} </PieEnvases>
 // ════════════════════════════════════════════════════════════════════
 function PieEnvases({
+  onPerdida,
+  onPerdidaCliente,
   c,
   ventas,
   onEditar,
@@ -26,24 +28,30 @@ function PieEnvases({
     "Dispenser": "dispenser"
   };
   const [draft, setDraft] = React.useState(null); // null = panel cerrado
-  const calcExtra = () => {
-    const ex = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
-    };
-    (ventas || []).filter(v => v.clienteId === c.id).forEach(v => {
-      (v.envPrest || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) ex[k] += Number(e.cant) || 0;
+  const [mostrarPerdida, setMostrarPerdida] = React.useState(false);
+  const [prodPerdida, setProdPerdida] = React.useState("sifon");
+  const [cantPerdida, setCantPerdida] = React.useState("");
+  const confirmarPerdidaCliente = () => {
+    const cant = Math.round(Number(cantPerdida) || 0);
+    if (cant <= 0) return;
+    // OJO: acá NO se usa onEditar (ese asume que lo que baja del fijo del
+    // cliente volvió al depósito). Un envase roto/perdido nunca volvió a
+    // ningún lado — se da de baja directo con onPerdidaCliente, que reduce
+    // el fijo/prestado del cliente sin acreditarle nada a Casa.
+    if (onPerdidaCliente) {
+      onPerdidaCliente(c.id, prodPerdida, cant);
+    } else if (onEditar) {
+      // Fallback por si algún lugar todavía no pasa el prop nuevo.
+      const nuevoValor = Math.max(0, (Number(c[prodPerdida]) || 0) - cant);
+      onEditar(c.id, {
+        [prodPerdida]: nuevoValor
       });
-      (v.envDev || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) ex[k] -= Number(e.cant) || 0;
-      });
-    });
-    return ex;
+      onPerdida && onPerdida({
+        [prodPerdida]: cant
+      }, "Roto/perdido en lo del cliente", c.nombre);
+    }
+    setMostrarPerdida(false);
+    setCantPerdida("");
   };
   const abrir = () => {
     setDraft({
@@ -52,18 +60,14 @@ function PieEnvases({
     });
   };
   const confirmar = () => {
-    // Sifón/bidón10/bidón20 se guardan directo en c.prestado. Dispenser no
-    // tiene campo directo, sigue calculándose como ajuste sobre el historial.
-    const ex = calcExtra();
+    // Los 4 productos (incluido dispenser) se guardan directo en c.prestado
+    // — campo estable que se mantiene solo, sumando/restando en cada venta
+    // (ver aplicarMovimientoEnvases en 16-app.js).
     onEditar(c.id, {
       ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.fijos[k])])),
       prestado: {
         ...(c.prestado || {}),
-        ...Object.fromEntries(KEYS.filter(k => k !== "dispenser").map(k => [k, Math.max(0, draft.prest[k])]))
-      },
-      envAjuste: {
-        ...(c.envAjuste || {}),
-        dispenser: draft.prest.dispenser - (ex.dispenser || 0)
+        ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.prest[k])]))
       }
     });
     setDraft(null);
@@ -169,7 +173,110 @@ function PieEnvases({
       color: "var(--color-text-tertiary)",
       margin: "2px 0 6px"
     }
-  }, "Prestados = total extra que tiene hoy · 0 = devolvió todo"), /*#__PURE__*/React.createElement("div", {
+  }, "Prestados = total extra que tiene hoy · 0 = devolvió todo"), !mostrarPerdida ? /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      background: "none",
+      border: "none",
+      color: "var(--color-text-danger)",
+      fontSize: 11,
+      fontWeight: 500,
+      cursor: "pointer",
+      padding: "4px 0",
+      textAlign: "left",
+      marginBottom: 6
+    },
+    onClick: e => {
+      e.stopPropagation();
+      setMostrarPerdida(true);
+    }
+  }, "💔 Se le rompió/perdió un envase") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-secondary)",
+      borderRadius: 7,
+      padding: 8,
+      marginBottom: 8
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-danger)",
+      fontWeight: 500,
+      marginBottom: 6
+    }
+  }, "💔 Registrar roto/perdido de ", c.nombre), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 60px",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    value: prodPerdida,
+    onChange: e => setProdPerdida(e.target.value),
+    style: {
+      ...s.inputNum,
+      padding: "6px 4px",
+      fontSize: 12,
+      textAlign: "left"
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "sifon"
+  }, "Sifón 1.5L"), /*#__PURE__*/React.createElement("option", {
+    value: "bidon10"
+  }, "Bidón 10L"), /*#__PURE__*/React.createElement("option", {
+    value: "bidon20"
+  }, "Bidón 20L"), /*#__PURE__*/React.createElement("option", {
+    value: "dispenser"
+  }, "Dispenser")), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: 1,
+    placeholder: "Cant.",
+    value: cantPerdida,
+    onChange: e => setCantPerdida(e.target.value),
+    style: {
+      ...s.inputNum,
+      padding: "6px 4px",
+      fontSize: 12,
+      textAlign: "center"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1,
+      fontSize: 11,
+      padding: "6px"
+    },
+    onClick: () => {
+      setMostrarPerdida(false);
+      setCantPerdida("");
+    }
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 2,
+      background: "var(--color-background-danger)",
+      color: "var(--color-text-danger)",
+      border: "1px solid var(--color-border-danger)",
+      borderRadius: 7,
+      padding: "7px",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    },
+    onClick: confirmarPerdidaCliente
+  }, "Confirmar pérdida")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--color-text-tertiary)",
+      marginTop: 5
+    }
+  }, "Se descuenta directo de lo que este cliente tiene asignado, y queda anotado en Stock → Pérdidas.")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6
