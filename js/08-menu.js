@@ -1514,7 +1514,11 @@ const guardarCapacidadFija = (pk, valorStr) => {
   syncData({ stock: s2 });
   setEditandoCapFija(null);
 };
-  const yaCerrado = !!planilla._diaCerrado;
+  // Si ya se confirmó el cierre alguna vez para este día (localStorage se
+  // marca de inmediato en confirmarCierre, antes incluso de que la planilla
+  // sincronizada vuelva a bajar como prop), no hay que volver a pedir la
+  // verificación de envases — se pasa directo al botón de enviar informe.
+  const yaCerrado = !!planilla._diaCerrado || !!localStorage.getItem(cierreKey);
   const llenosCargados = {
     soda: Number(datos.productos?.soda?.llenos || 0),
     b10: Number(datos.productos?.b10?.llenos || 0),
