@@ -1625,6 +1625,12 @@ const guardarCapacidadFija = (pk, valorStr) => {
   };
   const confirmarCierre = async () => {
     if (enviandoCierre) return;
+    // IMPORTANTE: bloquear el botón de inmediato. Sin este flag, un
+    // doble-toque (muy común cuando el guardado tarda un instante) podía
+    // disparar confirmarCierre() dos veces seguidas y sumar los mismos
+    // envases a sodería dos veces — una causa real de la acumulación de
+    // envases reportada.
+    setEnviandoCierre(true);
     localStorage.setItem(cierreKey, "1"); // marcar como confirmado
     const s = JSON.parse(JSON.stringify(stock));
     if (!s.soderia_vacios) s.soderia_vacios = {
