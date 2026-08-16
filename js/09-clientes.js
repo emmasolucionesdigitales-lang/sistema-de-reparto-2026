@@ -1386,7 +1386,7 @@ function DetalleCliente({
         style: {
           fontSize: 18
         }
-      }, "✏️"), /*#__PURE__*/React.createElement("div", {
+      }, v._esCargoMinimo ? "💧" : "✏️"), /*#__PURE__*/React.createElement("div", {
         style: {
           flex: 1
         }
@@ -1396,7 +1396,7 @@ function DetalleCliente({
           fontWeight: 700,
           color: "#818cf8"
         }
-      }, "Ajuste de saldo"), /*#__PURE__*/React.createElement("div", {
+      }, v._esCargoMinimo ? "Cargo por consumo mínimo" : "Ajuste de saldo"), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 12,
           color: "var(--color-text-secondary)",
@@ -1813,6 +1813,7 @@ function DetalleCliente({
   }, "Eliminar cliente")))), editandoCliente && /*#__PURE__*/React.createElement(FormCliente, {
     inicial: cliente,
     textoGuardar: "Guardar cambios",
+    productos: productos,
     onGuardar: cambios => {
       onEditar(cambios);
       setEditandoCliente(false);

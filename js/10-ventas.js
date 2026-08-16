@@ -2491,7 +2491,8 @@ function NuevoCliente({
   diaActual,
   onGuardar,
   onVolver,
-  prefill
+  prefill,
+  productos
 }) {
   // Usa el FormCliente UNIFICADO (en 04-utils.js) — mismo formulario en toda la app
   return /*#__PURE__*/React.createElement("div", {
@@ -2509,6 +2510,7 @@ function NuevoCliente({
       ...(prefill || {})
     },
     textoGuardar: "Agregar cliente",
+    productos: productos,
     onGuardar: onGuardar
   })));
 }

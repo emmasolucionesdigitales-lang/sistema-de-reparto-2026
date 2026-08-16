@@ -443,6 +443,7 @@ function GestionClientes({
       bidon20: 0,
       orden: ""
     },
+    productos: productos,
     onGuardar: datos => {
       onNuevo(datos);
       setModoNuevo(false);
@@ -474,6 +475,7 @@ function GestionClientes({
     onClick: () => setEditandoId(null)
   }, "Cancelar")), /*#__PURE__*/React.createElement(FormCliente, {
     inicial: c,
+    productos: productos,
     onGuardar: datos => {
       onEditar(c.id, datos);
       setEditandoId(null);
