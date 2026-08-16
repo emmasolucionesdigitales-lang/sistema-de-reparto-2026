@@ -1483,38 +1483,11 @@ function PlanillaDelDia({
   const cierreKey = `cierre_${dia}_${fecha}`;
   const yaConfirmado = !!localStorage.getItem(cierreKey) || !!planilla._diaCerrado;
   const [mostrarCierre, setMostrarCierre] = useState(!!(initCierre && !yaConfirmado));
-  // BUG: el botón "Confirmar — stock e informe" (adentro de la pantalla de
-  // Cierre) intentaba sacarle una foto a #planilla-capture recién ahí — pero
-  // ese elemento vive en la vista NORMAL de la planilla, que ya no está
-  // montada (React cambió de rama de render en cuanto se tocó "Cerrar el
-  // día..."). document.getElementById devolvía null, no tiraba error, y el
-  // mail salía sin la foto y sin ningún aviso. Ahora la foto se saca ANTES
-  // de cambiar a la pantalla de cierre (mientras el elemento todavía está
-  // visible) y se guarda acá para usarla al confirmar.
-  const [capturaPreCierre, setCapturaPreCierre] = useState(null);
-  const [capturandoParaCierre, setCapturandoParaCierre] = useState(false);
-  const capturarPlanillaImg = async () => {
-    try {
-      const el = document.getElementById("planilla-capture");
-      if (!el || !window.html2canvas) return null;
-      const canvas = await window.html2canvas(el, {
-        scale: 1.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--color-background-primary").trim() || "#0f1923",
-        scrollY: 0,
-        scrollX: 0,
-        width: el.offsetWidth,
-        height: el.scrollHeight,
-        windowWidth: el.offsetWidth,
-        windowHeight: el.scrollHeight
-      });
-      return canvas.toDataURL("image/jpeg", 0.78);
-    } catch (e) {
-      console.warn("Captura falló:", e);
-      return null;
-    }
-  };
+  // El envío del informe está desacoplado de confirmar el cierre (ver
+  // confirmarCierre): ya no hace falta pre-capturar la foto de la planilla
+  // antes de entrar a la pantalla de Cierre, porque el botón "Enviar
+  // informe" vive en la pantalla de Planilla y saca su propia foto fresca
+  // en el momento en que el dueño decide mandarlo.
   const [realesLlenos, setRealesLlenos] = useState({
     soda: "",
     b10: "",
@@ -1720,28 +1693,15 @@ const guardarCapacidadFija = (pk, valorStr) => {
         _cierreDiffs: diffs
       } : {})
     });
-    // Capturar la planilla como imagen y mandar el informe en el MISMO paso
-    // que se cierra el día — antes eran dos acciones separadas.
-    if (onCerrarDia) {
-      setEnviandoCierre(true);
-      // La foto YA se sacó antes de entrar a esta pantalla (ver
-      // capturarPlanillaImg / capturaPreCierre) porque acá #planilla-capture
-      // ya no existe en el DOM. Si por algún motivo no se guardó (ej.
-      // volvieron para atrás sin pasar por el botón), la intentamos sacar
-      // igual como respaldo, aunque lo más probable es que dé null.
-      const imgData = capturaPreCierre || await capturarPlanillaImg();
-      const ok = await onCerrarDia(imgData);
-      setEnviandoCierre(false);
-      setMostrarCierre(false);
-      if (ok) {
-        setEnviosInforme(Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`) || 1));
-        alert("✅ Día cerrado, stock actualizado e informe enviado a tu email.");
-      } else {
-        alert("✅ Día cerrado y stock actualizado.\n❌ No se pudo enviar el informe por email — podés reintentarlo con el botón \"Reenviar informe\" de abajo.");
-      }
-    } else {
-      setMostrarCierre(false);
-    }
+    // El envío del informe queda DESACOPLADO de confirmar los envases: acá
+    // solo se cierra el día y se actualiza el stock. El informe (con la
+    // copia/foto de la planilla) se manda aparte, cuando el dueño toque el
+    // botón "Enviar informe" — así no se dispara un mail cada vez que se
+    // verifica el cierre. Tampoco hay alert() acá: vuelve derecho a la
+    // planilla (sin popup que interrumpa) para que el dueño revise el
+    // arqueo del día y recién ahí, con el botón "Enviar informe" ya
+    // habilitado, decida mandarlo.
+    setMostrarCierre(false);
   };
   if (mostrarCierre) {
     return /*#__PURE__*/React.createElement("div", {
@@ -2126,7 +2086,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
       },
       disabled: enviandoCierre,
       onClick: confirmarCierre
-    }, enviandoCierre ? "⏳ Cerrando y enviando..." : "✓ Confirmar — stock e informe"))));
+    }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Confirmar y cerrar día"))));
   }
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
@@ -3002,23 +2962,11 @@ const guardarCapacidadFija = (pk, valorStr) => {
       color: "#e9d5ff",
       fontSize: 15,
       fontWeight: 600,
-      cursor: capturandoParaCierre ? "default" : "pointer",
-      marginTop: 10,
-      opacity: capturandoParaCierre ? 0.7 : 1
+      cursor: "pointer",
+      marginTop: 10
     },
-    disabled: capturandoParaCierre,
-    onClick: async () => {
-      if (capturandoParaCierre) return;
-      // Sacamos la foto de la planilla ACÁ, mientras todavía está en
-      // pantalla — si esperamos a que se abra "Cierre del día" ya es tarde,
-      // el elemento no existe más.
-      setCapturandoParaCierre(true);
-      const img = await capturarPlanillaImg();
-      setCapturaPreCierre(img);
-      setCapturandoParaCierre(false);
-      setMostrarCierre(true);
-    }
-  }, capturandoParaCierre ? "Preparando informe…" : "🔒 Cerrar el día, actualizar stock y enviar informe") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setMostrarCierre(true)
+  }, "🔒 Verificar envases y cerrar el día") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "12px",
@@ -3034,6 +2982,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
     const envios = enviosInforme;
     const quedan = MAX_ENVIOS - envios;
     const agotado = quedan <= 0;
+    const primerEnvio = envios === 0;
     return /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",
@@ -3077,12 +3026,12 @@ const guardarCapacidadFija = (pk, valorStr) => {
         const ok = await onCerrarDia(imgData);
         if (ok) {
           setEnviosInforme(Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`) || envios + 1));
-          alert(`✅ Informe enviado a tu email.${quedan - 1 > 0 ? `\n\nSi no te llega, podés reenviarlo ${quedan - 1} ${quedan - 1 === 1 ? "vez" : "veces"} más.` : ""}`);
+          alert(`✅ Informe enviado a tu email, con copia de la planilla del día.${quedan - 1 > 0 ? `\n\nSi hace falta, podés reenviarlo ${quedan - 1} ${quedan - 1 === 1 ? "vez" : "veces"} más.` : ""}`);
         } else {
           alert("❌ No se pudo enviar el informe. Verificá tu conexión e intentá de nuevo.");
         }
       }
-    }, agotado ? "✓ Informe enviado (máximo alcanzado)" : `🔄 Reenviar informe (${quedan} ${quedan === 1 ? "envío" : "envíos"} restante${quedan === 1 ? "" : "s"})`);
+    }, agotado ? "✓ Informe enviado (máximo alcanzado)" : primerEnvio ? "📧 Enviar informe (con copia de la planilla)" : `🔄 Reenviar informe (${quedan} ${quedan === 1 ? "envío" : "envíos"} restante${quedan === 1 ? "" : "s"})`);
   })())));
 }
 function InicioReparto({
@@ -3319,9 +3268,10 @@ function AtajoPlanillaSemana({
   const dias5 = [];
   const cur = new Date();
   cur.setHours(0, 0, 0, 0);
-  while (dias5.length < 5) {
+  // Las apps comerciales trabajan de lunes a sábado — solo se excluye domingo.
+  while (dias5.length < 6) {
     const dow = cur.getDay();
-    if (dow !== 0 && dow !== 6) {
+    if (dow !== 0) {
       const fechaKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
       dias5.push({
         fecha: new Date(cur),
@@ -3336,7 +3286,8 @@ function AtajoPlanillaSemana({
     "Martes": 2,
     "Miércoles": 3,
     "Jueves": 4,
-    "Viernes": 5
+    "Viernes": 5,
+    "Sábado": 6
   };
   dias5.sort((a, b) => ORDEN_DIA[a.dia] - ORDEN_DIA[b.dia]);
   return /*#__PURE__*/React.createElement("div", {

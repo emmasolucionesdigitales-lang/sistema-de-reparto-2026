@@ -1896,79 +1896,26 @@ function App() {
     if (JSON.stringify(nueva) !== JSON.stringify(planillaActual)) {
       savePlanilla(planillaKey, nueva);
     }
-    // CIERRE AUTOMÁTICO DEL STOCK — se ejecuta una sola vez por día
+    // Antes acá había un "cierre automático del stock" que sumaba sobrantes
+    // y vacíos a sodería apenas se terminaba de visitar al último cliente
+    // del día — en PARALELO e INDEPENDIENTE de confirmarCierre (08-menu.js,
+    // pantalla "Cierre del día"). Como confirmarCierre hace su PROPIO cálculo
+    // y su propia suma a sodería (con el conteo físico real del repartidor),
+    // los dos mecanismos se pisaban: sodería quedaba acreditada dos veces
+    // por el mismo día — una acá, automática y sin verificar, y otra en el
+    // cierre manual — y por eso el stock de sodería se iba acumulando de más
+    // con cada día. Ahora confirmarCierre es la ÚNICA fuente que actualiza
+    // sodería; acá solo queda la marca para no reenviar el aviso a Emma
+    // Control más de una vez por día.
     const camionCerradoKey = `lc_cam_${planillaKey}`;
-    // Solo cerrar si hubo reparto real (al menos 1 venta O la planilla tiene productos cargados)
+    // Solo marcar si hubo reparto real (al menos 1 venta O la planilla tiene productos cargados)
     const huboReparto = ventasDia.length > 0 || planillaActual.productos?.b10?.llenos > 0 || planillaActual.productos?.b20?.llenos > 0 || planillaActual.productos?.soda?.llenos > 0;
     if (planillaActual.iniciado && huboReparto && !planillaActual._stockCerrado && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
-      // Marca sincronizada en la planilla (viaja por Firebase) — evita que otro dispositivo repita el cierre y duplique el stock
+      // Marca sincronizada en la planilla (viaja por Firebase) — evita que otro dispositivo repita el envío a Emma Control
       savePlanilla(planillaKey, {
         ...nueva,
         _stockCerrado: true
-      });
-      const prodMap = {
-        "Bidón 10L": "b10",
-        "Bidón 20L": "b20",
-        "Sifón 1.5L": "soda",
-        "Dispenser": "disp"
-      };
-      // Cuánto salió en el camión (según planilla de inicio de reparto)
-      const llenos = {
-        b10: Number(planillaActual.productos?.b10?.llenos || 0),
-        b20: Number(planillaActual.productos?.b20?.llenos || 0),
-        soda: Number(planillaActual.productos?.soda?.llenos || 0),
-        disp: 0
-      };
-      // Cuánto se vendió (cada venta = 1 vacío que vuelve en el intercambio)
-      const vendidos = {
-        b10: 0,
-        b20: 0,
-        soda: 0,
-        disp: 0
-      };
-      ventasDia.forEach(v => v.detalle.forEach(d => {
-        const k = prodMap[d.nombre];
-        if (k) vendidos[k] += d.cantidad;
-      }));
-      // Préstamos (sin recibir vacío) y devoluciones de deudas anteriores
-      const prestados = {
-        b10: 0,
-        b20: 0,
-        soda: 0,
-        disp: 0
-      };
-      const devueltos = {
-        b10: 0,
-        b20: 0,
-        soda: 0,
-        disp: 0
-      };
-      ventasDia.forEach(v => {
-        (v.envPrest || []).forEach(e => {
-          const k = prodMap[e.prod];
-          if (k) prestados[k] += Number(e.cant) || 0;
-        });
-        (v.envDev || []).forEach(e => {
-          const k = prodMap[e.prod];
-          if (k) devueltos[k] += Number(e.cant) || 0;
-        });
-      });
-      setStock(prev => {
-        const s = JSON.parse(JSON.stringify(normStock(prev)));
-        ["b10", "b20", "soda", "disp"].forEach(pk => {
-          const sk = pk === "b10" ? "bidon10" : pk === "b20" ? "bidon20" : pk === "disp" ? "dispenser" : "sifon";
-          const sorb = Math.max(0, llenos[pk] - vendidos[pk] - prestados[pk]); // sobrantes llenos en camión
-          const vacios = vendidos[pk] + devueltos[pk]; // vacíos que vuelven (vendidos + devoluciones)
-          s.soderia[sk] = (s.soderia[sk] || 0) + sorb; // sobrantes llenos → sodería (llenos)
-          s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacios; // vacíos que vuelven → sodería (vacíos)
-          s.camion[sk] = Math.max(0, (s.camion[sk] || 0) - sorb - vacios); // camión queda en 0
-          s.casa[sk] = Math.max(0, (s.casa[sk] || 0) - Math.max(0, prestados[pk])); // préstamos salen del depósito
-        });
-        syncData({
-          stock: normStock(s)
-        });
-        return normStock(s);
       });
 
       // ── Enviar datos del día a Emma Control ──
