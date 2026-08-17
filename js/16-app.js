@@ -2505,7 +2505,21 @@ function App() {
     },
     noVisitas: noVisitas || [],
     onFiados: () => irA("fiadosPendientes"),
-    onDormidos: () => irA("clientesDormidos")
+    onDormidos: () => irA("clientesDormidos"),
+    // Reemplazan a "diaPrincipal" (pantalla intermedia sin datos que solo
+    // preguntaba Planilla-o-Clientes): ahora esa elección se hace en el
+    // propio menú, tocando el día, y estos dos props van directo al mismo
+    // destino al que iba diaPrincipal — mismo criterio de "saltar Inicio del
+    // reparto si el camión ya salió hoy" que ya usaba onIrClientes.
+    onIrPlanillaDia: d => {
+      setDiaActual(d);
+      irA("selectorFechaPlanilla");
+    },
+    onIrClientesDia: d => {
+      setDiaActual(d);
+      const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+    }
   }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
     planillas: planillas,
     ventas: ventas,
@@ -2587,18 +2601,32 @@ function App() {
     cargasDia: cargasDia,
     stock: stockNorm,
     onGuardar: (p, descontar) => {
-      savePlanilla(`${diaActual}_${fechaActual}`, p);
+      const planillaKeyIR = `${diaActual}_${fechaActual}`;
+      const prevPlanillaIR = planillas[planillaKeyIR] || planillaDiaVacia();
+      savePlanilla(planillaKeyIR, p);
       if (descontar) {
         const s = JSON.parse(JSON.stringify(normStock(stockNorm)));
         const soda = Number(p.productos?.soda?.llenos || 0);
         const b10 = Number(p.productos?.b10?.llenos || 0);
         const b20 = Number(p.productos?.b20?.llenos || 0);
-        s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - soda);
-        s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - b10);
-        s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - b20);
-        s.camion.sifon = (s.camion.sifon || 0) + soda;
-        s.camion.bidon10 = (s.camion.bidon10 || 0) + b10;
-        s.camion.bidon20 = (s.camion.bidon20 || 0) + b20;
+        // Si el día YA estaba iniciado (se está corrigiendo una cantidad, no
+        // cargando por primera vez), sólo hay que mover la DIFERENCIA. Restar
+        // el total cada vez que se toca "Actualizar y continuar" —incluso sin
+        // cambiar nada— vaciaba sodería de más en cada visita repetida a esta
+        // pantalla, una causa real de que sodería terminara mal.
+        const yaEstabaIniciadoIR = !!prevPlanillaIR.iniciado;
+        const sodaPrev = yaEstabaIniciadoIR ? Number(prevPlanillaIR.productos?.soda?.llenos || 0) : 0;
+        const b10Prev = yaEstabaIniciadoIR ? Number(prevPlanillaIR.productos?.b10?.llenos || 0) : 0;
+        const b20Prev = yaEstabaIniciadoIR ? Number(prevPlanillaIR.productos?.b20?.llenos || 0) : 0;
+        const dSoda = soda - sodaPrev,
+          dB10 = b10 - b10Prev,
+          dB20 = b20 - b20Prev;
+        s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - dSoda);
+        s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - dB10);
+        s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - dB20);
+        s.camion.sifon = Math.max(0, (s.camion.sifon || 0) + dSoda);
+        s.camion.bidon10 = Math.max(0, (s.camion.bidon10 || 0) + dB10);
+        s.camion.bidon20 = Math.max(0, (s.camion.bidon20 || 0) + dB20);
         setStock(normStock(s));
         syncData({
           stock: normStock(s)
@@ -3156,6 +3184,15 @@ function App() {
           saldo: (Number(x.saldo) || 0) + monto
         } : x));
       }
+    },
+    // BUG REPORTADO (mismo patrón encontrado y corregido en La Catalina): el
+    // ajuste de saldo de un cliente se perdía en silencio al entrar por
+    // Gestión de clientes / Mapa (esta pantalla) en vez de por la lista
+    // diaria normal (pantalla "detalleCliente", más arriba) — acá nunca se
+    // pasaba onGuardarAjuste, y DetalleCliente lo llama con "&&" de guarda
+    // (no explota, pero tampoco guarda nada).
+    onGuardarAjuste: vt => {
+      saveVentas(prev => [...prev, vt]);
     },
     onGuardarCambio: vt => {
       saveVentas(prev => [...prev, vt]);
