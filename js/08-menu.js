@@ -1578,15 +1578,26 @@ const guardarCapacidadFija = (pk, valorStr) => {
         llenos: dl,
         vacios: dv
       };
-      s.soderia[sk] = (s.soderia[sk] || 0) + llenTotal;
-      s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacReal;
-      s.camion[sk] = 0;
       // Sobra o falta del día vs lo esperado (según lo que salió, se prestó y
       // se devolvió) se ajusta contra el depósito: si sobra, se suma al
       // depósito; si falta, se resta.
+      // BUG REAL (causa de la acumulación "sin sentido" en sodería): antes
+      // acá se sumaba TODO lo que volvió (llenTotal+vacReal) a sodería Y,
+      // por separado, la diferencia contra "esperado" se sumaba también al
+      // depósito — contando esa diferencia dos veces cada vez que el usuario
+      // corrige un número a mano (todos los días). Resultado: sodería nunca
+      // volvía a su número fijo, solo crecía. Ahora sodería recibe SOLO lo
+      // esperado (mantiene su número fijo) y el depósito se lleva toda la
+      // diferencia — no ambos.
       const esperadoPk = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
       const vuelveTotalPk = llenTotal + vacReal;
       const diffDepositoPk = vuelveTotalPk - esperadoPk;
+      const factorFijo = vuelveTotalPk > 0 ? esperadoPk / vuelveTotalPk : 1;
+      const llenTotalFijo = Math.max(0, Math.round(llenTotal * factorFijo));
+      const vacRealFijo = Math.max(0, Math.round(vacReal * factorFijo));
+      s.soderia[sk] = (s.soderia[sk] || 0) + llenTotalFijo;
+      s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacRealFijo;
+      s.camion[sk] = 0;
       s.casa[sk] = (s.casa[sk] || 0) + diffDepositoPk;
     });
     // Sembrar la capacidad fija (si todavía no está guardada) para que el
