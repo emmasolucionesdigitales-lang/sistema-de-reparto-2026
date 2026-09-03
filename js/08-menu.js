@@ -43,6 +43,8 @@ function MenuDias({
   // del día") antes de recién ahí elegir la fecha. Se saca esa pantalla de
   // en medio: tocar el día expande estos 2 botones ACÁ MISMO, en la fila.
   const [diaExpandido, setDiaExpandido] = React.useState(null);
+  const [mostrarRecordatorios, setMostrarRecordatorios] = React.useState(false);
+  const [mostrarTransferencias, setMostrarTransferencias] = React.useState(false);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   const hoyFechaKey = (() => {
     const d = new Date();
@@ -111,9 +113,14 @@ function MenuDias({
       color: "#5daaff",
       marginBottom: 6,
       textTransform: "uppercase",
-      letterSpacing: "0.05em"
-    }
-  }, "🔔 Recordatorios pendientes"), recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
+      letterSpacing: "0.05em",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    },
+    onClick: () => setMostrarRecordatorios(v => !v)
+  }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (", recordatoriosActivos.length, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
     key: r.id,
     style: {
       ...s.card,
@@ -167,7 +174,7 @@ function MenuDias({
       marginTop: 2
     },
     onClick: () => onConfirmarRecordatorio && onConfirmarRecordatorio(r.id)
-  }, "✓"))), recordatoriosActivos.length > 5 && /*#__PURE__*/React.createElement("div", {
+  }, "✓"))), mostrarRecordatorios && recordatoriosActivos.length > 5 && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: "var(--color-text-tertiary)",
@@ -184,9 +191,14 @@ function MenuDias({
       color: "#f5b942",
       marginBottom: 6,
       textTransform: "uppercase",
-      letterSpacing: "0.05em"
-    }
-  }, "🔴 Transferencias sin confirmar"), transferenciasPendientes.map(({
+      letterSpacing: "0.05em",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    },
+    onClick: () => setMostrarTransferencias(v => !v)
+  }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transferencias sin confirmar (", transferenciasPendientes.length, ")"), mostrarTransferencias && transferenciasPendientes.map(({
     dia,
     fecha,
     count,
@@ -928,9 +940,20 @@ function DetalleVentasDia({
   ventas,
   clientes,
   noVisitas,
-  fecha
+  fecha,
+  productos,
+  todasLasVentas,
+  onEditarVenta,
+  onEliminarVenta,
+  onEditarCliente,
+  onPerdidaCliente
 }) {
   const [abierto, setAbierto] = React.useState(false);
+  // Qué venta se está editando in-place (solo aplica a compras reales —
+  // cobros/ajustes/cambios de envase solo se pueden eliminar, no editar,
+  // mismo criterio que el historial del perfil del cliente). Portado de
+  // La Catalina.
+  const [editandoVentaId, setEditandoVentaId] = React.useState(null);
   const todosMap = React.useMemo(() => {
     const m = {};
     (clientes || []).forEach(c => {
@@ -998,6 +1021,12 @@ function DetalleVentasDia({
   }, ventas.map((v, idx) => {
     const persona = todosMap[v.clienteId];
     const esCobro = v._esCobro;
+    // Mismo criterio que el historial del perfil del cliente (09-clientes.js):
+    // cobros/ajustes/cambios de envase solo se pueden eliminar, no editar —
+    // editarlos como si fueran una compra normal rompería el saldo/stock.
+    const esAjuste = v._esAjuste || false;
+    const esCambio = v._esCambio || false;
+    const esCompraReal = !esCobro && !esAjuste && !esCambio;
     const dir = persona ? (persona.calle ? `${persona.calle} ${persona.nro || ""}` : persona.manzana ? `Mz ${persona.manzana} L ${persona.lote}` : "") + (persona.barrio ? ` · ${persona.barrio}` : "") : "";
     const deudaPagada = Math.max(0, (v.pagadoNum || 0) - (v.neto || 0));
     const fmtEnv = arr => (arr || []).filter(e => e.prod && Number(e.cant) > 0).map(e => `${e.cant} ${e.prod}`).join(", ");
@@ -1034,12 +1063,53 @@ function DetalleVentasDia({
       color: "var(--color-text-secondary)",
       txt: v.pago
     };
+    const cardStyleV = {
+      padding: "10px 16px",
+      borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none"
+    };
+    if (editandoVentaId === v.id && esCompraReal) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: v.id,
+        style: cardStyleV
+      }, /*#__PURE__*/React.createElement(EditVenta, {
+        venta: v,
+        productos: productos,
+        onGuardar: (d, p, m, sa, obs, tr2) => {
+          onEditarVenta(v.id, d, p, m, sa, obs, tr2);
+          setEditandoVentaId(null);
+        },
+        onCancelar: () => setEditandoVentaId(null)
+      }));
+    }
+    // Fila de acciones al pie de cada tarjeta: registrar envases prestados/
+    // devueltos del cliente (mismo panel "♻️ Envases" que en Gestión/perfil),
+    // editar (solo compras reales) y eliminar. Portado de La Catalina.
+    const accionesRow = persona ? /*#__PURE__*/React.createElement(PieEnvases, {
+      c: persona,
+      ventas: todasLasVentas || [],
+      onEditar: onEditarCliente,
+      onPerdidaCliente: onPerdidaCliente
+    }, esCompraReal && /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        fontSize: 11,
+        padding: "3px 8px"
+      },
+      onClick: () => setEditandoVentaId(v.id)
+    }, "✏️ Editar"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btnDanger,
+        fontSize: 11,
+        padding: "3px 8px"
+      },
+      onClick: () => {
+        const tipo = esCobro ? "este cobro" : esAjuste ? "este ajuste" : esCambio ? "este cambio" : "esta venta";
+        if (window.confirm(`¿Eliminar ${tipo}?`)) onEliminarVenta(v.id);
+      }
+    }, "🗑 Eliminar")) : null;
     return /*#__PURE__*/React.createElement("div", {
       key: v.id,
-      style: {
-        padding: "10px 16px",
-        borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none"
-      }
+      style: cardStyleV
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -1163,7 +1233,7 @@ function DetalleVentasDia({
         paddingLeft: 8,
         marginTop: 2
       }
-    }, "📝 ", v.obs));
+    }, "📝 ", v.obs), accionesRow);
   }), (() => {
     const ventaIds = new Set(ventas.map(v => v.clienteId));
     const noComp = (noVisitas || []).filter(n => n.fecha === fecha && !ventaIds.has(n.clienteId) && n.motivo !== "salteado");
@@ -1197,11 +1267,14 @@ function DetalleVentasDia({
       return /*#__PURE__*/React.createElement("div", {
         key: "nv" + i,
         style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
           padding: "7px 16px",
           borderTop: i > 0 ? "0.5px solid var(--color-border-tertiary)" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
@@ -1224,7 +1297,12 @@ function DetalleVentasDia({
           color: info.c,
           flexShrink: 0
         }
-      }, info.ic, " ", info.t));
+      }, info.ic, " ", info.t)), p.id && /*#__PURE__*/React.createElement(PieEnvases, {
+        c: p,
+        ventas: todasLasVentas || [],
+        onEditar: onEditarCliente,
+        onPerdidaCliente: onPerdidaCliente
+      }));
     }));
   })()));
 }
@@ -1232,6 +1310,8 @@ function PlanillaDelDia({
   dia,
   fecha,
   ventas,
+  todasLasVentas,
+  dispMovs,
   clientes,
   planilla,
   productos,
@@ -1243,7 +1323,11 @@ function PlanillaDelDia({
   onCerrarDia,
   initCierre,
   noVisitas,
-  cargasDia
+  cargasDia,
+  onEditarVenta,
+  onEliminarVenta,
+  onEditarCliente,
+  onPerdidaCliente
 }) {
   const [enviosInforme, setEnviosInforme] = React.useState(() => Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`) || 0));
   const [enviandoCierre, setEnviandoCierre] = React.useState(false);
@@ -1418,6 +1502,9 @@ function PlanillaDelDia({
     b20: ""
   });
   const [editandoCapFija, setEditandoCapFija] = useState(null);
+  // Cartel de confirmación antes de mover algo del/al Depósito — pedido del
+  // usuario: la app tiene que avisar y preguntar, no mover en silencio.
+  const [mostrarConfirmDeposito, setMostrarConfirmDeposito] = useState(false);
 const guardarCapacidadFija = (pk, valorStr) => {
   const cajon = pk === "soda" ? CAJON_SODA : 1;
   const s2 = JSON.parse(JSON.stringify(stock || {}));
@@ -1441,7 +1528,8 @@ const guardarCapacidadFija = (pk, valorStr) => {
   const vendidosDia = {
     soda: 0,
     b10: 0,
-    b20: 0
+    b20: 0,
+    disp: 0
   };
   ventas.forEach(v => v.detalle.forEach(d => {
     const k = prodKey[d.nombre];
@@ -1450,12 +1538,14 @@ const guardarCapacidadFija = (pk, valorStr) => {
   const prestadosDia = {
       soda: 0,
       b10: 0,
-      b20: 0
+      b20: 0,
+      disp: 0
     },
     devueltosDia = {
       soda: 0,
       b10: 0,
-      b20: 0
+      b20: 0,
+      disp: 0
     };
   ventas.forEach(v => {
     (v.envPrest || []).forEach(e => {
@@ -1466,6 +1556,12 @@ const guardarCapacidadFija = (pk, valorStr) => {
       const k = prodKey[e.prod];
       if (k) devueltosDia[k] += Number(e.cant) || 0;
     });
+  });
+  // Dispenser: no se "vende", se presta/retira en comodato directo al
+  // cliente (ver registrarDispMov en 16-app.js) — se suma acá por separado
+  // para que aparezca en el mismo informe del día que sifón/bidones.
+  (dispMovs || []).forEach(m => {
+    if (m.delta > 0) prestadosDia.disp += m.delta;else devueltosDia.disp += -m.delta;
   });
   const sobrantes = {},
     vaciosRec = {};
@@ -1537,29 +1633,16 @@ const guardarCapacidadFija = (pk, valorStr) => {
     b10: (stock?.soderia?.bidon10 || 0) + (stock?.soderia_vacios?.bidon10 || 0) + enClientesPrestado.b10,
     b20: (stock?.soderia?.bidon20 || 0) + (stock?.soderia_vacios?.bidon20 || 0) + enClientesPrestado.b20
   };
-  const confirmarCierre = async () => {
-    if (enviandoCierre) return;
-    // IMPORTANTE: bloquear el botón de inmediato. Sin este flag, un
-    // doble-toque (muy común cuando el guardado tarda un instante) podía
-    // disparar confirmarCierre() dos veces seguidas y sumar los mismos
-    // envases a sodería dos veces — una causa real de la acumulación de
-    // envases reportada.
-    setEnviandoCierre(true);
-    localStorage.setItem(cierreKey, "1"); // marcar como confirmado
-    const s = JSON.parse(JSON.stringify(stock));
-    if (!s.soderia_vacios) s.soderia_vacios = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0
-    };
-    if (!s.casa) s.casa = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0
-    };
+  // Calcula cuánto hay que sumar o sacar del Depósito para que sodería
+  // vuelva a su número fijo (misma cuenta que antes hacía confirmarCierre
+  // al vuelo, pero SIN tocar el stock) — se separa para poder mostrar el
+  // resultado en un cartel de confirmación ANTES de aplicar el cambio.
+  const calcularMovimientoDeposito = () => {
     const diffs = {};
+    const diffDeposito = {};
+    const llenTotalFijo = {};
+    const vacRealFijo = {};
     ["soda", "b10", "b20"].forEach(pk => {
-      const sk = planKeyToStockKey[pk];
       const CAJON_F = pk === "soda" ? CAJON_SODA : 1;
       // Si el cajón de soda quedó a medio vender, los sifones sueltos que le
       // quedan siguen llenos — no se pierden solo porque no llenan un cajón
@@ -1591,14 +1674,50 @@ const guardarCapacidadFija = (pk, valorStr) => {
       // diferencia — no ambos.
       const esperadoPk = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
       const vuelveTotalPk = llenTotal + vacReal;
-      const diffDepositoPk = vuelveTotalPk - esperadoPk;
+      diffDeposito[pk] = vuelveTotalPk - esperadoPk;
       const factorFijo = vuelveTotalPk > 0 ? esperadoPk / vuelveTotalPk : 1;
-      const llenTotalFijo = Math.max(0, Math.round(llenTotal * factorFijo));
-      const vacRealFijo = Math.max(0, Math.round(vacReal * factorFijo));
-      s.soderia[sk] = (s.soderia[sk] || 0) + llenTotalFijo;
-      s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacRealFijo;
+      llenTotalFijo[pk] = Math.max(0, Math.round(llenTotal * factorFijo));
+      vacRealFijo[pk] = Math.max(0, Math.round(vacReal * factorFijo));
+    });
+    return {
+      diffs,
+      diffDeposito,
+      llenTotalFijo,
+      vacRealFijo
+    };
+  };
+  const confirmarCierre = async () => {
+    if (enviandoCierre) return;
+    // IMPORTANTE: bloquear el botón de inmediato. Sin este flag, un
+    // doble-toque (muy común cuando el guardado tarda un instante) podía
+    // disparar confirmarCierre() dos veces seguidas y sumar los mismos
+    // envases a sodería dos veces — una causa real de la acumulación de
+    // envases reportada.
+    setEnviandoCierre(true);
+    localStorage.setItem(cierreKey, "1"); // marcar como confirmado
+    const s = JSON.parse(JSON.stringify(stock));
+    if (!s.soderia_vacios) s.soderia_vacios = {
+      sifon: 0,
+      bidon10: 0,
+      bidon20: 0
+    };
+    if (!s.casa) s.casa = {
+      sifon: 0,
+      bidon10: 0,
+      bidon20: 0
+    };
+    const {
+      diffs,
+      diffDeposito,
+      llenTotalFijo,
+      vacRealFijo
+    } = calcularMovimientoDeposito();
+    ["soda", "b10", "b20"].forEach(pk => {
+      const sk = planKeyToStockKey[pk];
+      s.soderia[sk] = (s.soderia[sk] || 0) + llenTotalFijo[pk];
+      s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacRealFijo[pk];
       s.camion[sk] = 0;
-      s.casa[sk] = (s.casa[sk] || 0) + diffDepositoPk;
+      s.casa[sk] = (s.casa[sk] || 0) + diffDeposito[pk];
     });
     // Sembrar la capacidad fija (si todavía no está guardada) para que el
     // checksum "cuadra con el fijo" tenga una referencia estable de acá en
@@ -1627,6 +1746,18 @@ const guardarCapacidadFija = (pk, valorStr) => {
     // arqueo del día y recién ahí, con el botón "Enviar informe" ya
     // habilitado, decida mandarlo.
     setMostrarCierre(false);
+    setMostrarConfirmDeposito(false);
+  };
+  // Antes de cerrar, si hace falta agregar o sacar algo del Depósito (porque
+  // sobra o falta en sodería), se pregunta primero — si no hace falta mover
+  // nada, se cierra directo sin molestar con un cartel de más.
+  const intentarCerrar = () => {
+    if (enviandoCierre) return;
+    const {
+      diffDeposito
+    } = calcularMovimientoDeposito();
+    const hayMovimiento = ["soda", "b10", "b20"].some(pk => diffDeposito[pk] !== 0);
+    if (hayMovimiento) setMostrarConfirmDeposito(true);else confirmarCierre();
   };
   if (mostrarCierre) {
     return /*#__PURE__*/React.createElement("div", {
@@ -1638,14 +1769,12 @@ const guardarCapacidadFija = (pk, valorStr) => {
       style: {
         padding: 16
       }
-    }, /*#__PURE__*/React.createElement("details", {
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12
       }
-    }, /*#__PURE__*/React.createElement("summary", {
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
-        cursor: "pointer",
-        listStyle: "none",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1659,12 +1788,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
         fontWeight: 500,
         color: "var(--color-text-primary)"
       }
-    }, "Ver detalle del día (lo cargado y los movimientos)"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: "var(--color-text-tertiary)"
-      }
-    }, "▾")), /*#__PURE__*/React.createElement("div", {
+    }, "📋 Detalle del día (lo cargado y los movimientos)")), /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 8
       }
@@ -1713,7 +1837,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
         textAlign: h ? "center" : "left",
         fontWeight: 500
       }
-    }, h))), [["Soda", "soda"], ["10L", "b10"], ["20L", "b20"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
+    }, h))), [["Soda", "soda"], ["10L", "b10"], ["20L", "b20"], ["Dispenser", "disp"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
       key: pk,
       style: {
         display: "grid",
@@ -1946,9 +2070,95 @@ const guardarCapacidadFija = (pk, valorStr) => {
         cursor: enviandoCierre ? "default" : "pointer",
         opacity: enviandoCierre ? 0.7 : 1
       },
-      onClick: confirmarCierre,
+      onClick: intentarCerrar,
       disabled: enviandoCierre
-    }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Confirmar y cerrar día")));
+    }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Confirmar y cerrar día"), mostrarConfirmDeposito && (() => {
+      const { diffDeposito } = calcularMovimientoDeposito();
+      const LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L" };
+      const filas = ["soda", "b10", "b20"].filter(pk => diffDeposito[pk] !== 0);
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.75)",
+          zIndex: 2000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          ...s.card,
+          maxWidth: 360,
+          width: "100%",
+          margin: 0
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 15,
+          fontWeight: 600,
+          color: "var(--color-text-primary)",
+          marginBottom: 6
+        }
+      }, "📦 Movimiento en el Depósito"), /*#__PURE__*/React.createElement("p", {
+        style: {
+          fontSize: 12,
+          color: "var(--color-text-tertiary)",
+          margin: "0 0 12px"
+        }
+      }, "Sodería tiene que volver a su número fijo — esto es lo que se va a mover en el Depósito para compensar."), filas.map(pk => {
+        const diff = diffDeposito[pk];
+        const cajon = pk === "soda" ? CAJON_SODA : 1;
+        const cant = pk === "soda" ? Math.round(Math.abs(diff) / cajon) : Math.abs(diff);
+        const unidad = pk === "soda" ? (cant === 1 ? "cajón" : "cajones") : cant === 1 ? "unidad" : "unidades";
+        return /*#__PURE__*/React.createElement("div", {
+          key: pk,
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "7px 0",
+            borderTop: "0.5px solid var(--color-border-tertiary)",
+            fontSize: 13
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: { color: "var(--color-text-secondary)" }
+        }, LBL[pk]), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontWeight: 600,
+            color: diff > 0 ? "var(--color-text-success)" : "var(--color-text-warning)"
+          }
+        }, diff > 0 ? `+ guardar ${cant} ${unidad}` : `− sacar ${cant} ${unidad}`));
+      }), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 8,
+          marginTop: 14
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          ...s.btn,
+          flex: 1
+        },
+        onClick: () => setMostrarConfirmDeposito(false)
+      }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+        style: {
+          flex: 1,
+          background: "#1d9e75",
+          color: "#fff",
+          border: "none",
+          borderRadius: 8,
+          padding: "10px",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer"
+        },
+        onClick: confirmarCierre
+      }, "✓ Confirmar"))));
+    })()));
   }
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
@@ -2425,7 +2635,13 @@ const guardarCapacidadFija = (pk, valorStr) => {
     ventas: todasVentasDia,
     clientes: clientes,
     noVisitas: noVisitas,
-    fecha: fecha
+    fecha: fecha,
+    productos: productos,
+    todasLasVentas: todasLasVentas,
+    onEditarVenta: onEditarVenta,
+    onEliminarVenta: onEliminarVenta,
+    onEditarCliente: onEditarCliente,
+    onPerdidaCliente: onPerdidaCliente
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,

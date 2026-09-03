@@ -289,6 +289,13 @@ function App() {
   }, []);
   const [fechaActual, setFechaActual] = useLS("sr_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj] = useState(null);
+  // Si se entró a "clientes" con el atajo directo desde el menú (tocando el
+  // día, cuando el camión ya estaba cargado hoy — salta diaPrincipal y
+  // selectorFechaClientes), "Volver" tiene que volver directo al menú
+  // también. Si no, "Volver" quedaba yendo por el camino largo de siempre
+  // (selectorFechaClientes → diaPrincipal → menu = 3 pasos) aunque entrar
+  // había sido 1 solo paso. Mismo fix portado desde La Catalina.
+  const [origenClientes, setOrigenClientes] = useState(null);
   const [clienteId, setClienteId] = useState(null);
   const [initCierre, setInitCierre] = useState(false);
   const [noVisitas, setNoVisitas] = useLS("sr_novisitas_v1", []);
@@ -310,6 +317,27 @@ function App() {
       }];
       syncData({
         perdidas: next
+      });
+      return next;
+    });
+  };
+  // Registro de movimientos de dispenser (comodato) — préstamo/retiro directo
+  // al cliente, por día. Se guarda para poder informar cuánto se prestó/
+  // retiró en el Cierre del día, junto con sifón/bidones.
+  const [dispMovs, setDispMovs] = useLS("sr_dispmovs_v1", []);
+  const registrarDispMov = (clienteId, clienteNombre, delta) => {
+    if (!delta) return;
+    setDispMovs(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fechaKey: new Date().toLocaleDateString("en-CA"),
+        clienteId,
+        clienteNombre: clienteNombre || null,
+        delta,
+        _upd: Date.now()
+      }];
+      syncData({
+        dispMovs: next
       });
       return next;
     });
@@ -393,6 +421,32 @@ function App() {
   };
   const ventas = React.useMemo(() => (ventasRaw || []).map(normalizarFechaKey), [ventasRaw]);
   const setVentas = arg => setVentasRaw(typeof arg === 'function' ? prev => arg(prev) : arg);
+  // Migración única: corrige cobros de deuda cuyo campo "dia" quedó mal por
+  // el bug reportado (onCobrarSaldo guardaba diaActual en vez del día real
+  // del cliente — un pago de un cliente de los martes podía archivarse bajo
+  // otro día si esa era la última ruta activa cuando se cargó el pago).
+  // Solo toca el campo "dia" de ventas _esCobro; no toca saldo, fecha ni el
+  // enganche con ventas fiadas que haya saldado. Es idempotente. Portado de
+  // La Catalina.
+  React.useEffect(() => {
+    if (localStorage.getItem("sr_cobros_dia_migrados_v1")) return;
+    if (!ventas.length || !clientes.length) return;
+    const clientesPorId = {};
+    clientes.forEach(c => {
+      clientesPorId[c.id] = c;
+    });
+    const aCorregir = ventas.filter(v => v._esCobro && v.dia && clientesPorId[v.clienteId] && clientesPorId[v.clienteId].dia && v.dia !== clientesPorId[v.clienteId].dia);
+    if (aCorregir.length > 0) {
+      const idsCorregir = new Set(aCorregir.map(v => v.id));
+      saveVentas(prev => prev.map(v => idsCorregir.has(v.id) ? {
+        ...v,
+        dia: clientesPorId[v.clienteId].dia,
+        _upd: Date.now()
+      } : v));
+      console.log(`✓ Corregidos ${aCorregir.length} cobro(s) de deuda con el día equivocado.`);
+    }
+    localStorage.setItem("sr_cobros_dia_migrados_v1", "1");
+  }, [ventas, clientes]);
   const [productos, setProductos] = useLS("sr_productos_v3", PRODUCTOS_INICIALES);
   const normStock = s => {
     const e = () => ({
@@ -2492,6 +2546,7 @@ function App() {
       setFechaActual(fechaKey);
       setFechaObj(new Date(fechaKey + "T12:00:00"));
       const yaIniciado = planillas[`${dia}_${fechaKey}`]?.iniciado;
+      setOrigenClientes(yaIniciado ? "menu" : null);
       irA(yaIniciado ? "clientes" : "inicioReparto");
     },
     onDiaResumen: (dia, fechaKey) => {
@@ -2518,6 +2573,7 @@ function App() {
     onIrClientesDia: d => {
       setDiaActual(d);
       const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
+      setOrigenClientes(yaIniciado ? "menu" : null);
       irA(yaIniciado ? "clientes" : "selectorFechaClientes");
     }
   }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
@@ -2567,6 +2623,8 @@ function App() {
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual),
+    todasLasVentas: ventas,
+    dispMovs: dispMovs.filter(m => m.fechaKey === fechaActual),
     clientes: clientes,
     planilla: planillas[`${diaActual}_${fechaActual}`] || planillaDiaVacia(),
     productos: productos,
@@ -2580,7 +2638,22 @@ function App() {
     onCerrarDia: img => cerrarDia(fechaActual, diaActual, img),
     initCierre: initCierre,
     noVisitas: noVisitas,
-    cargasDia: cargasDia
+    cargasDia: cargasDia,
+    // Editar/eliminar venta y registrar envases prestados/devueltos directo
+    // desde la Planilla del día (antes solo se podía desde el perfil del
+    // cliente) — mismas funciones ya usadas en el resto de la app. Portado
+    // de La Catalina.
+    onEditarVenta: editarVenta,
+    onEliminarVenta: eliminarVenta,
+    onEditarCliente: (id, cambios) => {
+      const antes = clientes.find(c => c.id === id);
+      saveClientes(prev => prev.map(c => c.id === id ? {
+        ...c,
+        ...cambios
+      } : c));
+      if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
+    },
+    onPerdidaCliente: registrarPerdidaCliente
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
@@ -2589,6 +2662,9 @@ function App() {
     onSeleccionar: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
+      // Se pasó por selectorFechaClientes (camino normal, no el atajo desde
+      // el menú) — "Volver" desde clientes debe volver ahí, como siempre.
+      setOrigenClientes(null);
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
       irA(yaIniciado ? "clientes" : "inicioReparto");
     },
@@ -2661,6 +2737,7 @@ function App() {
         dispenser: Math.max(0, (Number(c.dispenser) || 0) + delta)
       } : c));
       if (antes) ajustarStockFijoCliente(antes, { ...antes, dispenser: Math.max(0, (Number(antes.dispenser) || 0) + delta) });
+      registrarDispMov(id, antes?.nombre, delta);
     },
     onEditarCliente: (id, cambios) => {
       const antes = clientes.find(c => c.id === id);
@@ -2679,7 +2756,11 @@ function App() {
       irA("venta");
     },
     onNuevoCliente: () => irA("nuevoCliente"),
-    onVolver: () => irA("selectorFechaClientes"),
+    // Si se entró con el atajo directo desde el menú (1 solo toque), volver
+    // también directo al menú — si no, "Volver" hacía el camino largo de
+    // siempre (selectorFechaClientes → diaPrincipal → menú, 3 toques) aunque
+    // entrar hubiera sido inmediato. Ver comentario junto a origenClientes.
+    onVolver: () => irA(origenClientes === "menu" ? "menu" : "selectorFechaClientes"),
     onReordenar: lista => {
       saveClientes(prev => [...prev.filter(c => c.dia !== diaActual), ...lista]);
     },
@@ -2808,12 +2889,18 @@ function App() {
         precio: 0,
         total: 0
       }];
+      // BUG REPORTADO: un cobro de deuda quedaba archivado bajo el día/fecha
+      // que la app tenía activos en ese momento (diaActual/fechaActual, que
+      // pueden venir de una sesión vieja o de otro cliente) en vez del día
+      // real del cliente y la fecha real de hoy — un pago de un cliente de
+      // los martes podía terminar archivado bajo "viernes". Portado de La
+      // Catalina.
       const vt = {
         id: Date.now(),
         clienteId: cl.id,
         cliente: cl.nombre,
-        dia: diaActual,
-        fechaKey: fechaActual,
+        dia: cl.dia,
+        fechaKey: new Date().toLocaleDateString("en-CA"),
         fecha: new Date().toLocaleString("es-AR"),
       hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
         detalle: det,
@@ -3151,12 +3238,17 @@ function App() {
           precio: 0,
           total: 0
         }];
-        const fk = fechaActual || new Date().toLocaleDateString("en-CA");
+        // BUG REPORTADO: mismo problema que en el perfil normal — Gestión
+        // permite ver cualquier cliente sin importar el día activo, así que
+        // ni diaActual ni fechaActual (que pueden venir de una sesión vieja)
+        // sirven acá. El cobro siempre va con el día del cliente y la fecha
+        // real de hoy. Portado de La Catalina.
+        const fk = new Date().toLocaleDateString("en-CA");
         const vt = {
           id: Date.now(),
           clienteId: cliente.id,
           cliente: cliente.nombre,
-          dia: diaActual || cliente.dia,
+          dia: cliente.dia,
           fechaKey: fk,
           fecha: new Date().toLocaleString("es-AR"),
       hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
@@ -3200,6 +3292,7 @@ function App() {
   }), pantalla === "agenda" && /*#__PURE__*/React.createElement(AgendaScreen, {
     recordatorios: recordatorios || [],
     clientes: clientes,
+    onReordenar: nuevaLista => saveRecordatorios(nuevaLista),
     onConfirmar: id => saveRecordatorios(prev => (prev || []).map(r => r.id === id ? {
       ...r,
       confirmado: true
@@ -3249,7 +3342,10 @@ function App() {
     onCobrar: (clienteId, monto, pago) => {
       const c = clientes.find(x => x.id === clienteId);
       if (!c) return;
-      const fk = fechaActual || new Date().toLocaleDateString("en-CA");
+      // "Fiados pendientes" es accesible sin importar el día activo — usar
+      // fechaActual acá corría el mismo riesgo de fecha vieja que el bug de
+      // onCobrarSaldo. Siempre la fecha real de hoy.
+      const fk = new Date().toLocaleDateString("en-CA");
       const vt = {
         id: Date.now(),
         clienteId: c.id,

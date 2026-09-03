@@ -43,7 +43,10 @@ function Prospectos({ prospectos, onGuardar, onEliminar, onConvertir, onVolver }
 
   const lista = (prospectos || [])
     .filter(p => verConvertidos || p.estado !== "convertido")
-    .sort((a, b) => (b.id || "").localeCompare(a.id || ""));
+    // String(...) defensivo: prospectos viejos podían tener id numérico,
+    // y localeCompare no existe en números — eso rompía la pantalla en
+    // celulares con datos viejos ("(b.id || "").localeCompare is not a function").
+    .sort((a, b) => String(b.id || "").localeCompare(String(a.id || "")));
 
   const renderForm = () => {
     if (!mostrarForm) return null;
