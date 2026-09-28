@@ -954,13 +954,82 @@ function HeaderBotones() {
     title: "Tamaño de texto"
   }, SCALE_LABELS_LC[scaleIdx]));
 }
+// ── Reloj del encabezado (portado de La Catalina) ────────────────────────────
+const _LC_DIAS_LARGO = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const _LC_MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function RelojHeaderLC() {
+  const [ahora, setAhora] = React.useState(() => new Date());
+  React.useEffect(() => {
+    let tid = null;
+    const programar = () => {
+      const d = new Date();
+      setAhora(d);
+      const falta = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds());
+      tid = setTimeout(programar, falta + 50);
+    };
+    programar();
+    const alVolver = () => {
+      if (document.visibilityState === "visible") {
+        if (tid) clearTimeout(tid);
+        programar();
+      }
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      if (tid) clearTimeout(tid);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, []);
+  const hh = String(ahora.getHours()).padStart(2, "0");
+  const mm = String(ahora.getMinutes()).padStart(2, "0");
+  const fecha = `${_LC_DIAS_LARGO[ahora.getDay()]} ${ahora.getDate()} de ${_LC_MESES_LARGO[ahora.getMonth()]}`;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      gap: 10,
+      padding: "0 14px 7px",
+      fontSize: 11.5,
+      color: "var(--color-text-tertiary)"
+    },
+    title: "Fecha y hora del dispositivo"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, fecha), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--color-text-secondary)",
+      fontWeight: 500,
+      flexShrink: 0,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, hh, ":", mm));
+}
 function HeaderApp({
   titulo,
   onVolver
 }) {
   const negocio = localStorage.getItem("sr_negocio_nombre") || "Sistema de Reparto";
   return /*#__PURE__*/React.createElement("div", {
-    style: s.header
+    style: {
+      position: "sticky",
+      top: 0,
+      zIndex: 10,
+      background: "var(--color-background-secondary)",
+      borderBottom: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.header,
+      position: "static",
+      background: "none",
+      borderBottom: "none",
+      paddingBottom: 4
+    }
   }, /*#__PURE__*/React.createElement("button", {
     style: s.backBtn,
     onClick: onVolver
@@ -974,7 +1043,7 @@ function HeaderApp({
     },
     onClick: () => window._lcIrInicio && window._lcIrInicio(),
     title: "Ir al inicio"
-  }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(HeaderBotones, null));
+  }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(HeaderBotones, null)), /*#__PURE__*/React.createElement(RelojHeaderLC, null));
 }
 // ════════════════════════════════════════════════════════════════════
 // ◆  CambioEnvasePanel — panel "🔄 Cambio de envase" UNIFICADO (venta,

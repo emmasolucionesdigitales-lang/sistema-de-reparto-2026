@@ -296,6 +296,19 @@ function App() {
   // (selectorFechaClientes → diaPrincipal → menu = 3 pasos) aunque entrar
   // había sido 1 solo paso. Mismo fix portado desde La Catalina.
   const [origenClientes, setOrigenClientes] = useState(null);
+  // Antes había 2 pantallas de perfil de cliente casi idénticas: una para
+  // cuando entrabas desde Clientes del día ("detalleCliente") y otra para
+  // Gestión/Agenda/Mapa/Dormidos ("detalleDesdeGestion") — se unificaron en
+  // una sola ("detalleCliente"); origenDetalle guarda de dónde viniste para
+  // que "Volver" y "Eliminar cliente" te devuelvan ahí. Portado de La Catalina.
+  const [origenDetalle, setOrigenDetalle] = useState("clientes");
+  // A dónde vuelve "Volver" desde la pantalla de venta (NuevaVenta) — cada
+  // punto de entrada la setea antes de irA("venta"). rutaDiariaVenta indica
+  // si esta carga es parte del recorrido diario real (auto-avanza al
+  // siguiente cliente pendiente al guardar/saltar) o una visita puntual
+  // (Gestión/Agenda/Mapa/Dormidos: guarda y vuelve, sin recorrer la ruta).
+  const [volverVentaA, setVolverVentaA] = useState("detalleCliente");
+  const [rutaDiariaVenta, setRutaDiariaVenta] = useState(true);
   const [clienteId, setClienteId] = useState(null);
   const [initCierre, setInitCierre] = useState(false);
   const [noVisitas, setNoVisitas] = useLS("sr_novisitas_v1", []);
@@ -1145,8 +1158,20 @@ function App() {
             d: viejas,
             archivadasEl: hoy.toISOString()
           }).then(() => {
-            const recientes = ventas.filter(v => !v.fechaKey || v.fechaKey >= limiteKey);
-            if (recientes.length < ventas.length) {
+            // Releer localStorage FRESCO acá (no la `ventas` capturada al
+            // montar el efecto): si llegó una venta nueva por sync mientras
+            // se archivaba, filtrar el array viejo la borraría. Se borran
+            // sólo los ids que efectivamente se archivaron. Portado de La
+            // Catalina.
+            const idsViejas = new Set(viejas.map(v => v.id));
+            let actualLS = [];
+            try {
+              actualLS = JSON.parse(localStorage.getItem("sr_ventas_v3") || "[]");
+            } catch {
+              actualLS = ventasRaw || [];
+            }
+            const recientes = actualLS.filter(v => !idsViejas.has(v.id));
+            if (recientes.length < actualLS.length) {
               console.log("Limpieza automática: archivadas " + viejas.length + " ventas antiguas en Firebase");
               setVentasRaw(recientes);
               syncData({
@@ -1194,8 +1219,21 @@ function App() {
             d: viejasNV,
             archivadasEl: hoy.toISOString()
           }).then(() => {
-            const recientesNV = noVisitas.filter(v => !v.fecha || v.fecha >= limiteKey);
-            if (recientesNV.length < noVisitas.length) {
+            // Mismo criterio que arriba: releer localStorage fresco y borrar
+            // sólo los ids archivados, no filtrar el array capturado al
+            // montar el efecto. Portado de La Catalina.
+            // Los registros de noVisitas no tienen id propio (se identifican
+            // por clienteId+dia+fecha), a diferencia de las ventas.
+            const claveNV = v => `${v.clienteId}|${v.dia}|${v.fecha}`;
+            const clavesViejas = new Set(viejasNV.map(claveNV));
+            let actualNV = [];
+            try {
+              actualNV = JSON.parse(localStorage.getItem("sr_novisitas_v1") || "[]");
+            } catch {
+              actualNV = noVisitas || [];
+            }
+            const recientesNV = actualNV.filter(v => !clavesViejas.has(claveNV(v)));
+            if (recientesNV.length < actualNV.length) {
               console.log("Limpieza automática: archivadas " + viejasNV.length + " marcas de visita antiguas en Firebase");
               setNoVisitas(recientesNV);
               syncData({
@@ -1414,10 +1452,16 @@ function App() {
           } catch {}
         }
         try {
+          // sinBorrar: el backup puede ser más viejo que lo que ya subieron
+          // otros aparatos desde que se hizo — no hay que borrar lo que
+          // falte acá. Recién después se recarga de la nube (abajo) para
+          // que el merge normal (por _upd) reconcilie todo. Portado de La
+          // Catalina.
           cloudSave({
             ...estadoRef.current,
             ...data
-          }, window._negocioId);
+          }, window._negocioId, { sinBorrar: true });
+          setTimeout(() => window.location.reload(), 1500);
         } catch {}
         return true;
       } catch (e) {
@@ -1437,16 +1481,25 @@ function App() {
     const hoy = new Date().toLocaleDateString("en-CA");
     if (ultimoBackup === hoy) return; // ya se hizo hoy
     try {
-      localStorage.setItem("sr_lc_backup_" + hoy, JSON.stringify({
-        clientes,
-        ventas,
-        planillas
-      }));
-      localStorage.setItem("sr_lc_ultimo_backup", hoy);
-      // Mantener solo el último backup (el de ayer)
-      const keys = Object.keys(localStorage).filter(k => k.startsWith("sr_lc_backup_")).sort().reverse();
-      keys.slice(1).forEach(k => localStorage.removeItem(k));
-      console.log("Auto-backup diario guardado:", hoy);
+      // Borrar los backups viejos ANTES de escribir el nuevo (no después):
+      // si el almacenamiento está casi lleno, escribir primero necesitaría
+      // el doble de espacio libre y podría fallar por quedarse sin lugar.
+      // Portado de La Catalina.
+      const keysViejas = Object.keys(localStorage).filter(k => k.startsWith("sr_lc_backup_"));
+      keysViejas.forEach(k => localStorage.removeItem(k));
+      try {
+        localStorage.setItem("sr_lc_backup_" + hoy, JSON.stringify({
+          clientes,
+          ventas,
+          planillas
+        }));
+        localStorage.setItem("sr_lc_ultimo_backup", hoy);
+        console.log("Auto-backup diario guardado:", hoy);
+      } catch (e2) {
+        // Ni con el espacio liberado entró: no dejar una clave a medio escribir.
+        localStorage.removeItem("sr_lc_backup_" + hoy);
+        throw e2;
+      }
     } catch (e) {
       console.warn("Auto-backup falló:", e);
     }
@@ -1808,6 +1861,18 @@ function App() {
     });
   };
   const cliente = clientes.find(c => c.id === clienteId) || null;
+  // A qué pantalla vuelve el perfil del cliente ("Volver", "Eliminar
+  // cliente") según por dónde se entró — ver comentario junto a
+  // origenDetalle más arriba. Portado de La Catalina.
+  const pantallaOrigenDetalle = () => ({
+    clientes: "clientes",
+    gestion: "gestionClientes",
+    agenda: "agenda",
+    dormidos: "clientesDormidos",
+    mapa: "mapaClientes",
+    resumen: "resumen",
+    menu: "menu"
+  })[origenDetalle] || "clientes";
   const irA = p => {
     const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
     if (needsDia.includes(p) && !diaActual) {
@@ -1888,6 +1953,50 @@ function App() {
     }));
   };
   const getPlanilla = dia => planillas[dia] || planillaDiaVacia();
+
+  // ── Reparación: cierres que quedaron marcados sólo en este dispositivo ──
+  // Cerrar un día deja DOS marcas: una en localStorage (`cierre_<dia>_<fecha>`,
+  // que confirmarCierre escribe de inmediato) y `_diaCerrado` en la planilla,
+  // que es la que sincroniza a la nube. Si está la primera y falta la segunda,
+  // el cierre se hizo pero no llegó a guardarse (falló, o un merge de la nube
+  // lo pisó justo después): el día se ve cerrado acá y abierto en otro equipo.
+  // Se repone SÓLO la bandera. El movimiento de stock del cierre ya se hizo en
+  // su momento y NO se repite.
+  const cierresReparadosRef = React.useRef(false);
+  React.useEffect(() => {
+    if (cierresReparadosRef.current) return;
+    const claves = Object.keys(planillas || {});
+    if (claves.length === 0) return;
+    // La clave de planilla es `${dia}_${fechaKey}` y la del cierre es la misma
+    // con el prefijo `cierre_`, así que se corresponden directo.
+    const aReparar = claves.filter(k => {
+      const pl = planillas[k];
+      if (!pl || pl._diaCerrado) return false;
+      try {
+        return !!localStorage.getItem(`cierre_${k}`);
+      } catch {
+        return false;
+      }
+    });
+    if (aReparar.length === 0) return;
+    cierresReparadosRef.current = true; // una sola vez por sesión
+    console.log(`✓ Reponiendo la marca de cierre en ${aReparar.length} planilla(s):`, aReparar);
+    savePlanillasCloud(prev => {
+      const next = {
+        ...prev
+      };
+      aReparar.forEach(k => {
+        if (next[k] && !next[k]._diaCerrado) {
+          next[k] = {
+            ...next[k],
+            _diaCerrado: true,
+            _upd: Date.now()
+          };
+        }
+      });
+      return next;
+    });
+  }, [planillas]);
 
   // Auto-guardado de planilla cuando todos los clientes del día tienen estado
   React.useEffect(() => {
@@ -2191,6 +2300,13 @@ function App() {
       ...c2,
       saldo: (Number(c2.saldo) || 0) + calc.saldoDelta
     } : c2));
+    // Si el cliente tenía recordatorios pendientes en Agenda, se resuelven
+    // solos al registrarle una venta — no hace falta ir a Agenda a tocar "✓".
+    saveRecordatorios(prev => (prev || []).map(r => r.clienteId === c.id && !r.confirmado ? {
+      ...r,
+      confirmado: true,
+      _upd: Date.now()
+    } : r));
   };
   const renumerarTrasEliminar = (lista, clienteEliminado) => {
     const {
@@ -2499,6 +2615,12 @@ function App() {
     onPromociones: () => irA("prospectos"),
     onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onNuevoCliente: () => irA("nuevoCliente"),
+    onVerDeudor: (c, d) => {
+      setDiaActual(d);
+      setClienteId(c.id);
+      setOrigenDetalle("menu");
+      irA("detalleCliente");
+    },
     planillas: planillas,
     onVolver: () => irA("portada"),
     darkMode: darkMode,
@@ -2580,6 +2702,7 @@ function App() {
     planillas: planillas,
     ventas: ventas,
     clientes: clientes,
+    noVisitas: noVisitas,
     onSeleccionar: (fk, dia) => {
       setDiaActual(dia);
       setFechaActual(fk);
@@ -2653,7 +2776,17 @@ function App() {
       } : c));
       if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
     },
-    onPerdidaCliente: registrarPerdidaCliente
+    onPerdidaCliente: registrarPerdidaCliente,
+    onConfirmarTransfer: (clienteId, ventaId) => {
+      saveVentas(prev => prev.map(v => v.id === ventaId ? {
+        ...v,
+        transConfirmada: !v.transConfirmada,
+        _upd: Date.now()
+      } : v));
+    },
+    // Volver a "Inicio del reparto" para corregir la cantidad de envases con
+    // la que se salió, incluso si el día ya estaba iniciado.
+    onEditarCarga: () => irA("inicioReparto")
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
@@ -2749,10 +2882,13 @@ function App() {
     },
     onSeleccionar: c => {
       setClienteId(c.id);
+      setOrigenDetalle("clientes");
       irA("detalleCliente");
     },
     onEntregar: c => {
       setClienteId(c.id);
+      setVolverVentaA("clientes");
+      setRutaDiariaVenta(true);
       irA("venta");
     },
     onNuevoCliente: () => irA("nuevoCliente"),
@@ -2799,6 +2935,7 @@ function App() {
     onSeleccionar: c => {
       setClienteId(c.id);
       setDiaActual(c.dia);
+      setOrigenDetalle("dormidos");
       irA("detalleCliente");
     },
     onEditarCliente: (id, cambios) => {
@@ -2813,33 +2950,64 @@ function App() {
     onPerdida: registrarPerdida,
     onPerdidaCliente: registrarPerdidaCliente
   })), pantalla === "detalleCliente" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
+    // Antes esta pantalla estaba duplicada (una copia para cuando entrabas
+    // desde Clientes del día, otra —"detalleDesdeGestion"— para Gestión,
+    // Agenda, Mapa y Dormidos) con ~90 líneas casi idénticas. Se unificó acá;
+    // origenDetalle (seteado por cada punto de entrada antes de navegar)
+    // decide a dónde vuelve "Volver"/"Eliminar cliente" y si corresponde el
+    // recorrido diario (auto-avance al siguiente cliente pendiente). Portado
+    // de La Catalina.
     cliente: cliente,
     ventas: ventas.filter(v => v.clienteId === cliente.id),
     noVisitas: (noVisitas || []).filter(v => v.clienteId === cliente.id),
-    dia: diaActual,
+    dia: diaActual || cliente.dia,
     fecha: fechaActual,
     productos: productos,
-    onVenta: () => irA("venta"),
-    onVolver: () => irA("clientes"),
+    onVenta: () => {
+      setVolverVentaA("detalleCliente");
+      const esRutaDiaria = origenDetalle === "clientes";
+      setRutaDiariaVenta(esRutaDiaria);
+      const hoyKey = new Date().toLocaleDateString("en-CA");
+      if (esRutaDiaria) {
+        if (fechaActual !== hoyKey) setFechaActual(hoyKey);
+      } else {
+        setDiaActual(cliente.dia);
+        if (!fechaActual) setFechaActual(hoyKey);
+      }
+      irA("venta");
+    },
+    onVolver: () => irA(pantallaOrigenDetalle()),
     onEditar: cambios => updateCliente(cliente.id, cambios),
     onPerdida: registrarPerdida,
     onPerdidaCliente: registrarPerdidaCliente,
     onEliminarVenta: eliminarVenta,
     onEditarVenta: editarVenta,
-    onEliminarCliente: () => eliminarCliente(cliente.id),
+    onEliminarCliente: () => {
+      eliminarCliente(cliente.id);
+      irA(pantallaOrigenDetalle());
+    },
     onNoEstaCliente: () => {
-      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaActual && v.fecha === fechaActual)), {
+      const diaN = diaActual || cliente.dia;
+      const fechaN = fechaActual || new Date().toLocaleDateString("en-CA");
+      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaN && v.fecha === fechaN)), {
         clienteId: cliente.id,
-        dia: diaActual,
-        fecha: fechaActual,
+        dia: diaN,
+        fecha: fechaN,
         motivo: "noesta",
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
-      const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste).map(v => v.clienteId));
+      // El auto-avance al siguiente cliente pendiente solo tiene sentido
+      // dentro del recorrido diario real — para una visita puntual, guardamos
+      // y volvemos a donde estábamos.
+      if (origenDetalle !== "clientes") {
+        irA(pantallaOrigenDetalle());
+        return;
+      }
+      const clientesDia = clientes.filter(c => c.dia === diaN).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaN && v.dia === diaN && !v._esCobro && !v._esAjuste).map(v => v.clienteId));
       const noVMap = {};
-      nv.filter(v => v.dia === diaActual && v.fecha === fechaActual).forEach(v => {
+      nv.filter(v => v.dia === diaN && v.fecha === fechaN).forEach(v => {
         noVMap[v.clienteId] = v.motivo;
       });
       const terminados = new Set(clientesDia.filter(c => ventasIds.has(c.id) || noVMap[c.id] === "noquiso" || noVMap[c.id] === "noesta2").map(c => c.id));
@@ -2852,18 +3020,24 @@ function App() {
       } else irA("clientes");
     },
     onNoQuiereCliente: () => {
-      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaActual && v.fecha === fechaActual)), {
+      const diaN = diaActual || cliente.dia;
+      const fechaN = fechaActual || new Date().toLocaleDateString("en-CA");
+      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaN && v.fecha === fechaN)), {
         clienteId: cliente.id,
-        dia: diaActual,
-        fecha: fechaActual,
+        dia: diaN,
+        fecha: fechaN,
         motivo: "noquiso",
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
-      const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste).map(v => v.clienteId));
+      if (origenDetalle !== "clientes") {
+        irA(pantallaOrigenDetalle());
+        return;
+      }
+      const clientesDia = clientes.filter(c => c.dia === diaN).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaN && v.dia === diaN && !v._esCobro && !v._esAjuste).map(v => v.clienteId));
       const noVMap = {};
-      nv.filter(v => v.dia === diaActual && v.fecha === fechaActual).forEach(v => {
+      nv.filter(v => v.dia === diaN && v.fecha === fechaN).forEach(v => {
         noVMap[v.clienteId] = v.motivo;
       });
       const terminados = new Set(clientesDia.filter(c => ventasIds.has(c.id) || noVMap[c.id] === "noquiso" || noVMap[c.id] === "noesta2").map(c => c.id));
@@ -2889,12 +3063,9 @@ function App() {
         precio: 0,
         total: 0
       }];
-      // BUG REPORTADO: un cobro de deuda quedaba archivado bajo el día/fecha
-      // que la app tenía activos en ese momento (diaActual/fechaActual, que
-      // pueden venir de una sesión vieja o de otro cliente) en vez del día
-      // real del cliente y la fecha real de hoy — un pago de un cliente de
-      // los martes podía terminar archivado bajo "viernes". Portado de La
-      // Catalina.
+      // Un cobro de deuda va con el día real del cliente y la fecha de hoy —
+      // no con diaActual/fechaActual, que pueden ser de otra ruta o estar
+      // vacíos si se entró por Gestión/Agenda/Mapa/Dormidos.
       const vt = {
         id: Date.now(),
         clienteId: cl.id,
@@ -2926,6 +3097,12 @@ function App() {
         ...x,
         saldo: (Number(x.saldo) || 0) + monto
       } : x));
+      // Un cobro también resuelve recordatorios pendientes de este cliente.
+      saveRecordatorios(prev => (prev || []).map(r => r.clienteId === cl.id && !r.confirmado ? {
+        ...r,
+        confirmado: true,
+        _upd: Date.now()
+      } : r));
     },
     onGuardarAjuste: vt => {
       saveVentas(prev => [...prev, vt]);
@@ -2976,6 +3153,14 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
+      // El auto-avance al siguiente cliente pendiente solo aplica al
+      // recorrido diario real — una visita puntual (Gestión/Agenda/Mapa/
+      // Dormidos) guarda y vuelve a donde estaba, sin "hacer todo el camino"
+      // del reparto. Portado de La Catalina.
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       irAlSiguiente(getSiguienteDelDia(nv, clienteId));
     },
     onNoQuiere: (envPrest, envDev) => {
@@ -3020,10 +3205,22 @@ function App() {
         }]);
         saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, clienteId, _ep, _ed));
       }
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       irAlSiguiente(getSiguienteDelDia(nv, clienteId));
     },
     onGuardar: (d, p, m, sa, ep, ed, obs, op, mt2, sd, tc) => {
       registrarVenta(clienteId, d, p, m, sa, ep, ed, obs, op, mt2, sd, tc);
+      // El auto-avance al siguiente cliente pendiente del recorrido solo
+      // aplica cuando esto ES el recorrido diario real — una visita puntual
+      // (entrada desde Gestión/Agenda/Mapa/Dormidos) simplemente guarda y
+      // vuelve a donde estaba.
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       // Usar noVisitas actual (sin cambios) — la venta ya marca al cliente como visitado
       irAlSiguiente(getSiguienteDelDia(noVisitas, clienteId));
     },
@@ -3036,9 +3233,13 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       irAlSiguiente(getSiguienteDelDia(nv, clienteId));
     },
-    onVolver: () => irA("detalleCliente")
+    onVolver: () => irA(volverVentaA || "detalleCliente")
   }), pantalla === "nuevoCliente" && /*#__PURE__*/React.createElement(NuevoCliente, {
     diaActual: diaActual,
     productos: productos,
@@ -3140,11 +3341,16 @@ function App() {
       setFechaActual(hoyKey);
       setFechaObj(new Date(hoyKey + "T12:00:00"));
       if (!diaActual) setDiaActual(c.dia);
+      // Visita puntual desde Gestión (no forma parte del recorrido diario):
+      // al guardar, vuelve directo acá — no auto-avanza por la ruta.
+      setVolverVentaA("gestionClientes");
+      setRutaDiariaVenta(false);
       irA("venta");
     },
     onVerDetalle: c => {
       setClienteId(c.id);
-      irA("detalleDesdeGestion");
+      setOrigenDetalle("gestion");
+      irA("detalleCliente");
     },
     onHistorial: undefined,
     onBackup: undefined,
@@ -3194,102 +3400,12 @@ function App() {
       const hoy = new Date().toLocaleDateString("en-CA");
       setFechaActual(hoy);
       setFechaObj(new Date(hoy + "T12:00:00"));
-      irA("detalleDesdeGestion");
+      setOrigenDetalle("mapa");
+      irA("detalleCliente");
     },
     onActualizar: nuevosClientes => saveClientes(nuevosClientes),
     onVolver: () => irA("menu")
-  })), pantalla === "detalleDesdeGestion" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
-    cliente: cliente,
-    ventas: ventas.filter(v => v.clienteId === cliente.id),
-    noVisitas: (noVisitas || []).filter(v => v.clienteId === cliente.id),
-    dia: diaActual || cliente.dia,
-    fecha: fechaActual,
-    productos: productos,
-    onVenta: () => {
-      setDiaActual(cliente.dia);
-      const hoy = new Date().toLocaleDateString("en-CA");
-      setFechaActual(hoy);
-      setFechaObj(new Date(hoy + "T12:00:00"));
-      irA("venta");
-    },
-    onVolver: () => irA("gestionClientes"),
-    onEditar: cambios => updateCliente(cliente.id, cambios),
-    onPerdida: registrarPerdida,
-    onPerdidaCliente: registrarPerdidaCliente,
-    onEliminarVenta: eliminarVenta,
-    onEditarVenta: editarVenta,
-    onEliminarCliente: () => {
-      eliminarCliente(cliente.id);
-      irA("gestionClientes");
-    },
-    onNoEstaCliente: () => {},
-    onNoQuiereCliente: () => {},
-    recordatorios: recordatorios,
-    onGuardarRecordatorio: r => saveRecordatorios(prev => [...(prev || []), r]),
-    onConfirmarRecordatorio: id => saveRecordatorios(prev => (prev || []).map(r => r.id === id ? {
-      ...r,
-      confirmado: true
-    } : r)),
-    onCobrarSaldo: (monto, pago) => {
-      if (cliente) {
-        const det = [{
-          nombre: "Cobro de deuda",
-          cantidad: 1,
-          precio: 0,
-          total: 0
-        }];
-        // BUG REPORTADO: mismo problema que en el perfil normal — Gestión
-        // permite ver cualquier cliente sin importar el día activo, así que
-        // ni diaActual ni fechaActual (que pueden venir de una sesión vieja)
-        // sirven acá. El cobro siempre va con el día del cliente y la fecha
-        // real de hoy. Portado de La Catalina.
-        const fk = new Date().toLocaleDateString("en-CA");
-        const vt = {
-          id: Date.now(),
-          clienteId: cliente.id,
-          cliente: cliente.nombre,
-          dia: cliente.dia,
-          fechaKey: fk,
-          fecha: new Date().toLocaleString("es-AR"),
-      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
-          detalle: det,
-          pago,
-          obs: `Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,
-          saldoAplicado: 0,
-          neto: 0,
-          bruto: 0,
-          desc: 0,
-          costo: 0,
-          ganancia: 0,
-          pagadoNum: monto,
-          saldoDelta: monto,
-          envPrest: [],
-          envDev: [],
-          saldoAntes: cliente.saldo || 0,
-          saldoDespues: (cliente.saldo || 0) + monto,
-          _esCobro: true,
-          _upd: Date.now()
-        };
-        saveVentas(prev => [...prev, vt]);
-        saveClientes(prev => prev.map(x => x.id === cliente.id ? {
-          ...x,
-          saldo: (Number(x.saldo) || 0) + monto
-        } : x));
-      }
-    },
-    // BUG REPORTADO (mismo patrón encontrado y corregido en La Catalina): el
-    // ajuste de saldo de un cliente se perdía en silencio al entrar por
-    // Gestión de clientes / Mapa (esta pantalla) en vez de por la lista
-    // diaria normal (pantalla "detalleCliente", más arriba) — acá nunca se
-    // pasaba onGuardarAjuste, y DetalleCliente lo llama con "&&" de guarda
-    // (no explota, pero tampoco guarda nada).
-    onGuardarAjuste: vt => {
-      saveVentas(prev => [...prev, vt]);
-    },
-    onGuardarCambio: vt => {
-      saveVentas(prev => [...prev, vt]);
-    }
-  }), pantalla === "agenda" && /*#__PURE__*/React.createElement(AgendaScreen, {
+  })), pantalla === "agenda" && /*#__PURE__*/React.createElement(AgendaScreen, {
     recordatorios: recordatorios || [],
     clientes: clientes,
     onReordenar: nuevaLista => saveRecordatorios(nuevaLista),
@@ -3318,6 +3434,7 @@ function App() {
       if (c) {
         setClienteId(clienteId);
         setDiaActual(c.dia);
+        setOrigenDetalle("agenda");
         irA("detalleCliente");
       }
     },
@@ -3409,6 +3526,12 @@ function App() {
     productos: productos,
     planillas: planillas,
     noVisitas: noVisitas || [],
+    onSeleccionarCliente: c => {
+      if (!diaActual) setDiaActual(c.dia);
+      setClienteId(c.id);
+      setOrigenDetalle("resumen");
+      irA("detalleCliente");
+    },
     onVolver: () => irA("menu")
   }), pantalla === "config" && /*#__PURE__*/React.createElement(Config, {
     productos: productos,

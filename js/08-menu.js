@@ -35,7 +35,8 @@ function MenuDias({
   onFiados,
   onDormidos,
   onIrPlanillaDia,
-  onIrClientesDia
+  onIrClientesDia,
+  onVerDeudor
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   // Antes, tocar un día llevaba a una pantalla intermedia ("Día Principal")
@@ -45,6 +46,7 @@ function MenuDias({
   const [diaExpandido, setDiaExpandido] = React.useState(null);
   const [mostrarRecordatorios, setMostrarRecordatorios] = React.useState(false);
   const [mostrarTransferencias, setMostrarTransferencias] = React.useState(false);
+  const [deudaExpandida, setDeudaExpandida] = React.useState(null);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   const hoyFechaKey = (() => {
     const d = new Date();
@@ -64,6 +66,13 @@ function MenuDias({
   const horaActual = new Date().getHours();
   const hayPendHoy = clientesHoy.length > 0 && !diaCompleto;
   const estadoHoy = diaCompleto ? "listo" : hayPendHoy && horaActual >= 17 ? "rojo" : hayPendHoy && horaActual >= 12 ? "naranja" : "normal";
+  // Notificaciones (Recordatorios pendientes / Transferencias sin confirmar):
+  // en vez de un solo número, mostrar días y clientes distintos por
+  // separado ("(D:2) ; (C:5)") para saber de un vistazo el alcance real.
+  const recDiasCount = new Set((recordatoriosActivos || []).map(r => r.dia)).size;
+  const recClientesCount = new Set((recordatoriosActivos || []).map(r => r.clienteId)).size;
+  const transDiasCount = (transferenciasPendientes || []).length;
+  const transClientesCount = new Set((transferenciasPendientes || []).flatMap(t => (t.ventas || []).map(v => v.clienteId))).size;
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
@@ -117,10 +126,16 @@ function MenuDias({
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      gap: 4
+      gap: 4,
+      // Mismo recuadro que el encabezado de "Transferencias sin confirmar",
+      // con los colores azules propios de los recordatorios.
+      background: "#1e2e4a",
+      border: "1px solid #5daaff",
+      borderRadius: 8,
+      padding: "8px 10px"
     },
     onClick: () => setMostrarRecordatorios(v => !v)
-  }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (", recordatoriosActivos.length, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
+  }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (D:", recDiasCount, ") ; (C:", recClientesCount, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
     key: r.id,
     style: {
       ...s.card,
@@ -195,10 +210,14 @@ function MenuDias({
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      gap: 4
+      gap: 4,
+      background: "#1e3a5f",
+      border: "1px solid #f5b942",
+      borderRadius: 8,
+      padding: "8px 10px"
     },
     onClick: () => setMostrarTransferencias(v => !v)
-  }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transferencias sin confirmar (", transferenciasPendientes.length, ")"), mostrarTransferencias && transferenciasPendientes.map(({
+  }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transferencias sin confirmar (D:", transDiasCount, ") ; (C:", transClientesCount, ")"), mostrarTransferencias && transferenciasPendientes.map(({
     dia,
     fecha,
     count,
@@ -351,7 +370,14 @@ function MenuDias({
         color: "var(--color-text-primary)",
         overflow: "hidden",
         textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
+        whiteSpace: "nowrap",
+        cursor: "pointer",
+        borderBottom: "1px dotted var(--color-text-tertiary)"
+      },
+      title: "Tocá para editar la zona",
+      onClick: e => {
+        e.stopPropagation();
+        setEditandoZona(d);
       }
     }, zona)), !zona && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -373,9 +399,17 @@ function MenuDias({
     }, totalDeuda > 0 ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
-        color: "var(--color-text-danger)"
+        color: "var(--color-text-danger)",
+        cursor: "pointer",
+        textDecoration: "underline",
+        textDecorationStyle: "dotted"
+      },
+      title: "Tocá para ver quién debe",
+      onClick: e => {
+        e.stopPropagation();
+        setDeudaExpandida(deudaExpandida === d ? null : d);
       }
-    }, "⚠ ", deudas.length, " cliente", deudas.length > 1 ? "s" : "", " ", deudas.length > 1 ? "deben" : "debe", " ", fmt(totalDeuda)) : /*#__PURE__*/React.createElement("span", {
+    }, "⚠ ", deudas.length, " cliente", deudas.length > 1 ? "s" : "", " ", deudas.length > 1 ? "deben" : "debe", " ", fmt(totalDeuda), " ", deudaExpandida === d ? "▲" : "▼") : /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         color: "var(--color-text-success)"
@@ -541,24 +575,52 @@ function MenuDias({
         fontSize: 13
       },
       onClick: () => setEditandoZona(null)
-    }, "✕"))), zona && editandoZona !== d && /*#__PURE__*/React.createElement("div", {
+    }, "✕"))), deudaExpandida === d && /*#__PURE__*/React.createElement("div", {
       style: {
-        textAlign: "right",
+        background: "var(--color-background-secondary)",
+        border: "0.5px solid var(--color-border-secondary)",
+        borderRadius: 10,
+        padding: "8px 10px",
         marginTop: 2,
-        marginBottom: 2
+        display: "flex",
+        flexDirection: "column",
+        gap: 4
+      },
+      onClick: e => e.stopPropagation()
+    }, [...deudas].sort((a, b) => a.saldo - b.saldo).map(c => /*#__PURE__*/React.createElement("button", {
+      key: c.id,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 8,
+        background: "none",
+        border: "none",
+        borderBottom: "0.5px solid var(--color-border-tertiary)",
+        padding: "8px 4px",
+        cursor: "pointer",
+        textAlign: "left"
+      },
+      onClick: () => {
+        setDeudaExpandida(null);
+        onVerDeudor && onVerDeudor(c, d);
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 10,
-        color: "var(--color-text-tertiary)",
-        cursor: "pointer",
-        textDecoration: "underline"
-      },
-      onClick: e => {
-        e.stopPropagation();
-        setEditandoZona(d);
+        fontSize: 13,
+        color: "var(--color-text-primary)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
       }
-    }, "editar zona")), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
+    }, c.nombre), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: "var(--color-text-danger)",
+        flexShrink: 0
+      }
+    }, fmt(Math.abs(c.saldo)))))), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,
@@ -840,9 +902,16 @@ function DiaPrincipal({
 }
 function DetalleTransferencias({
   ventas,
-  ventasPendTrans
+  ventasPendTrans,
+  clientes,
+  onConfirmarTransfer
 }) {
   const [abierto, setAbierto] = React.useState(false);
+  const clientePorId = React.useMemo(() => {
+    const m = {};
+    (clientes || []).forEach(c => m[c.id] = c);
+    return m;
+  }, [clientes]);
   const pendientes = (ventasPendTrans || []).length;
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -898,6 +967,10 @@ function DetalleTransferencias({
     }
   }, ventas.map(v => {
     const confirmada = !!v.transConfirmada;
+    const monto = v.pago === "mixto" ? Number(v.montoTrans) || 0 : v.pagadoNum || v.neto || 0;
+    const cli = clientePorId[v.clienteId];
+    const tel = cli && cli.telefono;
+    const msjWA = armarMsjTransferWA([v]);
     return /*#__PURE__*/React.createElement("div", {
       key: v.id,
       style: {
@@ -917,7 +990,7 @@ function DetalleTransferencias({
         color: "var(--color-text-primary)",
         fontWeight: 500
       }
-    }, v.cliente), /*#__PURE__*/React.createElement("span", {
+    }, v.cliente), /*#__PURE__*/React.createElement("button", {
       style: {
         marginLeft: 6,
         fontSize: 10,
@@ -925,15 +998,32 @@ function DetalleTransferencias({
         borderRadius: 4,
         background: confirmada ? "var(--color-background-success)" : "var(--color-background-warning)",
         color: confirmada ? "var(--color-text-success)" : "#f5b942",
-        fontWeight: 600
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: confirmada ? "Transfer. confirmada — tocá para desmarcar" : "Tocá para confirmar transferencia",
+      onClick: e => {
+        e.stopPropagation();
+        onConfirmarTransfer && onConfirmarTransfer(v.clienteId, v.id);
       }
-    }, confirmada ? "✅ Confirmada" : "🔴 Pendiente")), /*#__PURE__*/React.createElement("span", {
+    }, confirmada ? "✅ Confirmada" : "🔴 Pendiente"), !confirmada && tel && /*#__PURE__*/React.createElement("a", {
+      href: `https://wa.me/54${tel}?text=${msjWA}`,
+      target: "_blank",
+      rel: "noreferrer",
+      title: "Mandar WhatsApp para pedir que confirme la transferencia",
+      style: {
+        marginLeft: 6,
+        fontSize: 13,
+        textDecoration: "none"
+      }
+    }, "💬")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 13,
         fontWeight: 500,
         color: confirmada ? "var(--color-text-success)" : "#f5b942"
       }
-    }, fmt(v.pago === "mixto" ? Number(v.montoTrans) || 0 : v.pagadoNum || v.neto || 0)));
+    }, fmt(monto)));
   })));
 }
 function DetalleVentasDia({
@@ -946,7 +1036,8 @@ function DetalleVentasDia({
   onEditarVenta,
   onEliminarVenta,
   onEditarCliente,
-  onPerdidaCliente
+  onPerdidaCliente,
+  onConfirmarTransfer
 }) {
   const [abierto, setAbierto] = React.useState(false);
   // Qué venta se está editando in-place (solo aplica a compras reales —
@@ -1067,15 +1158,24 @@ function DetalleVentasDia({
       padding: "10px 16px",
       borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none"
     };
-    if (editandoVentaId === v.id && esCompraReal) {
+    if (editandoVentaId === v.id && esCompraReal && persona) {
       return /*#__PURE__*/React.createElement("div", {
         key: v.id,
         style: cardStyleV
-      }, /*#__PURE__*/React.createElement(EditVenta, {
-        venta: v,
+      }, /*#__PURE__*/React.createElement(NuevaVenta, {
+        compacto: true,
+        ventaEditar: v,
+        cliente: persona,
         productos: productos,
-        onGuardar: (d, p, m, sa, obs, tr2) => {
-          onEditarVenta(v.id, d, p, m, sa, obs, tr2);
+        ventasCliente: [],
+        onGuardar: (detalle, pagoArg, montoArg, saldoApl, envPrest, envDev, obs, opcionSaldo, otroLeg) => {
+          if (opcionSaldo === "mixto_ef") {
+            onEditarVenta(v.id, detalle, "mixto", montoArg, saldoApl, obs, otroLeg);
+          } else if (opcionSaldo === "mixto_tr") {
+            onEditarVenta(v.id, detalle, "mixto", otroLeg, saldoApl, obs, montoArg);
+          } else {
+            onEditarVenta(v.id, detalle, pagoArg, montoArg, saldoApl, obs);
+          }
           setEditandoVentaId(null);
         },
         onCancelar: () => setEditandoVentaId(null)
@@ -1136,7 +1236,23 @@ function DetalleVentasDia({
         fontSize: 10,
         color: "var(--color-text-tertiary)"
       }
-    }, "· ", persona.dia), /*#__PURE__*/React.createElement("span", {
+    }, "· ", persona.dia), (v.pago === "transferencia" || esMixto) ? /*#__PURE__*/React.createElement("button", {
+      style: {
+        fontSize: 10,
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: pagoBadge.bg,
+        color: pagoBadge.color,
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: v.transConfirmada ? "Transfer. confirmada — tocá para desmarcar" : "Tocá para confirmar transferencia",
+      onClick: e => {
+        e.stopPropagation();
+        onConfirmarTransfer && onConfirmarTransfer(v.clienteId, v.id);
+      }
+    }, pagoBadge.txt) : /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
         padding: "1px 6px",
@@ -1145,7 +1261,18 @@ function DetalleVentasDia({
         color: pagoBadge.color,
         fontWeight: 600
       }
-    }, pagoBadge.txt), v.hora && /*#__PURE__*/React.createElement("span", {
+    }, pagoBadge.txt), !v.transConfirmada && (v.pago === "transferencia" || esMixto) && persona && persona.telefono && /*#__PURE__*/React.createElement("a", {
+      href: `https://wa.me/54${persona.telefono}?text=${armarMsjTransferWA([v])}`,
+      target: "_blank",
+      rel: "noreferrer",
+      title: "Mandar WhatsApp para pedir que confirme la transferencia",
+      onClick: e => e.stopPropagation(),
+      style: {
+        marginLeft: 4,
+        fontSize: 13,
+        textDecoration: "none"
+      }
+    }, "💬"), v.hora && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
         color: "var(--color-text-tertiary)"
@@ -1327,7 +1454,9 @@ function PlanillaDelDia({
   onEditarVenta,
   onEliminarVenta,
   onEditarCliente,
-  onPerdidaCliente
+  onPerdidaCliente,
+  onConfirmarTransfer,
+  onEditarCarga
 }) {
   const [enviosInforme, setEnviosInforme] = React.useState(() => Number(localStorage.getItem(`sr_informe_${fecha}_${dia}`) || 0));
   const [enviandoCierre, setEnviandoCierre] = React.useState(false);
@@ -1649,9 +1778,15 @@ const guardarCapacidadFija = (pk, valorStr) => {
       // entero. Se suman siempre, tanto si el usuario dejó el cálculo como
       // si tipeó la cantidad de cajones a mano.
       const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON_SODA : 0;
+      // Mismo cuidado para vacíos: los sifones vacíos sueltos que no llenan
+      // un cajón entero (ej. 3 de 6) se perdían acá — nunca volvían a
+      // aparecer en ningún lado, y eso hacía que el cierre marcara "falta
+      // un cajón" con frecuencia. Encontrado y arreglado primero en La
+      // Catalina; mismo fix acá.
+      const sueltosVV = pk === "soda" ? vaciosRec[pk] % CAJON_SODA : 0;
       const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * CAJON_F + sueltosLL : sobrantes[pk];
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * CAJON_F : paraLlenarCalc[pk] * CAJON_F;
-      const vacReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * CAJON_F : vaciosRestoCalc[pk] * CAJON_F;
+      const vacReal = (realesVacios[pk] !== "" ? Number(realesVacios[pk]) * CAJON_F : vaciosRestoCalc[pk] * CAJON_F) + sueltosVV;
       // "Para llenar" se llena antes de salir mañana — para el stock ya
       // cuenta como LLENO, no como vacío.
       const llenTotal = llenReal + paraLlenarReal;
@@ -1914,9 +2049,12 @@ const guardarCapacidadFija = (pk, valorStr) => {
         setFn: setRealesVacios
       }];
       const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON_SODA : 0;
+      // Mismo fix que en calcularMovimientoDeposito: los vacíos sueltos que
+      // no completan un cajón se perdían acá (causa de "falta un cajón").
+      const sueltosVV = pk === "soda" ? vaciosRec[pk] % CAJON_SODA : 0;
       const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : sobrantes[pk];
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
-      const vacReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : vaciosRestoCalc[pk] * cajon;
+      const vacReal = (realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : vaciosRestoCalc[pk] * cajon) + sueltosVV;
       // Sodería solo controla que vuelva todo lo que salió cargado — los
       // préstamos/devoluciones son un asunto del depósito, no de acá.
       const esperado = llenosCargados[pk];
@@ -2000,7 +2138,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
             textAlign: "center",
             marginBottom: 3
           }
-        }, "calc. ", calc, tipo === "llenos" && pk === "soda" && sobrantes[pk] % CAJON_SODA > 0 ? ` (+${sobrantes[pk] % CAJON_SODA} suelto lleno)` : ""), /*#__PURE__*/React.createElement("input", {
+        }, "calc. ", calc, tipo === "llenos" && pk === "soda" && sobrantes[pk] % CAJON_SODA > 0 ? ` (+${sobrantes[pk] % CAJON_SODA} suelto lleno)` : "", tipo === "vacios" && pk === "soda" && vaciosRec[pk] % CAJON_SODA > 0 ? ` (+${vaciosRec[pk] % CAJON_SODA} suelto vacío)` : ""), /*#__PURE__*/React.createElement("input", {
           type: "number",
           min: 0,
           value: stateObj[pk],
@@ -2197,7 +2335,16 @@ const guardarCapacidadFija = (pk, valorStr) => {
       color: "var(--color-text-info)",
       fontWeight: 500
     }
-  }, "📦 Stock actualizado"))), /*#__PURE__*/React.createElement("div", {
+  }, "📦 Stock actualizado"), onEditarCarga && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-info)",
+      fontWeight: 500,
+      cursor: "pointer",
+      textDecoration: "underline"
+    },
+    onClick: onEditarCarga
+  }, "✏️ Editar envases con los que salió"))), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 16
     }
@@ -2641,7 +2788,8 @@ const guardarCapacidadFija = (pk, valorStr) => {
     onEditarVenta: onEditarVenta,
     onEliminarVenta: onEliminarVenta,
     onEditarCliente: onEditarCliente,
-    onPerdidaCliente: onPerdidaCliente
+    onPerdidaCliente: onPerdidaCliente,
+    onConfirmarTransfer: onConfirmarTransfer
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
@@ -2928,7 +3076,9 @@ const guardarCapacidadFija = (pk, valorStr) => {
     }
   }, v))), /*#__PURE__*/React.createElement(DetalleTransferencias, {
     ventas: todasVentasDia.filter(v => v.pago === "transferencia" || v.pago === "mixto" && (Number(v.montoTrans) || 0) > 0),
-    ventasPendTrans: ventasPendTrans
+    ventasPendTrans: ventasPendTrans,
+    clientes: clientes,
+    onConfirmarTransfer: onConfirmarTransfer
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
@@ -3337,11 +3487,14 @@ function AtajoPlanillaSemana({
   planillas,
   ventas,
   clientes,
+  noVisitas,
   onSeleccionar,
   onVolver
 }) {
   const DIAS_NOMBRE = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
   const dias5 = [];
+  const hoy0 = new Date();
+  hoy0.setHours(0, 0, 0, 0);
   const cur = new Date();
   cur.setHours(0, 0, 0, 0);
   // Las apps comerciales trabajan de lunes a sábado — solo se excluye domingo.
@@ -3390,17 +3543,50 @@ function AtajoPlanillaSemana({
     dia
   }) => {
     const pl = (planillas || {})[`${dia}_${fechaKey}`];
-    const cerrada = !!(pl && pl._diaCerrado);
+    // El cierre deja DOS marcas: `_diaCerrado` en la planilla (sincroniza a la
+    // nube) y una en localStorage, que confirmarCierre escribe de inmediato.
+    // La pantalla de la planilla mira las dos (su `yaCerrado`); esta tarjeta
+    // miraba sólo `_diaCerrado`, así que un día ya cerrado acá seguía
+    // apareciendo abierto si el guardado de la planilla no llegó a persistir
+    // (falló, o un merge de la nube lo pisó). Ahora mira las mismas dos.
+    const cerradaEnPlanilla = !!(pl && pl._diaCerrado);
+    const cerradaLocal = (() => {
+      try {
+        return !!localStorage.getItem(`cierre_${dia}_${fechaKey}`);
+      } catch {
+        return false;
+      }
+    })();
+    const cerrada = cerradaEnPlanilla || cerradaLocal;
+    // Se cerró en este dispositivo pero la planilla no guardó la marca: el día
+    // está cerrado de hecho, pero en otro dispositivo se va a seguir viendo abierto.
+    const cierreNoRegistrado = cerradaLocal && !cerradaEnPlanilla;
     const iniciada = !!(pl && pl.iniciado);
-    const totalClientes = (clientes || []).filter(c => c.dia === dia).length;
-    const entregas = (ventas || []).filter(v => v.fechaKey === fechaKey).length;
+    const clientesDia = (clientes || []).filter(c => c.dia === dia);
+    const totalClientes = clientesDia.length;
+    const esPasado = fecha.getTime() < hoy0.getTime();
+    const ventaIdsDia = new Set((ventas || []).filter(v => v.fechaKey === fechaKey).map(v => v.clienteId));
+    const noVisitaIdsDia = new Set((noVisitas || []).filter(n => n.fecha === fechaKey).map(n => n.clienteId));
+    // VISITADOS: clientes ÚNICOS del día con alguna venta registrada. Se cuenta
+    // por cliente y no por registro de venta a propósito: un cliente que no
+    // compró pero pagó deuda vieja SÍ fue visitado (queda como venta _esCobro),
+    // y un mismo cliente puede tener varios registros el mismo día sin ser dos visitas.
+    const visitados = clientesDia.filter(c => ventaIdsDia.has(c.id)).length;
+    // Marcados: no compraron pero quedaron registrados (no estaba / no quiso / salteado).
+    const marcados = clientesDia.filter(c => !ventaIdsDia.has(c.id) && noVisitaIdsDia.has(c.id)).length;
+    // Pendientes: ni venta ni marca — son los que faltó atender o marcar antes de cerrar.
+    const pendientes = clientesDia.filter(c => !ventaIdsDia.has(c.id) && !noVisitaIdsDia.has(c.id));
+    const sinCerrar = esPasado && iniciada && !cerrada;
+    // Causa concreta por la que el día quedó sin cerrar.
+    const causaSinCierre = pendientes.length > 0 ? `⚠️ No se cerró porque faltan ${pendientes.length} cliente${pendientes.length === 1 ? "" : "s"} por atender o marcar` : `⚠️ No se cerró: ${visitados} visitados + ${marcados} marcados, pero nunca se confirmó el cierre`;
     const label = fecha.toLocaleDateString("es-AR", {
       weekday: "short",
       day: "numeric",
       month: "short"
     });
-    return /*#__PURE__*/React.createElement("button", {
+    return /*#__PURE__*/React.createElement("div", {
       key: fechaKey + "_" + dia,
+      role: "button",
       onClick: () => onSeleccionar(fechaKey, dia),
       style: {
         ...s.card,
@@ -3425,7 +3611,35 @@ function AtajoPlanillaSemana({
         marginTop: 2,
         textTransform: "capitalize"
       }
-    }, label, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : "")), /*#__PURE__*/React.createElement("div", {
+    }, label, totalClientes ? ` · ${visitados}/${totalClientes} visitados` : ""), cierreNoRegistrado && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)",
+        marginTop: 2
+      }
+    }, "Cerrada en este dispositivo (no quedó guardada en la planilla)"), sinCerrar && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-danger)",
+        marginTop: 2
+      }
+    }, causaSinCierre), sinCerrar && /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        onSeleccionar(fechaKey, dia);
+      },
+      style: {
+        marginTop: 6,
+        fontSize: 12,
+        fontWeight: 600,
+        padding: "5px 12px",
+        borderRadius: 8,
+        border: "none",
+        cursor: "pointer",
+        background: "var(--color-accent)",
+        color: "#fff"
+      }
+    }, "Cerrar día")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -3439,7 +3653,15 @@ function AtajoPlanillaSemana({
         background: "var(--color-background-success)",
         color: "var(--color-text-success)"
       }
-    }, "Cerrada ✓") : iniciada ? /*#__PURE__*/React.createElement("span", {
+    }, "Cerrada ✓") : sinCerrar ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "3px 8px",
+        borderRadius: 20,
+        background: "var(--color-background-danger)",
+        color: "var(--color-text-danger)"
+      }
+    }, "Sin cerrar ⚠️") : iniciada ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         padding: "3px 8px",

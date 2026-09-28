@@ -375,6 +375,29 @@ function buscarCliente(c, q) {
   return 0;
 }
 // ════════════════════════════════════════════════════════════════════
+// ◆  Mensaje de WhatsApp para transferencias pendientes de confirmar —
+//    UN SOLO lugar para el texto, usado desde cualquier pantalla donde
+//    aparezca una transferencia sin confirmar. Portado de La Catalina.
+//    Recibe una o varias ventas del MISMO cliente (agrupa cantidades de
+//    un mismo producto si viene repartido en más de una venta) y devuelve
+//    el texto ya codificado, listo para el href de wa.me.
+// ════════════════════════════════════════════════════════════════════
+function armarMsjTransferWA(ventas) {
+  const lista = ventas || [];
+  const porNombre = {};
+  lista.forEach(v => {
+    (v.detalle || []).forEach(d => {
+      if (!d || !(d.cantidad > 0) || /^Pago mixto/.test(d.nombre || "")) return;
+      porNombre[d.nombre] = (porNombre[d.nombre] || 0) + d.cantidad;
+    });
+  });
+  const items = Object.keys(porNombre).map(nombre => `${porNombre[nombre]} ${nombre}`);
+  const itemsTxt = items.length ? items.reduce((acc, txt, i) => i === 0 ? txt : i === items.length - 1 ? `${acc} y ${txt}` : `${acc}, ${txt}`, "") : "";
+  const total = lista.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+  const texto = itemsTxt ? `Buen día, estimado cliente! Hoy le dejé ${itemsTxt}, lo que da un total de ${fmt(total)}. Muchas gracias!` : `Buen día, estimado cliente! Le escribo por la transferencia de hoy, de ${fmt(total)}. Muchas gracias!`;
+  return encodeURIComponent(texto);
+}
+// ════════════════════════════════════════════════════════════════════
 // ◆  Helpers de guardado seguro — evitan que un guardado pise cambios
 //    que llegaron de otro dispositivo (PC/móvil) segundos antes.
 //    Mismo patrón usado en Sistema de Reparto Multi.

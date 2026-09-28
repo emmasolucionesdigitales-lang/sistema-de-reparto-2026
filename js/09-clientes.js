@@ -30,7 +30,7 @@ function ClientesTabs({
       cursor: "pointer",
       border: "none",
       background: activo === id ? "var(--color-background-tertiary)" : "transparent",
-      borderBottom: activo === id ? "2px solid var(--color-accent)" : "2px solid transparent"
+      borderBottom: activo === id ? "2px solid var(--color-accent-solid)" : "2px solid transparent"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -44,96 +44,16 @@ function ClientesTabs({
     }
   }, lbl))));
 }
-function ListaClientes({
-  clientes,
-  dia,
-  fecha,
-  ventas,
-  todasVentas,
-  noVisitas,
-  recordatorios,
-  productos,
-  onSeleccionar,
-  onEntregar,
-  onNuevoCliente,
-  onVolver,
-  onReordenar,
-  onEditarCliente,
-  onRegistrarNoVisita,
-  onQuitarNoVisita,
-  onConfirmarTransfer,
-  onAbrirMapa,
-  onPlanilla,
-  onDormidos,
-  onGuardarVenta,
-  onCambiarDispenserCliente
+// ClienteCard: antes vivía como "const Card = (...) => {...}" DEFINIDA ADENTRO
+// de ListaClientes — mismo bug que se encontró y arregló en La Catalina: al
+// estar definida adentro, React la trataba como componente nuevo en cada
+// render y desmontaba/remontaba TODAS las tarjetas de golpe (cada tecla del
+// buscador, cada "Entregar", etc.). Ahora es una función de módulo estable;
+// todo lo que antes tomaba del cierre de ListaClientes llega por props
+// (mismos nombres, el cuerpo de abajo no se tocó).
+const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
+  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, productos, marcarNoVisita, onGuardarVenta, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar
 }) {
-  const [busqueda, setBusqueda] = useState("");
-  const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
-  const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
-  // Auto-scroll al botón "Ver planilla del día" apenas se termina de
-  // registrar el último cliente pendiente.
-  const btnPlanillaRef = React.useRef(null);
-  // ventas y noVisitas ya filtradas por fecha+dia desde App
-  const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
-  const noVMap = {};
-  (noVisitas || []).filter(v => v.fecha === fecha).forEach(v => {
-    noVMap[v.clienteId] = v.motivo;
-  });
-  // visitados = ventas + noesta2 + noquiso (noesta 1ra vez NO cuenta)
-  const visitadosSinVenta = new Set(Object.entries(noVMap).filter(([, m]) => m === "noesta2" || m === "noquiso").map(([id]) => Number(id)));
-  const visitados = new Set([...atendidos, ...visitadosSinVenta]);
-  const marcarNoVisita = (id, motivo) => {
-    const prev = noVMap[id];
-    if (motivo === "noesta" && prev === "noesta") onRegistrarNoVisita(id, "noesta2");else if (prev === motivo) onQuitarNoVisita(id);else onRegistrarNoVisita(id, motivo);
-  };
-  const clientesOrdenados = [...clientes].sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-  const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
-  const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta");
-  const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
-  const pendientes = [...pendientesNormales, ...volverAlFinal];
-  const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
-  const listos = filtrados.filter(c => atendidos.has(c.id));
-  const todosListos = pendientesNormales.length === 0 && visitados.size > 0;
-  React.useEffect(() => {
-    if (todosListos && btnPlanillaRef.current) {
-      btnPlanillaRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-      });
-    }
-  }, [todosListos]);
-  const abrirRuta = () => {
-    const cp = pendientes.filter(c => c.maps).slice(0, 9);
-    if (!cp.length) {
-      alert("Ningún pendiente tiene Maps cargado.");
-      return;
-    }
-    const dest = encodeURIComponent(cp[cp.length - 1].maps);
-    const wps = cp.slice(0, -1).map(c => encodeURIComponent(c.maps)).join("|");
-    window.open(`https://www.google.com/maps/dir/?api=1${wps ? `&waypoints=${wps}` : ""}&destination=${dest}&travelmode=driving`, "_blank");
-  };
-  const moverCliente = (idOrigen, idDestino) => {
-    if (idOrigen === idDestino) return;
-    const ordenActual = clientesOrdenados.map(c => c.id);
-    const idxOrigen = ordenActual.indexOf(idOrigen);
-    const idxDestino = ordenActual.indexOf(idDestino);
-    if (idxOrigen === -1 || idxDestino === -1) return;
-    const nuevoOrden = [...ordenActual];
-    const [item] = nuevoOrden.splice(idxOrigen, 1);
-    nuevoOrden.splice(idxDestino, 0, item);
-    const posMap = {};
-    nuevoOrden.forEach((id, i) => {
-      posMap[id] = i + 1;
-    });
-    onReordenar(clientes.map(c => posMap[c.id] !== undefined ? {
-      ...c,
-      orden: posMap[c.id]
-    } : c));
-  };
-  const Card = ({
-    c
-  }) => {
     const [fotoOpen, setFotoOpen] = React.useState(false);
     const atendido = atendidos.has(c.id),
       est = noVMap[c.id];
@@ -226,7 +146,7 @@ function ListaClientes({
       const vt = ventas.find(v => v.clienteId === c.id && v.fechaKey === fecha && (v.pago === "transferencia" || v.pago === "mixto" && (v.montoTrans || 0) > 0));
       if (!vt) return null;
       const montoMostrar = vt.pago === "mixto" ? (v => v.montoTrans)(vt) : vt.pagadoNum || vt.neto || 0;
-      return /*#__PURE__*/React.createElement("button", {
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
         style: {
           background: vt.transConfirmada ? "transparent" : "rgba(245,185,66,0.15)",
           border: "none",
@@ -254,7 +174,18 @@ function ListaClientes({
           fontWeight: 500,
           color: "#f5b942"
         }
-      }, fmt(montoMostrar)));
+      }, fmt(montoMostrar))), !vt.transConfirmada && c.telefono && /*#__PURE__*/React.createElement("a", {
+        href: `https://wa.me/54${c.telefono}?text=${armarMsjTransferWA([vt])}`,
+        target: "_blank",
+        rel: "noreferrer",
+        onClick: e => e.stopPropagation(),
+        title: "Mandar WhatsApp para pedir que confirme la transferencia",
+        style: {
+          fontSize: 15,
+          textDecoration: "none",
+          flexShrink: 0
+        }
+      }, "💬"));
     })()), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 17,
@@ -357,7 +288,10 @@ function ListaClientes({
         fontWeight: 500,
         flex: 1
       },
-      onClick: () => marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta")
+      onClick: () => {
+        marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta");
+        irAlSiguientePendiente();
+      }
     }, est === "noesta" ? "2ª vez" : "🔄 No está"), /*#__PURE__*/React.createElement("button", {
       style: {
         background: "var(--color-background-danger)",
@@ -370,7 +304,10 @@ function ListaClientes({
         fontWeight: 500,
         flex: 1
       },
-      onClick: () => marcarNoVisita(c.id, "noquiso")
+      onClick: () => {
+        marcarNoVisita(c.id, "noquiso");
+        irAlSiguientePendiente();
+      }
     }, "No quiere"), /*#__PURE__*/React.createElement("button", {
       style: {
         background: "#185FA5",
@@ -408,7 +345,10 @@ function ListaClientes({
         cursor: "pointer",
         fontWeight: 500
       },
-      onClick: () => marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta")
+      onClick: () => {
+        marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta");
+        irAlSiguientePendiente();
+      }
     }, est === "noesta" ? "2ª vez" : "🔄 No está"), /*#__PURE__*/React.createElement("button", {
       style: {
         flex: 1,
@@ -421,7 +361,10 @@ function ListaClientes({
         cursor: "pointer",
         fontWeight: 500
       },
-      onClick: () => marcarNoVisita(c.id, "noquiso")
+      onClick: () => {
+        marcarNoVisita(c.id, "noquiso");
+        irAlSiguientePendiente();
+      }
     }, "No quiere"), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
@@ -465,7 +408,132 @@ function ListaClientes({
         } : x));
       }
     }));
+});
+
+function ListaClientes({
+  clientes,
+  dia,
+  fecha,
+  ventas,
+  todasVentas,
+  noVisitas,
+  recordatorios,
+  productos,
+  onSeleccionar,
+  onEntregar,
+  onNuevoCliente,
+  onVolver,
+  onReordenar,
+  onEditarCliente,
+  onRegistrarNoVisita,
+  onQuitarNoVisita,
+  onConfirmarTransfer,
+  onAbrirMapa,
+  onPlanilla,
+  onDormidos,
+  onGuardarVenta,
+  onCambiarDispenserCliente
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
+  const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
+  // Auto-scroll al botón "Ver planilla del día" apenas se termina de
+  // registrar el último cliente pendiente.
+  const btnPlanillaRef = React.useRef(null);
+  // ventas y noVisitas ya filtradas por fecha+dia desde App
+  // Memoizado (mismo fix que en La Catalina): antes se recalculaba TODO en
+  // cada render, incluso al tocar botones que no cambian la composición de
+  // la lista — con muchos clientes eso generaba props nuevas para todas las
+  // tarjetas en cada toque. Solo se recalcula si cambian los datos reales.
+  const {
+    atendidos,
+    noVMap,
+    visitadosSinVenta,
+    visitados,
+    clientesOrdenados,
+    filtrados,
+    pendientesNormales,
+    volverAlFinal,
+    pendientes,
+    sinEntrega,
+    listos,
+    todosListos
+  } = React.useMemo(() => {
+    const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
+    const noVMap = {};
+    (noVisitas || []).filter(v => v.fecha === fecha).forEach(v => {
+      noVMap[v.clienteId] = v.motivo;
+    });
+    // visitados = ventas + noesta2 + noquiso (noesta 1ra vez NO cuenta)
+    const visitadosSinVenta = new Set(Object.entries(noVMap).filter(([, m]) => m === "noesta2" || m === "noquiso").map(([id]) => Number(id)));
+    const visitados = new Set([...atendidos, ...visitadosSinVenta]);
+    const clientesOrdenados = [...clientes].sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+    const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
+    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta");
+    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
+    const pendientes = [...pendientesNormales, ...volverAlFinal];
+    const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
+    const listos = filtrados.filter(c => atendidos.has(c.id));
+    const todosListos = pendientesNormales.length === 0 && visitados.size > 0;
+    return {
+      atendidos,
+      noVMap,
+      visitadosSinVenta,
+      visitados,
+      clientesOrdenados,
+      filtrados,
+      pendientesNormales,
+      volverAlFinal,
+      pendientes,
+      sinEntrega,
+      listos,
+      todosListos
+    };
+  }, [clientes, ventas, noVisitas, fecha, busqueda]);
+  const marcarNoVisita = (id, motivo) => {
+    const prev = noVMap[id];
+    if (motivo === "noesta" && prev === "noesta") onRegistrarNoVisita(id, "noesta2");else if (prev === motivo) onQuitarNoVisita(id);else onRegistrarNoVisita(id, motivo);
   };
+  React.useEffect(() => {
+    if (todosListos && btnPlanillaRef.current) {
+      btnPlanillaRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }
+  }, [todosListos]);
+  const abrirRuta = () => {
+    const cp = pendientes.filter(c => c.maps).slice(0, 9);
+    if (!cp.length) {
+      alert("Ningún pendiente tiene Maps cargado.");
+      return;
+    }
+    const dest = encodeURIComponent(cp[cp.length - 1].maps);
+    const wps = cp.slice(0, -1).map(c => encodeURIComponent(c.maps)).join("|");
+    window.open(`https://www.google.com/maps/dir/?api=1${wps ? `&waypoints=${wps}` : ""}&destination=${dest}&travelmode=driving`, "_blank");
+  };
+  const moverCliente = (idOrigen, idDestino) => {
+    if (idOrigen === idDestino) return;
+    const ordenActual = clientesOrdenados.map(c => c.id);
+    const idxOrigen = ordenActual.indexOf(idOrigen);
+    const idxDestino = ordenActual.indexOf(idDestino);
+    if (idxOrigen === -1 || idxDestino === -1) return;
+    const nuevoOrden = [...ordenActual];
+    const [item] = nuevoOrden.splice(idxOrigen, 1);
+    nuevoOrden.splice(idxDestino, 0, item);
+    const posMap = {};
+    nuevoOrden.forEach((id, i) => {
+      posMap[id] = i + 1;
+    });
+    onReordenar(clientes.map(c => posMap[c.id] !== undefined ? {
+      ...c,
+      orden: posMap[c.id]
+    } : c));
+  };
+  // Props estables para ClienteCard (ver comentario arriba de su definición).
+  const cardProps = c => ({
+    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, productos, marcarNoVisita, onGuardarVenta, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar
+  });
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
@@ -528,27 +596,27 @@ function ListaClientes({
     }
   }, "No hay clientes para ", dia, "."), pendientesNormales.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Pendientes (", pendientesNormales.length, ")"), pendientesNormales.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "Pendientes (", pendientesNormales.length, ")"), pendientesNormales.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), volverAlFinal.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: {
       ...s.sectionTitle,
       color: "#f5b942"
     }
-  }, "🔄 Volver a visitar (", volverAlFinal.length, ")"), volverAlFinal.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "🔄 Volver a visitar (", volverAlFinal.length, ")"), volverAlFinal.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), listos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Entregado (", listos.length, ")"), listos.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "Entregado (", listos.length, ")"), listos.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), sinEntrega.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Sin entrega (", sinEntrega.length, ")"), sinEntrega.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "Sin entrega (", sinEntrega.length, ")"), sinEntrega.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), todosListos && /*#__PURE__*/React.createElement("div", {
     ref: btnPlanillaRef,
     style: {
@@ -1520,11 +1588,20 @@ function DetalleCliente({
         style: {
           marginBottom: 6
         }
-      }, editandoVentaId === v.id ? /*#__PURE__*/React.createElement(EditVenta, {
-        venta: v,
+      }, editandoVentaId === v.id ? /*#__PURE__*/React.createElement(NuevaVenta, {
+        compacto: true,
+        ventaEditar: v,
+        cliente: cliente,
         productos: productos,
-        onGuardar: (d, p, m, sa, obs, tr2) => {
-          onEditarVenta(v.id, d, p, m, sa, obs, tr2);
+        ventasCliente: [],
+        onGuardar: (detalle, pagoArg, montoArg, saldoApl, envPrest, envDev, obs, opcionSaldo, otroLeg) => {
+          if (opcionSaldo === "mixto_ef") {
+            onEditarVenta(v.id, detalle, "mixto", montoArg, saldoApl, obs, otroLeg);
+          } else if (opcionSaldo === "mixto_tr") {
+            onEditarVenta(v.id, detalle, "mixto", otroLeg, saldoApl, obs, montoArg);
+          } else {
+            onEditarVenta(v.id, detalle, pagoArg, montoArg, saldoApl, obs);
+          }
           setEditandoVentaId(null);
         },
         onCancelar: () => setEditandoVentaId(null)
