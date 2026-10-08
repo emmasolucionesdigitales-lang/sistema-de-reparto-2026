@@ -119,8 +119,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontWeight: 500,
-        fontSize: 15,
+        fontWeight: 700,
+        fontSize: 17,
         color: "var(--color-text-primary)",
         overflow: "hidden",
         textOverflow: "ellipsis",
@@ -145,7 +145,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     }, "🔔"), (() => {
       const vt = ventas.find(v => v.clienteId === c.id && v.fechaKey === fecha && (v.pago === "transferencia" || v.pago === "mixto" && (v.montoTrans || 0) > 0));
       if (!vt) return null;
-      const montoMostrar = vt.pago === "mixto" ? (v => v.montoTrans)(vt) : vt.pagadoNum || vt.neto || 0;
+      const montoMostrar = vt.pago === "mixto" ? (v => v.montoTrans)(vt) : (vt.pagadoNum != null ? vt.pagadoNum : vt.neto) || 0;
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
         style: {
           background: vt.transConfirmada ? "transparent" : "rgba(245,185,66,0.15)",
@@ -189,8 +189,9 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     })()), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 17,
-        color: "var(--color-text-secondary)",
-        marginTop: 2
+        color: "var(--color-text-primary)",
+        fontWeight: 600,
+        marginTop: 3
       }
     }, direccionCliente(c)), c.notas && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -202,8 +203,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       style: {
         display: "flex",
         flexWrap: "wrap",
-        gap: 4,
-        marginTop: 5
+        gap: 5,
+        marginTop: 7
       }
     }, (() => {
       const real = {
@@ -211,18 +212,17 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         bidon10: Math.max(0, (Number(c.bidon10) || 0) + prestadoClienteDe(c, "bidon10", todasVentas || ventas)),
         bidon20: Math.max(0, (Number(c.bidon20) || 0) + prestadoClienteDe(c, "bidon20", todasVentas || ventas))
       };
-      return /*#__PURE__*/React.createElement(React.Fragment, null, real.sifon > 0 && /*#__PURE__*/React.createElement("span", {
-        style: s.tag
-      }, "Sifón×", real.sifon), real.bidon10 > 0 && /*#__PURE__*/React.createElement("span", {
-        style: s.tag
-      }, "10L×", real.bidon10), real.bidon20 > 0 && /*#__PURE__*/React.createElement("span", {
-        style: s.tag
-      }, "20L×", real.bidon20), c.dispenser > 0 && /*#__PURE__*/React.createElement("span", {
+      const pill = txt => /*#__PURE__*/React.createElement("span", {
         style: {
-          ...s.tag,
-          color: "#5daaff"
+          fontSize: 12,
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: 20,
+          background: "var(--color-background-info)",
+          color: "var(--color-text-primary)"
         }
-      }, "Disp×", c.dispenser));
+      }, txt);
+      return /*#__PURE__*/React.createElement(React.Fragment, null, real.sifon > 0 && pill(`Sifón×${real.sifon}`), real.bidon10 > 0 && pill(`10L×${real.bidon10}`), real.bidon20 > 0 && pill(`20L×${real.bidon20}`), c.dispenser > 0 && pill(`Disp×${c.dispenser}`));
     })(), atendido && /*#__PURE__*/React.createElement("span", {
       style: s.badge("success")
     }, "✓ Listo"), est === "noesta" && !atendido && /*#__PURE__*/React.createElement("span", {

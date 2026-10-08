@@ -773,7 +773,7 @@ function Config({
       fontWeight: 700,
       color: "var(--color-text-info)"
     }
-  }, "📦 Stock en depósito")), [["soderia", "🏭 Sodería"], ["casa", "🏠 Casa"], ["camion", "🚚 Camión"]].map(([lugar, titulo]) => /*#__PURE__*/React.createElement("div", {
+  }, "📦 Stock en depósito")), [["soderia", "🏭 Sodería"], ["casa", "🏠 Casa"]].map(([lugar, titulo]) => /*#__PURE__*/React.createElement("div", {
     key: lugar,
     style: {
       ...s.card,

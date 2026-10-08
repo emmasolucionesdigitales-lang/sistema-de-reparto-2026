@@ -390,6 +390,12 @@ if (root) root.render(/*#__PURE__*/React.createElement(App, null));else ReactDOM
     window.desactivarNotif = desactivarNotif;
     window.estadoNotif = estadoNotif;
   })();
+  // Confirm helper para correcciones manuales de envases (PieEnvases,
+  // 05-componentes.js) — queda como función global para poder cambiarlo
+  // más adelante por un modal propio sin tocar los componentes que lo usan.
+  window.srConfirm = function (msg) {
+    return Promise.resolve(confirm(msg));
+  };
   </script>
 </body>
 </html>

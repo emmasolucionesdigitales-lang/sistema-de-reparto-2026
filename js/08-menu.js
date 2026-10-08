@@ -967,7 +967,7 @@ function DetalleTransferencias({
     }
   }, ventas.map(v => {
     const confirmada = !!v.transConfirmada;
-    const monto = v.pago === "mixto" ? Number(v.montoTrans) || 0 : v.pagadoNum || v.neto || 0;
+    const monto = v.pago === "mixto" ? Number(v.montoTrans) || 0 : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
     const cli = clientePorId[v.clienteId];
     const tel = cli && cli.telefono;
     const msjWA = armarMsjTransferWA([v]);
@@ -1526,15 +1526,18 @@ function PlanillaDelDia({
   const bultosAuto = cajonesCargados + b10Cargados + b20Cargados;
   const totalVentaPlata = Object.values(totalesPorProd).reduce((a, p) => a + p.plata, 0);
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a, p) => a + p.llenar, 0);
-  const extraEfectivo = ventasExtraDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-  const extraTrans = ventasExtraDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+  const extraEfectivo = ventasExtraDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+  const extraTrans = ventasExtraDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
   const extraFiado = ventasExtraDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
   const extraTotal = extraEfectivo + extraTrans + extraFiado;
-  const cobEfectivo = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoEfec) || 0 : v.pagadoNum || v.neto || 0), 0);
-  const cobTransBruto = todasVentasDia.filter(v => v.pago === "transferencia" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoTrans) || 0 : v.pagadoNum || v.neto || 0), 0);
+  const cobEfectivo = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoEfec) || 0 : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+  const cobTransBruto = todasVentasDia.filter(v => v.pago === "transferencia" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoTrans) || 0 : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
   const cobTransDesc = Math.round(cobTransBruto * 0.025);
   const cobTransNeto = cobTransBruto - cobTransDesc;
   const ventasPendTrans = ventas.filter(v => (v.pago === "transferencia" || v.pago === "mixto" && (Number(v.montoTrans) || 0) > 0) && !v.transConfirmada);
+  // Plata del día cubierta con saldo a favor (crédito de una planilla
+  // anterior) — no es efectivo ni transferencia nueva, se muestra aparte.
+  const cobSaldoUsado = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "transferencia").reduce((a, v) => a + (Number(v.saldoAplicado) || 0), 0);
   const cobFiado = todasVentasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
   const cobSaldosEfec = todasVentasDia.filter(v => v.pago === "contado").reduce((a, v) => {
     const extra = (v.pagadoNum || 0) - (v.neto || 0);
@@ -1596,7 +1599,11 @@ function PlanillaDelDia({
     retenciones = num(datos.retenciones);
   const sobrante = efectivo - (totalVentaPlata - fiado);
   const ganancia = cobEfectivo - totalVentaLlenar - totalGastos + cobTransNeto;
-  const totalLlenosIngresados = PRODUCTOS_CONFIG.reduce((a, p) => a + num(datos.productos[p.id]?.llenos), 0);
+  // Antes sumaba unidades sueltas de los 3 productos (bidones + sifones)
+  // mezclado en un solo número que no representa nada real. Acá todo se
+  // piensa en bultos (igual que "Bultos auto" más arriba): sifones a cajón,
+  // bidones 1 bulto cada uno.
+  const totalBultosIngresados = calcCajones(num(datos.productos.soda?.llenos)) + num(datos.productos.b10?.llenos) + num(datos.productos.b20?.llenos);
   const planKeyToStockKey = {
     "soda": "sifon",
     "b10": "bidon10",
@@ -1851,7 +1858,6 @@ const guardarCapacidadFija = (pk, valorStr) => {
       const sk = planKeyToStockKey[pk];
       s.soderia[sk] = (s.soderia[sk] || 0) + llenTotalFijo[pk];
       s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacRealFijo[pk];
-      s.camion[sk] = 0;
       s.casa[sk] = (s.casa[sk] || 0) + diffDeposito[pk];
     });
     // Sembrar la capacidad fija (si todavía no está guardada) para que el
@@ -1864,6 +1870,19 @@ const guardarCapacidadFija = (pk, valorStr) => {
     syncData({
       stock: s
     });
+    if (window._srRegistrarMovimientoStock) {
+      const detalleCierre = {};
+      ["soda", "b10", "b20"].forEach(pk => {
+        const sk = planKeyToStockKey[pk];
+        const soderiaVuelta = (llenTotalFijo[pk] || 0) + (vacRealFijo[pk] || 0);
+        const deposito = diffDeposito[pk] || 0;
+        if (soderiaVuelta || deposito) detalleCierre[sk] = {
+          soderia: soderiaVuelta,
+          deposito
+        };
+      });
+      window._srRegistrarMovimientoStock("cierre", detalleCierre, `Cierre del día ${dia} (${fecha})`);
+    }
     onGuardar({
       ...datos,
       _diaCerrado: true,
@@ -2470,14 +2489,14 @@ const guardarCapacidadFija = (pk, valorStr) => {
       fontWeight: 500,
       color: "var(--color-text-primary)"
     }
-  }, totalLlenosIngresados || "—"), /*#__PURE__*/React.createElement("div", {
+  }, totalBultosIngresados || "—"), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "right",
       fontSize: 12,
       fontWeight: 500,
       color: "var(--color-text-primary)"
     }
-  }, Object.values(totalesPorProd).reduce((a, p) => a + p.vacios, 0) || "—"), /*#__PURE__*/React.createElement("div", {
+  }, Object.values(totalesPorProd).reduce((a, p) => a + (p.cajones != null ? p.cajones : p.vacios), 0) || "—"), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "right",
       fontSize: 12,
@@ -2877,7 +2896,25 @@ const guardarCapacidadFija = (pk, valorStr) => {
       color: "var(--color-text-info)",
       fontStyle: "italic"
     }
-  }, fmt(cobSaldosTrans))), /*#__PURE__*/React.createElement("div", {
+  }, fmt(cobSaldosTrans))), cobSaldoUsado > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "5px 0",
+      borderBottom: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-secondary)"
+    }
+  }, "💳 Pagado con saldo a favor"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "#b794f6"
+    }
+  }, fmt(cobSaldoUsado))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -2937,7 +2974,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
         fontWeight: 500,
         color: "var(--color-text-info)"
       }
-    }, fmt(v.pago === "mixto" ? Number(v.montoTrans) || 0 : v.pagadoNum || v.neto || 0)));
+    }, fmt(v.pago === "mixto" ? Number(v.montoTrans) || 0 : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0)));
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",

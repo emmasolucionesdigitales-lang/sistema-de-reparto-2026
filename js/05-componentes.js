@@ -59,7 +59,43 @@ function PieEnvases({
       prest: Object.fromEntries(KEYS.map(k => [k, prestadoClienteDe(c, k, ventas)]))
     });
   };
-  const confirmar = () => {
+  const LBL_ENV = {
+    sifon: "Sifón",
+    bidon10: "Bidón 10L",
+    bidon20: "Bidón 20L",
+    dispenser: "Dispenser"
+  };
+  const confirmar = async () => {
+    // Antes esto guardaba directo, sin dejar rastro de qué cambió ni quién
+    // lo tocó — si un cliente aparecía con envases "de más" era imposible
+    // saber si fue un error de tipeo. Ahora se pide confirmación mostrando
+    // el antes/después y queda anotado en el historial de ajustes.
+    const cambios = [];
+    KEYS.forEach(k => {
+      const fijoAntes = Number(c[k]) || 0;
+      const fijoDespues = Math.max(0, draft.fijos[k]);
+      if (fijoAntes !== fijoDespues) cambios.push({
+        campo: "fijo",
+        producto: k,
+        antes: fijoAntes,
+        despues: fijoDespues
+      });
+      const prestAntes = prestadoClienteDe(c, k, ventas);
+      const prestDespues = Math.max(0, draft.prest[k]);
+      if (prestAntes !== prestDespues) cambios.push({
+        campo: "prestado",
+        producto: k,
+        antes: prestAntes,
+        despues: prestDespues
+      });
+    });
+    if (!cambios.length) {
+      setDraft(null);
+      return;
+    }
+    const resumen = cambios.map(ch => `${LBL_ENV[ch.producto]} (${ch.campo === "fijo" ? "Fijos" : "Prestados"}): ${ch.antes} → ${ch.despues}`).join("\n");
+    const ok = window.srConfirm ? await window.srConfirm(`Confirmar corrección de envases de ${c.nombre}:\n\n${resumen}`) : window.confirm(`Confirmar corrección de envases de ${c.nombre}:\n\n${resumen}`);
+    if (!ok) return;
     // Los 4 productos (incluido dispenser) se guardan directo en c.prestado
     // — campo estable que se mantiene solo, sumando/restando en cada venta
     // (ver aplicarMovimientoEnvases en 16-app.js).
@@ -70,6 +106,7 @@ function PieEnvases({
         ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.prest[k])]))
       }
     });
+    window._srRegistrarAjusteEnvases && window._srRegistrarAjusteEnvases(c.id, c.nombre, cambios);
     setDraft(null);
   };
   const abierto = !!draft;
@@ -442,6 +479,7 @@ function FormCliente({
   });
   const [gpsEstado, setGpsEstado] = React.useState("");
   const [mostrarFotoComodato, setMostrarFotoComodato] = React.useState(false);
+  const [mostrarFotoCasa, setMostrarFotoCasa] = React.useState(false);
   const set = (k, v) => setDatos(d => ({
     ...d,
     [k]: v
@@ -609,11 +647,38 @@ function FormCliente({
     }))
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label
-  }, "Link foto del domicilio (Google Drive, etc)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "https://...",
-    value: datos.foto || "",
-    onChange: e => set("foto", e.target.value)
+  }, "Foto de la casa (útil cuando el mapa no tiene imagen de la zona)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, datos.foto && /*#__PURE__*/React.createElement("img", {
+    src: datos.foto,
+    alt: "Domicilio",
+    onClick: () => setMostrarFotoCasa(true),
+    style: {
+      width: 44,
+      height: 44,
+      objectFit: "cover",
+      borderRadius: 8,
+      border: "0.5px solid var(--color-border-secondary)",
+      cursor: "pointer"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "6px 10px"
+    },
+    onClick: () => setMostrarFotoCasa(true)
+  }, datos.foto ? "🏠 Cambiar foto" : "📷 Cargar foto de la casa")), mostrarFotoCasa && /*#__PURE__*/React.createElement(FotoClienteModal, {
+    cliente: datos,
+    campo: "foto",
+    titulo: "Domicilio",
+    onCerrar: () => setMostrarFotoCasa(false),
+    onGuardarFoto: b64 => set("foto", b64)
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label
   }, "Foto del comodato (la ficha en papel que firma el cliente)"), /*#__PURE__*/React.createElement("div", {

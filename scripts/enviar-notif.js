@@ -110,24 +110,28 @@ async function main(){
       if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
     }
 
-    // ── 2) Transferencias pendientes (13:00 y 19:00) ──
-    if(hora===13 || hora===19){
+    // ── 2) Transferencias pendientes (horas configurables, 13:00/19:00 por defecto) ──
+    const horasTrans = (data.horasAvisoTrans && data.horasAvisoTrans.length===2) ? data.horasAvisoTrans : ['13:00','19:00'];
+    const objetivoTrans = horasTrans.map((h,i)=>{ const [hh,mm]=h.split(':').map(Number); return {min:(hh||0)*60+(mm||0), clave:'t'+i}; })
+      .find(o => ahoraMin >= o.min && ahoraMin - o.min <= VENTANA_MIN);
+    if(objetivoTrans){
       const pend = ventas.filter(v => v.fechaKey===hoy && (v.pago==='transferencia' || (v.pago==='mixto' && Number(v.montoTrans)>0)) && !v.transConfirmada).length;
-      const clave = 'trans_'+hoy+'_'+hora;
+      const clave = 'trans_'+hoy+'_'+objetivoTrans.clave;
       if(pend>0 && !log[clave]){
         const ok = await enviarATodos(subsMap, datosRef, { title:'💳 Transferencias sin confirmar', body:`Tenés ${pend} transferencia${pend>1?'s':''} pendiente${pend>1?'s':''} de hoy.`, tag:'trans-pend', requireInteraction:true });
         if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
       }
     }
 
-    // ── 3) Mantenimiento de vehículo (07:00) ──
+    // ── 3) Mantenimiento de vehículo (07:00, días configurables) ──
     if(hora===7){
+      const diasAviso = (data.diasAvisoMant && data.diasAvisoMant.length) ? data.diasAvisoMant : [3,2,1,0];
       const hoyD = new Date(hoy+'T12:00:00');
       for(const mv of mantVeh){
         if(!mv.proximaFechaISO) continue;
         const prox = new Date(mv.proximaFechaISO+'T12:00:00');
         const dias = Math.round((prox-hoyD)/(1000*60*60*24));
-        if(dias>=0 && dias<=3){
+        if(diasAviso.includes(dias)){
           const clave = 'mant_'+mv.proximaFechaISO;
           if(log[clave]) continue;
           const cuando = dias===0?'HOY':`en ${dias} día${dias>1?'s':''}`;
@@ -139,16 +143,20 @@ async function main(){
 
     // ── 4) y 5) Avisos de cierre — SOLO si hoy es día de reparto, hubo reparto
     //     (planilla iniciada o alguna venta) y la planilla sigue sin cerrar.
-    if((hora===18 || hora===20) && DIAS.includes(diaHoy)){
+    const horaAviso = data.horaAvisoCierre || '18:00';
+    const [hA,mA] = horaAviso.split(':').map(Number);
+    const minAviso = (hA||18)*60+(mA||0);
+    const esHoraAviso = ahoraMin >= minAviso && ahoraMin - minAviso <= VENTANA_MIN;
+    if((esHoraAviso || hora===20) && DIAS.includes(diaHoy)){
       const planKey = `${diaHoy}_${hoy}`;
       const plan = planillas[planKey];
       const huboReparto = (plan && plan.iniciado) || ventas.some(v => v.fechaKey===hoy && v.dia===diaHoy);
       const sinCerrar = !plan || ((!plan.efectivo || plan.efectivo==='') && (!plan.fiado || plan.fiado===''));
       if(huboReparto && sinCerrar){
-        if(hora===18){
-          const clave='cierre18_'+hoy;
+        if(esHoraAviso){
+          const clave='cierre-aviso_'+hoy;
           if(!log[clave]){
-            const ok = await enviarATodos(subsMap, datosRef, { title:'🚚 Sistema de Reparto — 18:00 hs', body:`¿Ya cerraste la planilla de ${diaHoy}?`, tag:'cierre-18', requireInteraction:false });
+            const ok = await enviarATodos(subsMap, datosRef, { title:'🚚 Sistema de Reparto', body:`Son las ${horaAviso} — ¿Ya cerraste la planilla de ${diaHoy}?`, tag:'cierre-aviso', requireInteraction:false });
             if(ok){ log[clave]=Date.now(); cambioLog=true; enviados++; }
           }
         }

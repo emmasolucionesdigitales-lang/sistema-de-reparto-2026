@@ -54,8 +54,8 @@ function usarInformes({
       // registrarla (mismo criterio que usa el resto de la app, ej.
       // ListaClientes).
       const todasVentasDia = (ventas || []).filter(v => v.fechaKey === fecha && v.dia === dia);
-      const calcEf = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoEfec) || 0 : v.pagadoNum || v.neto || 0), 0);
-      const calcTr = todasVentasDia.filter(v => v.pago === "transferencia" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoTrans) || 0 : v.pagadoNum || v.neto || 0), 0);
+      const calcEf = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoEfec) || 0 : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+      const calcTr = todasVentasDia.filter(v => v.pago === "transferencia" || v.pago === "mixto").reduce((a, v) => a + (v.pago === "mixto" ? Number(v.montoTrans) || 0 : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
       const calcFi = todasVentasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
       const ef = planEf !== null ? planEf : Math.round(calcEf);
       const ret = planRet !== null ? planRet : Math.round(calcTr * 0.025);
@@ -355,6 +355,62 @@ function App() {
       return next;
     });
   };
+  // Registro de correcciones manuales de envases (♻️ Envases, en
+  // PieEnvases — 05-componentes.js) — deja constancia de qué cliente, qué
+  // cambió (Fijos o Prestados, por producto) y los valores antes/después,
+  // para poder revisar quién corrigió qué.
+  const [ajustesEnvases, setAjustesEnvases] = useLS("sr_ajustesenvases_v1", []);
+  const registrarAjusteEnvases = (clienteId, clienteNombre, cambios) => {
+    if (!cambios || !cambios.length) return;
+    setAjustesEnvases(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: new Date().toLocaleString("es-AR"),
+        fechaKey: new Date().toLocaleDateString("en-CA"),
+        clienteId,
+        clienteNombre: clienteNombre || null,
+        cambios,
+        _upd: Date.now()
+      }];
+      syncData({
+        ajustesEnvases: next
+      });
+      return next;
+    });
+  };
+  // Registro de movimientos internos de stock entre Sodería y Depósito —
+  // el cierre del día (confirmarCierre, 08-menu.js) mueve stock
+  // automáticamente; queda anotado acá cuánto se movió y cuándo.
+  const [movStock, setMovStock] = useLS("sr_movstock_v1", []);
+  const registrarMovimientoStock = (tipo, detalle, nota) => {
+    if (!detalle || !Object.keys(detalle).length) return;
+    setMovStock(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: new Date().toLocaleString("es-AR"),
+        fechaKey: new Date().toLocaleDateString("en-CA"),
+        tipo,
+        detalle,
+        nota: nota || null,
+        _upd: Date.now()
+      }];
+      syncData({
+        movStock: next
+      });
+      return next;
+    });
+  };
+  // Expuestos en window para que otros componentes (PieEnvases en
+  // 05-componentes.js, el cierre del día en 08-menu.js) los llamen sin
+  // prop-drilling.
+  React.useEffect(() => {
+    window._srRegistrarAjusteEnvases = registrarAjusteEnvases;
+    window._srRegistrarMovimientoStock = registrarMovimientoStock;
+    return () => {
+      if (window._srRegistrarAjusteEnvases === registrarAjusteEnvases) delete window._srRegistrarAjusteEnvases;
+      if (window._srRegistrarMovimientoStock === registrarMovimientoStock) delete window._srRegistrarMovimientoStock;
+    };
+  });
   const [recordatorios, setRecordatorios] = useLS("sr_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   // BUG: clientes (y productos/recordatorios) borrados podían volver a
@@ -485,23 +541,20 @@ function App() {
     const base = {
       soderia: e(),
       soderia_vacios: e(),
-      casa: e(),
-      camion: e()
+      casa: e()
     };
     if (!s || typeof s !== "object") return base;
     if (s.soderia && typeof s.soderia === "object") {
       return {
         soderia: pick(s.soderia),
         soderia_vacios: pick(s.soderia_vacios),
-        casa: pick(s.casa),
-        camion: e() /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
+        casa: pick(s.casa)
       };
     }
     return {
       soderia: pick(s),
       soderia_vacios: e(),
-      casa: e(),
-      camion: e()
+      casa: e()
     };
   };
   const [stockRaw, setStockRaw] = useLS("sr_stock_v4", {
@@ -522,12 +575,6 @@ function App() {
       bidon10: 0,
       bidon20: 0,
       dispenser: 0
-    },
-    camion: {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
     }
   });
   const stockNorm = React.useMemo(() => normStock(stockRaw), [JSON.stringify(stockRaw)]);
@@ -544,21 +591,6 @@ function App() {
     const normalized = normStock(stockRaw);
     if (JSON.stringify(normalized) !== JSON.stringify(stockRaw)) setStockRaw(normalized);
   }, []);
-  // Helper: transferir del camión a sodería al cerrar el día
-  const cerrarCamion = (sobrLlenos, vacios) => {
-    setStock(prev => {
-      const s = JSON.parse(JSON.stringify(normStock(prev)));
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
-        s.soderia[k] = (s.soderia[k] || 0) + (sobrLlenos[k] || 0);
-        s.soderia_vacios[k] = (s.soderia_vacios[k] || 0) + (vacios[k] || 0);
-        s.camion[k] = Math.max(0, (s.camion[k] || 0) - (sobrLlenos[k] || 0) - (vacios[k] || 0));
-      });
-      syncData({
-        stock: s
-      });
-      return s;
-    });
-  };
   const [planillas, setPlanillas] = useLS("sr_planillas_v1", {});
   // Cargas de salida por día — declarado acá arriba para que estadoRef pueda incluirlo y viaje a Firebase
   const [cargasDia, setCargasDia] = useLS("sr_cargas_dia_v1", CARGA_DIA_DEFAULT);
@@ -807,11 +839,6 @@ function App() {
             sifon: 0,
             bidon10: 0,
             bidon20: 0
-          },
-          camion: {
-            sifon: 0,
-            bidon10: 0,
-            bidon20: 0
           }
         };
         // Guarda por _upd: si el stock local (todavía no subido, ej. recién
@@ -1045,6 +1072,84 @@ function App() {
           }), 2000);
         }
       }
+      if (data.ajustesEnvases?.length) {
+        const ajustesLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("sr_ajustesenvases_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdAj = {};
+        (data.ajustesEnvases || []).forEach(a => {
+          porIdAj[a.id] = a;
+        });
+        let cambiosLocalesAj = 0;
+        ajustesLocales.forEach(a => {
+          const enNube = porIdAj[a.id];
+          if (!enNube) {
+            porIdAj[a.id] = a;
+            cambiosLocalesAj++;
+            return;
+          }
+          const uL = Number(a._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdAj[a.id] = a;
+            cambiosLocalesAj++;
+          }
+        });
+        const mergedAj = Object.values(porIdAj);
+        setAjustesEnvases(mergedAj);
+        try {
+          localStorage.setItem("sr_ajustesenvases_v1", JSON.stringify(mergedAj));
+        } catch {}
+        if (cambiosLocalesAj > 0) {
+          console.log("Merge: " + cambiosLocalesAj + " ajustes de envases locales más nuevos, sincronizando");
+          setTimeout(() => syncData({
+            ajustesEnvases: mergedAj
+          }), 2000);
+        }
+      }
+      if (data.movStock?.length) {
+        const movLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("sr_movstock_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdMov = {};
+        (data.movStock || []).forEach(m => {
+          porIdMov[m.id] = m;
+        });
+        let cambiosLocalesMov = 0;
+        movLocales.forEach(m => {
+          const enNube = porIdMov[m.id];
+          if (!enNube) {
+            porIdMov[m.id] = m;
+            cambiosLocalesMov++;
+            return;
+          }
+          const uL = Number(m._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdMov[m.id] = m;
+            cambiosLocalesMov++;
+          }
+        });
+        const mergedMov = Object.values(porIdMov);
+        setMovStock(mergedMov);
+        try {
+          localStorage.setItem("sr_movstock_v1", JSON.stringify(mergedMov));
+        } catch {}
+        if (cambiosLocalesMov > 0) {
+          console.log("Merge: " + cambiosLocalesMov + " movimientos de stock locales más nuevos, sincronizando");
+          setTimeout(() => syncData({
+            movStock: mergedMov
+          }), 2000);
+        }
+      }
       if (data.mantVeh?.length) localStorage.setItem("sr_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("sr_lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.horaAvisoCierre) localStorage.setItem("sr_hora_notif_cierre", data.horaAvisoCierre);
@@ -1076,6 +1181,9 @@ function App() {
     noVisitas,
     recordatorios,
     cargasDia,
+    perdidas,
+    ajustesEnvases,
+    movStock,
     prospectos
   });
   // Guards anti doble-tap: evitan sumar/restar el saldo dos veces si el
@@ -1110,6 +1218,8 @@ function App() {
       zonasReparto,
       cargasDia,
       perdidas,
+      ajustesEnvases,
+      movStock,
       prospectos
     };
   });
@@ -1406,11 +1516,6 @@ function App() {
               sifon: 0,
               bidon10: 0,
               bidon20: 0
-            },
-            camion: {
-              sifon: 0,
-              bidon10: 0,
-              bidon20: 0
             }
           };
           setStock(ns);
@@ -1434,6 +1539,18 @@ function App() {
           setPerdidas(data.perdidas || []);
           try {
             localStorage.setItem("sr_perdidas_v1", JSON.stringify(data.perdidas || []));
+          } catch {}
+        }
+        if (data.ajustesEnvases !== undefined) {
+          setAjustesEnvases(data.ajustesEnvases || []);
+          try {
+            localStorage.setItem("sr_ajustesenvases_v1", JSON.stringify(data.ajustesEnvases || []));
+          } catch {}
+        }
+        if (data.movStock !== undefined) {
+          setMovStock(data.movStock || []);
+          try {
+            localStorage.setItem("sr_movstock_v1", JSON.stringify(data.movStock || []));
           } catch {}
         }
         if (data.recordatorios !== undefined) {
@@ -1624,6 +1741,12 @@ function App() {
         }
         if (overrides.perdidas !== undefined) {
           merged.perdidas = mergeArrayPorClave(prevData.perdidas, data.perdidas, fresh.perdidas, p => p.id);
+        }
+        if (overrides.ajustesEnvases !== undefined) {
+          merged.ajustesEnvases = mergeArrayPorClave(prevData.ajustesEnvases, data.ajustesEnvases, fresh.ajustesEnvases, a => a.id);
+        }
+        if (overrides.movStock !== undefined) {
+          merged.movStock = mergeArrayPorClave(prevData.movStock, data.movStock, fresh.movStock, m => m.id);
         }
         guardarFinal(merged, fresh);
       }).catch(function () {
@@ -2040,9 +2163,9 @@ function App() {
     }));
     const sodaCajones = Math.floor(tots.soda.vacios / CAJON_SODA) || 0;
     // Pago mixto: guardado como pago="mixto" con montoEfec y montoTrans
-    const cobEfectivo = ventasDia.filter(v => v.pago === "contado" && !v._esMixtoTrans).reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0) + ventasDia.filter(v => v.pago === "mixto").reduce((a, v) => a + (Number(v.montoEfec) || 0), 0);
+    const cobEfectivo = ventasDia.filter(v => v.pago === "contado" && !v._esMixtoTrans).reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0) + ventasDia.filter(v => v.pago === "mixto").reduce((a, v) => a + (Number(v.montoEfec) || 0), 0);
     const cobFiado = ventasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
-    const cobTransBruto = ventasDia.filter(v => v.pago === "transferencia" && !v._esMixtoTrans).reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0) + ventasDia.filter(v => v.pago === "mixto").reduce((a, v) => a + (Number(v.montoTrans) || 0), 0);
+    const cobTransBruto = ventasDia.filter(v => v.pago === "transferencia" && !v._esMixtoTrans).reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0) + ventasDia.filter(v => v.pago === "mixto").reduce((a, v) => a + (Number(v.montoTrans) || 0), 0);
     const cobTransDesc = Math.round(cobTransBruto * 0.025);
     const planillaKey = `${diaActual}_${fechaActual}`;
     const planillaActual = planillas[planillaKey] || planillaDiaVacia();
@@ -2083,8 +2206,8 @@ function App() {
 
       // ── Enviar datos del día a Emma Control ──
       if (ecToken && window.enviarAEmmaControl) {
-        const cobEf = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-        const cobTr = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+        const cobEf = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+        const cobTr = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
         const totalCob = Math.round(cobEf + cobTr);
         const gastosData = (planillaActual.gastos || []).filter(g => g.monto && Number(g.monto) > 0).map(g => ({
           desc: g.desc || 'Gasto reparto',
@@ -2235,13 +2358,39 @@ function App() {
       firma: firmaReg,
       ts: ahoraReg
     };
-    // Auto-detectar envases prestados (solo si no es cobro de deuda)
+    // Auto-detectar envases prestados (solo si no es cobro de deuda).
+    // Si el cliente no tiene Fijos asignados (asignado === 0) puede ser
+    // simplemente que nunca se le configuraron — no necesariamente que
+    // TODO lo que lleva hoy sea prestado. Para no inflar "prestados" de
+    // más con clientes nuevos o mal configurados, se auto-calibra el Fijo
+    // (en vez de marcarlo como préstamo) cuando es la primera venta de ese
+    // producto para el cliente, o cuando las últimas 2 cantidades vendidas
+    // de ese producto coinciden (patrón estable → es su Fijo real).
     const envAutoDetect = [];
+    const fijosAutoAjuste = {};
     if (opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase") {
+      const campoFijo = {
+        "Sifón 1.5L": "sifon",
+        "Bidón 10L": "bidon10",
+        "Bidón 20L": "bidon20"
+      };
       detalle.forEach(d => {
-        const asignado = d.nombre === "Sifón 1.5L" ? c.sifon || 0 : d.nombre === "Bidón 10L" ? c.bidon10 || 0 : d.nombre === "Bidón 20L" ? c.bidon20 || 0 : 0;
+        const k = campoFijo[d.nombre];
+        if (!k) return;
+        const asignado = Number(c[k]) || 0;
         const extra = d.cantidad - asignado;
-        if (extra > 0) envAutoDetect.push({
+        if (extra <= 0) return;
+        if ((envPrest || []).some(ep => ep.prod === d.nombre)) return;
+        if (asignado === 0) {
+          const cantsPrevias = ventas.filter(v => v.clienteId === c.id && !v._esCobro && !v._esCambio).map(v => (v.detalle || []).find(x => x.nombre === d.nombre)?.cantidad).filter(cant => cant !== undefined);
+          const esPrimeraVez = cantsPrevias.length === 0;
+          const ultimasDosIguales = cantsPrevias.length >= 2 && cantsPrevias.slice(-2).every(cant => cant === d.cantidad);
+          if (esPrimeraVez || ultimasDosIguales) {
+            fijosAutoAjuste[k] = d.cantidad;
+            return;
+          }
+        }
+        envAutoDetect.push({
           prod: d.nombre,
           cant: String(extra)
         });
@@ -2298,6 +2447,7 @@ function App() {
     saveVentas(prev => [...prev, nuevaVenta]);
     saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev).map(c2 => c2.id === c.id ? {
       ...c2,
+      ...fijosAutoAjuste,
       saldo: (Number(c2.saldo) || 0) + calc.saldoDelta
     } : c2));
     // Si el cliente tenía recordatorios pendientes en Agenda, se resuelven
@@ -2648,7 +2798,7 @@ function App() {
         dia,
         fecha: fechas[0] || "",
         count: vts.length,
-        monto: vts.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0),
+        monto: vts.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0),
         ventas: vts
       };
     }).filter(Boolean),
@@ -2833,9 +2983,6 @@ function App() {
         s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - dSoda);
         s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - dB10);
         s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - dB20);
-        s.camion.sifon = Math.max(0, (s.camion.sifon || 0) + dSoda);
-        s.camion.bidon10 = Math.max(0, (s.camion.bidon10 || 0) + dB10);
-        s.camion.bidon20 = Math.max(0, (s.camion.bidon20 || 0) + dB20);
         setStock(normStock(s));
         syncData({
           stock: normStock(s)
@@ -3518,6 +3665,7 @@ function App() {
     planillas: planillas,
     perdidas: perdidas,
     registrarPerdida: registrarPerdida,
+    movStock: movStock,
     onVolver: () => irA("menu"),
     onResumen: () => irA("resumen")
   }), pantalla === "resumen" && /*#__PURE__*/React.createElement(Resumen, {
