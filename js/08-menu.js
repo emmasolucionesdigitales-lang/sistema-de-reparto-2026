@@ -1803,18 +1803,24 @@ const guardarCapacidadFija = (pk, valorStr) => {
         llenos: dl,
         vacios: dv
       };
-      // Sobra o falta del día vs lo esperado (según lo que salió, se prestó y
-      // se devolvió) se ajusta contra el depósito: si sobra, se suma al
-      // depósito; si falta, se resta.
-      // BUG REAL (causa de la acumulación "sin sentido" en sodería): antes
-      // acá se sumaba TODO lo que volvió (llenTotal+vacReal) a sodería Y,
-      // por separado, la diferencia contra "esperado" se sumaba también al
-      // depósito — contando esa diferencia dos veces cada vez que el usuario
-      // corrige un número a mano (todos los días). Resultado: sodería nunca
-      // volvía a su número fijo, solo crecía. Ahora sodería recibe SOLO lo
-      // esperado (mantiene su número fijo) y el depósito se lleva toda la
-      // diferencia — no ambos.
-      const esperadoPk = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
+      // Sobra o falta del día vs lo esperado se ajusta contra el depósito:
+      // si sobra, se suma al depósito; si falta, se resta. Sodería solo
+      // controla que vuelva TODO lo que salió cargado — los préstamos y
+      // devoluciones son un asunto exclusivo del depósito (un préstamo hoy
+      // hace que vuelva menos de lo que salió; el depósito repone esa
+      // diferencia para que sodería se mantenga siempre en su número fijo,
+      // SIEMPRE, sin excepción).
+      // CORRECCIÓN 2026-10-11: "esperado" es SOLO llenosCargados — ni
+      // +devuelto ni -prestado (antes se le restaba/sumaba acá, lo que
+      // hacía que la sodería "absorbiera" el préstamo en vez del depósito,
+      // y que una devolución inflara la sodería en vez de reponer el
+      // depósito). vaciosRec (en vacReal/llenTotal) ya incluye el efecto de
+      // hoy (vendidos+devueltos-prestados) UNA sola vez; al comparar contra
+      // el fijo (llenosCargados), diffDeposito queda exactamente en
+      // (devueltosDia − prestadosDia) + cualquier diferencia real contada a
+      // mano — sin doble conteo. Mismo criterio que Multiple, que ya lo
+      // tenía bien.
+      const esperadoPk = llenosCargados[pk];
       const vuelveTotalPk = llenTotal + vacReal;
       diffDeposito[pk] = vuelveTotalPk - esperadoPk;
       const factorFijo = vuelveTotalPk > 0 ? esperadoPk / vuelveTotalPk : 1;
