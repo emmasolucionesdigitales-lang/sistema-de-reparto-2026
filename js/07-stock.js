@@ -165,7 +165,7 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -201,7 +201,7 @@ function StockGeneral({
   const movStockOrdenado = [...(movStock || [])].reverse().slice(0, 30);
   const inNum = {
     ...s.inputNum,
-    padding: "5px 2px",
+    padding: "3px 2px",
     fontSize: 13
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -211,13 +211,13 @@ function StockGeneral({
     onVolver: onVolver
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: "10px 14px 40px"
+      padding: "6px 9px 26px"
     }
   }, onResumen && /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       width: "100%",
-      marginBottom: 10,
+      marginBottom: 6,
       fontSize: 13,
       fontWeight: 500
     },
@@ -226,15 +226,15 @@ function StockGeneral({
     style: {
       fontSize: 12,
       color: "var(--color-text-info)",
-      margin: "0 0 10px",
-      padding: "7px 11px",
+      margin: "0 0 6px",
+      padding: "5px 7px",
       background: "var(--color-background-info)",
       borderRadius: 8
     }
   }, "ℹ️ El ", /*#__PURE__*/React.createElement("b", null, "sifón"), " se cuenta en ", /*#__PURE__*/React.createElement("b", null, "unidades sueltas"), " (6 unidades = 1 cajón)."), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px"
+      margin: "0 0 6px"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -242,8 +242,8 @@ function StockGeneral({
       background: "var(--color-background-tertiary)",
       border: "none",
       borderRadius: 10,
-      padding: "14px 16px",
-      marginBottom: abiertoSoderia ? 10 : 0,
+      padding: "9px 10px",
+      marginBottom: abiertoSoderia ? 6 : 0,
       display: "flex",
       alignItems: "center",
       cursor: "pointer",
@@ -280,10 +280,10 @@ function StockGeneral({
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 52px 52px 46px",
-      gap: 6,
+      gap: 4,
       fontSize: 12,
       color: "var(--color-text-tertiary)",
-      marginBottom: 5
+      marginBottom: 3
     }
   }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -306,9 +306,9 @@ function StockGeneral({
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 52px 52px 46px",
-        gap: 6,
+        gap: 4,
         alignItems: "center",
-        marginBottom: 5
+        marginBottom: 3
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -343,7 +343,7 @@ function StockGeneral({
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px"
+      margin: "0 0 6px"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -351,8 +351,8 @@ function StockGeneral({
       background: "var(--color-background-tertiary)",
       border: "none",
       borderRadius: 10,
-      padding: "14px 16px",
-      marginBottom: abiertoDeposito ? 10 : 0,
+      padding: "9px 10px",
+      marginBottom: abiertoDeposito ? 6 : 0,
       display: "flex",
       alignItems: "center",
       cursor: "pointer",
@@ -389,7 +389,7 @@ function StockGeneral({
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: 7
+      gap: 5
     }
   }, PRODS.map(([k, lbl]) => /*#__PURE__*/React.createElement("div", {
     key: k,
@@ -399,7 +399,7 @@ function StockGeneral({
       alignItems: "center",
       background: "var(--color-background-tertiary)",
       borderRadius: 8,
-      padding: "6px 9px"
+      padding: "4px 6px"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -423,7 +423,7 @@ function StockGeneral({
   }))))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px"
+      margin: "0 0 6px"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -431,8 +431,8 @@ function StockGeneral({
       background: "var(--color-background-tertiary)",
       border: "none",
       borderRadius: 10,
-      padding: "14px 16px",
-      marginBottom: abiertoEnClientes ? 10 : 0,
+      padding: "9px 10px",
+      marginBottom: abiertoEnClientes ? 6 : 0,
       display: "flex",
       alignItems: "center",
       cursor: "pointer",
@@ -468,15 +468,15 @@ function StockGeneral({
   }, abiertoEnClientes ? "▲" : "▼")), abiertoEnClientes && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 6,
+      gap: 4,
       flexWrap: "wrap",
-      marginBottom: 8
+      marginBottom: 5
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -493,7 +493,7 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -505,7 +505,7 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -517,7 +517,7 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -536,16 +536,16 @@ function StockGeneral({
     }
   }, /*#__PURE__*/React.createElement("span", null, "✏️ Detalle por cliente (", clientesReales.length, ")"), /*#__PURE__*/React.createElement("span", null, clientesAbierto ? "▲" : "▼")), clientesAbierto && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 8
+      marginTop: 5
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 42px 42px 42px 42px",
-      gap: 4,
+      gap: 3,
       fontSize: 12,
       color: "var(--color-text-tertiary)",
-      marginBottom: 5
+      marginBottom: 3
     }
   }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -568,9 +568,9 @@ function StockGeneral({
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 42px 42px 42px 42px",
-      gap: 4,
+      gap: 3,
       alignItems: "center",
-      marginBottom: 4
+      marginBottom: 3
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -586,7 +586,7 @@ function StockGeneral({
     onChange: e => setClienteEnv(c.id, "sifon", e.target.value),
     style: {
       ...inNum,
-      padding: "4px 2px",
+      padding: "3px 2px",
       fontSize: 12
     }
   }), /*#__PURE__*/React.createElement("input", {
@@ -595,7 +595,7 @@ function StockGeneral({
     onChange: e => setClienteEnv(c.id, "bidon10", e.target.value),
     style: {
       ...inNum,
-      padding: "4px 2px",
+      padding: "3px 2px",
       fontSize: 12
     }
   }), /*#__PURE__*/React.createElement("input", {
@@ -604,7 +604,7 @@ function StockGeneral({
     onChange: e => setClienteEnv(c.id, "bidon20", e.target.value),
     style: {
       ...inNum,
-      padding: "4px 2px",
+      padding: "3px 2px",
       fontSize: 12
     }
   }), /*#__PURE__*/React.createElement("input", {
@@ -613,13 +613,13 @@ function StockGeneral({
     onChange: e => setClienteEnv(c.id, "dispenser", e.target.value),
     style: {
       ...inNum,
-      padding: "4px 2px",
+      padding: "3px 2px",
       fontSize: 12
     }
   })))))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px",
+      margin: "0 0 6px",
       border: "1px solid var(--color-border-secondary)"
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -633,11 +633,11 @@ function StockGeneral({
     style: {
       fontSize: 12,
       color: "var(--color-text-tertiary)",
-      marginBottom: 9
+      marginBottom: 6
     }
   }, "El número real que existe en total, sea cual sea la ubicación."), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 10
+      marginBottom: 6
     }
   }, PRODS.map(([k, lbl]) => {
     const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0);
@@ -648,13 +648,13 @@ function StockGeneral({
     return /*#__PURE__*/React.createElement("div", {
       key: `res-${k}`,
       style: {
-        marginBottom: 8
+        marginBottom: 5
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "baseline",
-        gap: 6
+        gap: 4
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -671,19 +671,19 @@ function StockGeneral({
     }, total)), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
-        gap: 6,
+        gap: 4,
         flexWrap: "wrap",
-        marginTop: 3
+        marginTop: 2
       }
     }, chipResumen("🏭 Sodería", enSoderia, "var(--color-text-info)"), chipResumen("📦 Depósito", enDeposito, "var(--color-text-secondary)"), chipResumen("👥 Clientes", enClientes, "var(--color-text-secondary)"), perdido > 0 && chipResumen("💔 Perdidos", perdido, "var(--color-text-danger)")));
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 60px 60px 60px 60px",
-      gap: 6,
+      gap: 4,
       fontSize: 12,
       color: "var(--color-text-tertiary)",
-      marginBottom: 5
+      marginBottom: 3
     }
   }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -714,9 +714,9 @@ function StockGeneral({
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 60px 60px 60px 60px",
-        gap: 6,
+        gap: 4,
         alignItems: "center",
-        padding: "5px 0",
+        padding: "3px 0",
         borderTop: "0.5px solid var(--color-border-tertiary)"
       }
     }, /*#__PURE__*/React.createElement("span", {
@@ -760,7 +760,7 @@ function StockGeneral({
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px"
+      margin: "0 0 6px"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -768,8 +768,8 @@ function StockGeneral({
       background: "var(--color-background-tertiary)",
       border: "none",
       borderRadius: 10,
-      padding: "14px 16px",
-      marginBottom: abiertoPerdidas ? 10 : 0,
+      padding: "9px 10px",
+      marginBottom: abiertoPerdidas ? 6 : 0,
       display: "flex",
       alignItems: "center",
       cursor: "pointer",
@@ -805,15 +805,15 @@ function StockGeneral({
   }, abiertoPerdidas ? "▲" : "▼")), abiertoPerdidas && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 6,
+      gap: 4,
       flexWrap: "wrap",
-      marginBottom: 10
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -825,7 +825,7 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -837,7 +837,7 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -849,7 +849,7 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 6,
-      padding: "3px 8px",
+      padding: "2px 5px",
       fontSize: 12,
       color: "var(--color-text-secondary)"
     }
@@ -861,22 +861,22 @@ function StockGeneral({
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 8,
-      padding: "10px",
-      marginBottom: 10
+      padding: "6px",
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       fontWeight: 500,
       color: "var(--color-text-primary)",
-      marginBottom: 8
+      marginBottom: 5
     }
   }, "Registrar una pérdida"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 70px",
-      gap: 6,
-      marginBottom: 6
+      gap: 4,
+      marginBottom: 4
     }
   }, /*#__PURE__*/React.createElement("select", {
     value: formPerdida.producto,
@@ -903,14 +903,14 @@ function StockGeneral({
     style: inNum
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 6
+      marginBottom: 4
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
       fontSize: 12,
       color: "var(--color-text-tertiary)",
       display: "block",
-      marginBottom: 3
+      marginBottom: 2
     }
   }, "¿De dónde salía?"), /*#__PURE__*/React.createElement("select", {
     value: formPerdida.ubicacion,
@@ -933,14 +933,14 @@ function StockGeneral({
     value: "clientes"
   }, "De un cliente (no descuenta stock acá)"))), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 8
+      marginBottom: 5
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
       fontSize: 12,
       color: "var(--color-text-tertiary)",
       display: "block",
-      marginBottom: 3
+      marginBottom: 2
     }
   }, "Motivo"), /*#__PURE__*/React.createElement("input", {
     type: "text",
@@ -968,7 +968,7 @@ function StockGeneral({
     style: {
       fontSize: 12,
       color: "var(--color-text-tertiary)",
-      marginBottom: 6
+      marginBottom: 4
     }
   }, "Historial (", perdidas.length, ")"), [...perdidas].reverse().slice(0, 20).map(p => {
     const items = [p.sifon && `${p.sifon} Sifón`, p.bidon10 && `${p.bidon10} 10L`, p.bidon20 && `${p.bidon20} 20L`].filter(Boolean).join(" · ");
@@ -976,7 +976,7 @@ function StockGeneral({
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
       style: {
-        padding: "6px 0",
+        padding: "4px 0",
         borderTop: "0.5px solid var(--color-border-tertiary)"
       }
     }, /*#__PURE__*/React.createElement("div", {
@@ -993,7 +993,7 @@ function StockGeneral({
   })))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px"
+      margin: "0 0 6px"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -1001,8 +1001,8 @@ function StockGeneral({
       background: "var(--color-background-tertiary)",
       border: "none",
       borderRadius: 10,
-      padding: "14px 16px",
-      marginBottom: abiertoMovStock ? 10 : 0,
+      padding: "9px 10px",
+      marginBottom: abiertoMovStock ? 6 : 0,
       display: "flex",
       alignItems: "center",
       cursor: "pointer",
@@ -1044,7 +1044,7 @@ function StockGeneral({
     return /*#__PURE__*/React.createElement("div", {
       key: m.id,
       style: {
-        padding: "6px 0",
+        padding: "4px 0",
         borderTop: "0.5px solid var(--color-border-tertiary)"
       }
     }, /*#__PURE__*/React.createElement("div", {
@@ -1067,7 +1067,7 @@ function StockGeneral({
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px"
+      margin: "0 0 6px"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -1075,8 +1075,8 @@ function StockGeneral({
       background: "var(--color-background-tertiary)",
       border: "none",
       borderRadius: 10,
-      padding: "14px 16px",
-      marginBottom: abiertoProductos ? 10 : 0,
+      padding: "9px 10px",
+      marginBottom: abiertoProductos ? 6 : 0,
       display: "flex",
       alignItems: "center",
       cursor: "pointer",
@@ -1116,16 +1116,16 @@ function StockGeneral({
     style: {
       fontSize: 12,
       color: "var(--color-text-tertiary)",
-      marginBottom: 9
+      marginBottom: 6
     }
   }, "De acá salen los precios de la planilla y todas las ventas"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 56px 56px 50px 20px",
-      gap: 5,
+      gap: 3,
       fontSize: 12,
       color: "var(--color-text-tertiary)",
-      marginBottom: 5
+      marginBottom: 3
     }
   }, /*#__PURE__*/React.createElement("span", null, "Producto"), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -1147,9 +1147,9 @@ function StockGeneral({
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 56px 56px 50px 20px",
-        gap: 5,
+        gap: 3,
         alignItems: "center",
-        marginBottom: 5
+        marginBottom: 3
       }
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
@@ -1206,13 +1206,13 @@ function StockGeneral({
     style: {
       ...s.btn,
       width: "100%",
-      marginTop: 6,
+      marginTop: 4,
       fontSize: 13
     }
   }, "+ Agregar producto"))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
-      margin: "0 0 10px"
+      margin: "0 0 6px"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -1220,8 +1220,8 @@ function StockGeneral({
       background: "var(--color-background-tertiary)",
       border: "none",
       borderRadius: 10,
-      padding: "14px 16px",
-      marginBottom: abiertoCarga ? 10 : 0,
+      padding: "9px 10px",
+      marginBottom: abiertoCarga ? 6 : 0,
       display: "flex",
       alignItems: "center",
       cursor: "pointer",
@@ -1251,8 +1251,8 @@ function StockGeneral({
   }, abiertoCarga ? "▲" : "▼")), abiertoCarga && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 5,
-      marginBottom: 10,
+      gap: 3,
+      marginBottom: 6,
       flexWrap: "wrap"
     }
   }, DIAS.map(d => /*#__PURE__*/React.createElement("button", {
@@ -1260,7 +1260,7 @@ function StockGeneral({
     onClick: () => setDiaCarga(d),
     style: {
       fontSize: 12,
-      padding: "4px 9px",
+      padding: "3px 6px",
       borderRadius: 7,
       border: "none",
       cursor: "pointer",
@@ -1272,7 +1272,7 @@ function StockGeneral({
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: 7
+      gap: 5
     }
   }, [["soda", "Sifón"], ["b10", "Bidón 10L"], ["b20", "Bidón 20L"], ["disp", "Dispenser"]].map(([k, lbl]) => /*#__PURE__*/React.createElement("div", {
     key: k,
@@ -1282,7 +1282,7 @@ function StockGeneral({
       alignItems: "center",
       background: "var(--color-background-tertiary)",
       borderRadius: 8,
-      padding: "6px 9px"
+      padding: "4px 6px"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -1344,13 +1344,13 @@ function ConfirmacionesDia({
     onVolver: onVolver
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: "10px 14px 4px"
+      padding: "6px 9px 3px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 8,
-      marginBottom: 8
+      gap: 5,
+      marginBottom: 5
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1359,7 +1359,7 @@ function ConfirmacionesDia({
       margin: 0,
       background: "#1e3a5f",
       border: "1px solid #f5b942",
-      padding: "10px 12px"
+      padding: "6px 8px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1367,7 +1367,7 @@ function ConfirmacionesDia({
       color: "#f5b942",
       fontWeight: 500,
       textTransform: "uppercase",
-      marginBottom: 4
+      marginBottom: 3
     }
   }, "🔴 Pendientes"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1387,7 +1387,7 @@ function ConfirmacionesDia({
       margin: 0,
       background: "#0a2e1f",
       border: "1px solid #4dd9a0",
-      padding: "10px 12px"
+      padding: "6px 8px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1395,7 +1395,7 @@ function ConfirmacionesDia({
       color: "#4dd9a0",
       fontWeight: 500,
       textTransform: "uppercase",
-      marginBottom: 4
+      marginBottom: 3
     }
   }, "✓ Confirmadas"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1411,7 +1411,7 @@ function ConfirmacionesDia({
   }, confirmadas.length, " transfer."))), grupos.length === 0 && /*#__PURE__*/React.createElement("p", {
     style: {
       textAlign: "center",
-      padding: "20px 0",
+      padding: "13px 0",
       color: "var(--color-text-tertiary)",
       fontSize: 14
     }
@@ -1422,14 +1422,14 @@ function ConfirmacionesDia({
     key: c?.id || Math.random(),
     style: {
       ...s.card,
-      marginBottom: 8
+      marginBottom: 5
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "flex-start",
-      marginBottom: 8
+      marginBottom: 5
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1455,16 +1455,16 @@ function ConfirmacionesDia({
     key: v.id,
     style: {
       ...s.card,
-      margin: "0 0 6px",
+      margin: "0 0 4px",
       background: "var(--color-background-tertiary)",
-      padding: "10px 12px"
+      padding: "6px 8px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 6
+      marginBottom: 4
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1486,7 +1486,7 @@ function ConfirmacionesDia({
   }, fmt((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0))), /*#__PURE__*/React.createElement("button", {
     style: {
       width: "100%",
-      padding: "9px",
+      padding: "6px",
       borderRadius: 8,
       border: "none",
       background: "#185FA5",
@@ -1498,7 +1498,7 @@ function ConfirmacionesDia({
     onClick: () => onConfirmar(v.id)
   }, "✓ Confirmar transferencia"))))), fechasConf.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 8
+      marginTop: 5
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1507,7 +1507,7 @@ function ConfirmacionesDia({
       fontWeight: 500,
       textTransform: "uppercase",
       letterSpacing: "0.05em",
-      margin: "8px 0 6px"
+      margin: "5px 0 4px"
     }
   }, "✓ Ya confirmadas"), fechasConf.map(fk => {
     const vtsFecha = confirmadasPorFecha[fk];
@@ -1517,7 +1517,7 @@ function ConfirmacionesDia({
       key: fk,
       style: {
         ...s.card,
-        margin: "0 0 6px",
+        margin: "0 0 4px",
         background: "#0a2e1f",
         border: "0.5px solid #4dd9a0"
       }
@@ -1559,9 +1559,9 @@ function ConfirmacionesDia({
       }
     }, open ? "▲" : "▼"))), open && /*#__PURE__*/React.createElement("div", {
       style: {
-        marginTop: 10,
+        marginTop: 6,
         borderTop: "0.5px solid rgba(77,217,160,0.2)",
-        paddingTop: 8
+        paddingTop: 5
       }
     }, vtsFecha.map(v => {
       const c = clientes.find(x => x.id === v.clienteId);
@@ -1571,7 +1571,7 @@ function ConfirmacionesDia({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "6px 0",
+          padding: "4px 0",
           borderBottom: "0.5px solid rgba(77,217,160,0.15)"
         }
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -1589,7 +1589,7 @@ function ConfirmacionesDia({
         style: {
           textAlign: "right",
           flexShrink: 0,
-          marginLeft: 8
+          marginLeft: 5
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
