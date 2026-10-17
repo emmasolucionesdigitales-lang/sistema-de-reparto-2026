@@ -1490,7 +1490,16 @@ function PlanillaDelDia({
     "Bidón 20L": "b20",
     "Sifón 1.5L": "soda"
   };
-  const todasVentasDia = [...ventasPropias, ...ventasExtraDia];
+  // BUG RAÍZ (ver La Catalina, mismo arreglo 2026-10-17): esto incluía
+  // ventasExtraDia (ventas de clientes de OTRO día que cayeron en esta
+  // misma fecha calendario) en TODOS los cálculos de plata y envases de
+  // este día — cobEfectivo, cobFiado, cobTransBruto, "Guardar planilla" y
+  // el envío a Emma Control. Si esta pantalla no era la dueña real de esa
+  // fecha, terminaba guardando la plata de OTRO día — duplicándola en
+  // cualquier resumen que sume todas las planillas. Las ventas de otros
+  // días se siguen mostrando aparte (tarjeta "Ventas de otros días"), pero
+  // ya NUNCA se suman a la plata/stock de ESTE día.
+  const todasVentasDia = ventasPropias;
   const totalesPorProd = {
     b10: {
       vacios: 0,

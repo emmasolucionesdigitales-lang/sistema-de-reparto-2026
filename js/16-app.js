@@ -2776,7 +2776,11 @@ function App() {
     onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onNuevoCliente: () => irA("nuevoCliente"),
     onVerDeudor: (c, d) => {
-      setDiaActual(d);
+      // RAÍZ DEL BUG (ver La Catalina, mismo arreglo 2026-10-17): diaActual
+      // es una sola variable global compartida por toda la app. Mirar un
+      // deudor es una acción de todos los días — antes pisaba diaActual con
+      // el día del cliente aunque ya hubiera una ruta real en curso.
+      if (!diaActual) setDiaActual(d);
       setClienteId(c.id);
       setOrigenDetalle("menu");
       irA("detalleCliente");
@@ -2797,7 +2801,7 @@ function App() {
       confirmado: true
     } : r)),
     onVerConfirmaciones: dia => {
-      if (dia) setDiaActual(dia);
+      if (dia && !diaActual) setDiaActual(dia);
       irA("confirmacionesDia");
     },
     transferenciasPendientes: DIAS.map(dia => {
@@ -3091,7 +3095,7 @@ function App() {
     onVolver: () => window.history.back(),
     onSeleccionar: c => {
       setClienteId(c.id);
-      setDiaActual(c.dia);
+      if (!diaActual) setDiaActual(c.dia);
       setOrigenDetalle("dormidos");
       irA("detalleCliente");
     },
@@ -3128,7 +3132,7 @@ function App() {
       if (esRutaDiaria) {
         if (fechaActual !== hoyKey) setFechaActual(hoyKey);
       } else {
-        setDiaActual(cliente.dia);
+        if (!diaActual) setDiaActual(cliente.dia);
         if (!fechaActual) setFechaActual(hoyKey);
       }
       irA("venta");
@@ -3553,7 +3557,7 @@ function App() {
     noVisitas: noVisitas,
     onSeleccionar: c => {
       setClienteId(c.id);
-      setDiaActual(c.dia);
+      if (!diaActual) setDiaActual(c.dia);
       const hoy = new Date().toLocaleDateString("en-CA");
       setFechaActual(hoy);
       setFechaObj(new Date(hoy + "T12:00:00"));
@@ -3590,7 +3594,7 @@ function App() {
       const c = clientes.find(x => x.id === clienteId);
       if (c) {
         setClienteId(clienteId);
-        setDiaActual(c.dia);
+        if (!diaActual) setDiaActual(c.dia);
         setOrigenDetalle("agenda");
         irA("detalleCliente");
       }
