@@ -1922,7 +1922,7 @@ function App() {
 
   // ── Helper: siguiente pendiente del día ──
   const getSiguienteDelDia = (nvActual, excludeId) => {
-    const clientesDia = clientes.filter(cc => cc.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+    const clientesDia = clientes.filter(cc => cc.dia === diaActual && !cc._retirado).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
     const visitadosIds = new Set([...ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste).map(v => v.clienteId), ...(nvActual || noVisitas || []).filter(v => v.dia === diaActual && v.fecha === fechaActual).map(v => v.clienteId)]);
     if (excludeId) visitadosIds.add(excludeId);
     const sigCl = clientesDia.find(cc => !visitadosIds.has(cc.id));
@@ -2133,7 +2133,7 @@ function App() {
   // Auto-guardado de planilla cuando todos los clientes del día tienen estado
   React.useEffect(() => {
     if (!diaActual || !fechaActual) return;
-    const clientesDia = clientes.filter(c => c.dia === diaActual);
+    const clientesDia = clientes.filter(c => c.dia === diaActual && !c._retirado);
     if (clientesDia.length === 0) return;
     const ventasDia = ventas.filter(v => v.dia === diaActual && v.fechaKey === fechaActual);
     const noVisitasDia = (noVisitas || []).filter(v => v.dia === diaActual && v.fecha === fechaActual);
@@ -3016,7 +3016,7 @@ function App() {
     },
     onVolver: () => window.history.back()
   }), pantalla === "clientes" && /*#__PURE__*/React.createElement(ListaClientes, {
-    clientes: clientes.filter(c => c.dia === diaActual),
+    clientes: clientes.filter(c => c.dia === diaActual && !c._retirado),
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual),
@@ -3165,7 +3165,7 @@ function App() {
         irA(pantallaOrigenDetalle());
         return;
       }
-      const clientesDia = clientes.filter(c => c.dia === diaN).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+      const clientesDia = clientes.filter(c => c.dia === diaN && !c._retirado).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
       const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaN && v.dia === diaN && !v._esCobro && !v._esAjuste).map(v => v.clienteId));
       const noVMap = {};
       nv.filter(v => v.dia === diaN && v.fecha === fechaN).forEach(v => {
@@ -3195,7 +3195,7 @@ function App() {
         irA(pantallaOrigenDetalle());
         return;
       }
-      const clientesDia = clientes.filter(c => c.dia === diaN).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+      const clientesDia = clientes.filter(c => c.dia === diaN && !c._retirado).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
       const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaN && v.dia === diaN && !v._esCobro && !v._esAjuste).map(v => v.clienteId));
       const noVMap = {};
       nv.filter(v => v.dia === diaN && v.fecha === fechaN).forEach(v => {
@@ -3278,7 +3278,7 @@ function App() {
     fecha: fechaActual,
     ventasCliente: ventas.filter(v => v.clienteId === cliente.id),
     progressData: (() => {
-      const clientesDia = clientes.filter(c => c.dia === diaActual);
+      const clientesDia = clientes.filter(c => c.dia === diaActual && !c._retirado);
       // IDs de todos los del día
       const idsClientes = new Set(clientesDia.map(c => c.id));
       const idsTodos = idsClientes;
