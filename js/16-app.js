@@ -3147,6 +3147,13 @@ function App() {
       eliminarCliente(cliente.id);
       irA(pantallaOrigenDetalle());
     },
+    onEliminarNoVisita: (nvDia, nvFecha) => {
+      saveNoVisitas(prev => (prev || []).filter(v => !(v.clienteId === cliente.id && v.dia === nvDia && v.fecha === nvFecha)));
+    },
+    onRetirarCliente: () => {
+      retirarCliente(cliente.id);
+      irA(pantallaOrigenDetalle());
+    },
     onNoEstaCliente: () => {
       const diaN = diaActual || cliente.dia;
       const fechaN = fechaActual || new Date().toLocaleDateString("en-CA");
