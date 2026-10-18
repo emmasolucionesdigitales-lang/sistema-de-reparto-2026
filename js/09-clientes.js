@@ -1503,7 +1503,18 @@ function DetalleCliente({
             fontSize: 11,
             color: "var(--color-text-tertiary)"
           }
-        }, item.fechaKey, " · ", item.dia)));
+        }, item.fechaKey, " · ", item.dia)), onEliminarNoVisita && /*#__PURE__*/React.createElement("button", {
+          style: {
+            ...s.btnDanger,
+            fontSize: 11,
+            padding: "3px 8px",
+            marginLeft: "auto",
+            flexShrink: 0
+          },
+          onClick: () => {
+            if (window.confirm(`¿Eliminar "${esNoEsta ? "No estaba en casa" : "No quiso comprar"}" del ${item.fechaKey}?`)) onEliminarNoVisita(item.dia, item.fecha);
+          }
+        }, "Eliminar"));
       }
       const v = item;
       const esCobro = v.pagadoNum > 0 && v.neto === 0 && !v._esAjuste;
