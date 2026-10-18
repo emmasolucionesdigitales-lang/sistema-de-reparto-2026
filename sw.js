@@ -1,5 +1,5 @@
 // v56 — push handler blindado (todo dentro de waitUntil, con fallback)
-const CACHE = 'lc-v71';
+const CACHE = 'lc-v72';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
