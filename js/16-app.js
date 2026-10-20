@@ -409,6 +409,30 @@ function App() {
       return next;
     });
   };
+  // ── Auditoría de cambios en ventas ──────────────────────────────────────────
+  // Pedido del usuario: un registro aparte de lo que NO queda a la vista en
+  // el historial normal de cada cliente — ventas ELIMINADAS (desaparecen del
+  // todo) y ventas EDITADAS (se pisa el valor viejo sin dejar rastro). Los
+  // ajustes de saldo YA quedan como ventas _esAjuste (se ven en el historial
+  // de cada cliente); la pantalla de Auditoría los junta en vivo desde
+  // `ventas`, no se duplican acá. Capado a 200 para no crecer sin límite.
+  const [auditoria, setAuditoria] = useLS("sr_auditoria_v1", []);
+  const registrarAuditoria = (tipo, detalle) => {
+    setAuditoria(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: new Date().toISOString(),
+        tipo,
+        ...detalle,
+        _upd: Date.now()
+      }];
+      const acotado = next.length > 200 ? next.slice(next.length - 200) : next;
+      syncData({
+        auditoria: acotado
+      });
+      return acotado;
+    });
+  };
   // Expuestos en window para que otros componentes (PieEnvases en
   // 05-componentes.js, el cierre del día en 08-menu.js) los llamen sin
   // prop-drilling.
@@ -1562,6 +1586,12 @@ function App() {
             localStorage.setItem("sr_movstock_v1", JSON.stringify(data.movStock || []));
           } catch {}
         }
+        if (data.auditoria !== undefined) {
+          setAuditoria(data.auditoria || []);
+          try {
+            localStorage.setItem("sr_auditoria_v1", JSON.stringify(data.auditoria || []));
+          } catch {}
+        }
         if (data.recordatorios !== undefined) {
           setRecordatorios(data.recordatorios || []);
           try {
@@ -2661,6 +2691,20 @@ function App() {
     });
     // Guardar lo borrado para poder "Deshacer" — antes de tocar nada
     const ventasBorradas = ventas.filter(x => idsABorrar.has(x.id));
+    // Dejar constancia en Auditoría (Config → Respaldo) de qué se borró —
+    // una vez que sale de `ventas` no queda rastro en el historial del
+    // cliente, así que si no se registra acá se pierde del todo.
+    ventasBorradas.filter(x => !x._esMixtoTrans).forEach(x => {
+      const det = (Array.isArray(x.detalle) ? x.detalle : Object.values(x.detalle || {})).map(d => `${d.cantidad}× ${d.nombre}`).join(", ");
+      registrarAuditoria("eliminada", {
+        clienteId: x.clienteId,
+        cliente: x.cliente || "",
+        fechaVenta: x.fecha || "",
+        detalleTxt: det || "(sin productos)",
+        pago: x.pago || "",
+        monto: x.neto || 0
+      });
+    });
     const ajusteTotal = v.saldoDelta + ajusteSaldoExtra;
     if (deshacerTimerRef.current) clearTimeout(deshacerTimerRef.current);
     setDeshacerVenta({
@@ -2745,6 +2789,23 @@ function App() {
     // puro, no depende del saldo actual del cliente (seguro de aplicar
     // después sobre el saldo más reciente, en vez del que había al abrir).
     const netDeltaCambio = calc.saldoDelta - vV.saldoDelta;
+    // Dejar constancia en Auditoría del antes/después — al editar se pisa
+    // el valor viejo de la venta sin dejar rastro en el historial normal.
+    if (vV.pago !== (esMixto ? "mixto" : pago) || (Number(vV.neto) || 0) !== (Number(calc.neto) || 0)) {
+      const detAntes = (Array.isArray(vV.detalle) ? vV.detalle : Object.values(vV.detalle || {})).map(d => `${d.cantidad}× ${d.nombre}`).join(", ");
+      const detDespues = detalle.map(d => `${d.cantidad}× ${d.nombre}`).join(", ");
+      registrarAuditoria("editada", {
+        clienteId: vV.clienteId,
+        cliente: vV.cliente || "",
+        fechaVenta: vV.fecha || "",
+        pagoAntes: vV.pago || "",
+        pagoDespues: esMixto ? "mixto" : pago,
+        montoAntes: vV.neto || 0,
+        montoDespues: calc.neto || 0,
+        detalleAntes: detAntes || "(sin productos)",
+        detalleDespues: detDespues || "(sin productos)"
+      });
+    }
     // Limpiar restos de versiones viejas que creaban una venta-transferencia aparte
     saveVentas(prev => {
       let nev = prev.filter(v => !(v._esMixtoTrans && v._mixtoDe === ventaId));
@@ -3771,6 +3832,7 @@ function App() {
     setClientes: saveClientes,
     ventas: ventas,
     setVentas: saveVentas,
+    auditoria: auditoria,
     planillas: planillas,
     setPlanillas: savePlanillasCloud,
     stock: stockNorm,
