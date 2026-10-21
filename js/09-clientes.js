@@ -1345,6 +1345,7 @@ function DetalleCliente({
   }, "Guardar saldo")))), mostrarCambio && /*#__PURE__*/React.createElement(CambioEnvasePanel, {
     productos: productos,
     onConfirmar: (productoViejo, productoNuevo, motivo) => {
+      const esDevol = !productoNuevo;
       const vt = {
         id: Date.now(),
         clienteId: cliente.id,
@@ -1353,13 +1354,13 @@ function DetalleCliente({
         fechaKey: fecha,
         fecha: new Date().toLocaleString("es-AR"),
         detalle: [{
-          nombre: "Cambio de envase",
+          nombre: esDevol ? "Devolución de envase" : "Cambio de envase",
           cantidad: 1,
           precio: 0,
           total: 0
         }],
-        pago: "cambio",
-        obs: `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`,
+        pago: esDevol ? "devolucion" : "cambio",
+        obs: esDevol ? `Devolución: ${productoViejo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}` : `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`,
         neto: 0,
         bruto: 0,
         desc: 0,
@@ -1371,11 +1372,12 @@ function DetalleCliente({
           prod: productoViejo,
           cant: 1
         }],
-        envPrest: [{
+        envPrest: esDevol ? [] : [{
           prod: productoNuevo,
           cant: 1
         }],
         _esCambio: true,
+        _esDevolucion: esDevol,
         _upd: Date.now()
       };
       onGuardarCambio && onGuardarCambio(vt);
@@ -1553,6 +1555,7 @@ function DetalleCliente({
       const esCobro = v.pagadoNum > 0 && v.neto === 0 && !v._esAjuste;
       const esAjuste = v._esAjuste || false;
       const esCambio = v._esCambio || false;
+      const esDevolucion = v._esDevolucion || false;
       if (esCobro) return /*#__PURE__*/React.createElement("div", {
         key: v.id,
         style: {
@@ -1694,9 +1697,9 @@ function DetalleCliente({
           alignItems: "flex-start",
           padding: "10px 12px",
           marginBottom: 6,
-          background: "rgba(129,140,248,0.08)",
+          background: esDevolucion ? "rgba(29,158,117,0.08)" : "rgba(129,140,248,0.08)",
           borderRadius: 10,
-          border: "0.5px solid rgba(129,140,248,0.3)"
+          border: esDevolucion ? "0.5px solid rgba(29,158,117,0.3)" : "0.5px solid rgba(129,140,248,0.3)"
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
@@ -1709,7 +1712,7 @@ function DetalleCliente({
         style: {
           fontSize: 18
         }
-      }, "🔄"), /*#__PURE__*/React.createElement("div", {
+      }, esDevolucion ? "↩️" : "🔄"), /*#__PURE__*/React.createElement("div", {
         style: {
           flex: 1
         }
@@ -1717,15 +1720,15 @@ function DetalleCliente({
         style: {
           fontSize: 13,
           fontWeight: 700,
-          color: "#818cf8"
+          color: esDevolucion ? "#1D9E75" : "#818cf8"
         }
-      }, "Cambio de envase"), /*#__PURE__*/React.createElement("div", {
+      }, esDevolucion ? "Devolución de envase" : "Cambio de envase"), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 12,
           color: "var(--color-text-secondary)",
           marginTop: 2
         }
-      }, v.obs?.replace("Cambio: ", "")), /*#__PURE__*/React.createElement("div", {
+      }, esDevolucion ? v.obs?.replace("Devolución: ", "") : v.obs?.replace("Cambio: ", "")), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 11,
           color: "var(--color-text-tertiary)",
@@ -1741,7 +1744,7 @@ function DetalleCliente({
           flexShrink: 0
         },
         onClick: () => {
-          if (window.confirm("¿Eliminar este cambio?")) onEliminarVenta(v.id);
+          if (window.confirm(esDevolucion ? "¿Eliminar esta devolución?" : "¿Eliminar este cambio?")) onEliminarVenta(v.id);
         }
       }, "Eliminar"));
       return /*#__PURE__*/React.createElement("div", {
