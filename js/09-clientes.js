@@ -7,7 +7,7 @@ function ClientesTabs({
   activo,
   onIr
 }) {
-  const tabs = [["todos", "👥", "Todos", "gestionClientes"], ["fiados", "💰", "Fiados", "fiadosPendientes"], ["dormidos", "😴", "Dormidos", "clientesDormidos"], ["mapa", "🗺", "Mapa", "mapaClientes"]];
+  const tabs = [["todos", "👥", "Todos", "gestionClientes"], ["fiados", "💰", "Fiados", "fiadosPendientes"], ["dormidos", "😴", "Dormidos", "clientesDormidos"], ["mapa", "🗺", "Mapa", "mapaClientes"], ["dispenser", "🌡", "Dispenser", "dispensersFrioCalor"]];
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1077,6 +1077,121 @@ function PausaClienteModal({
     }
   }, "Guardar"))));
 }
+// Modal "🌡 Mínimo del dispenser": a qué producto está atado y cuántas
+// unidades por mes hay que consumirle al cliente para no pagar la
+// diferencia del dispenser frío/calor en comodato. El guardado es un
+// merge parcial sobre el cliente (dispenserProducto/dispenserMinimoMensual)
+// vía onGuardar -> onEditar, igual que PausaClienteModal. El cobro de la
+// diferencia NO se hace acá: se hace a mano desde la pantalla
+// "Dispensers frío/calor" (DispensersFrioCalor, más abajo). Portado de
+// La Catalina 2026-11-17 (reemplaza cliente.minimoMensual).
+function DispenserConfigModal({
+  cliente,
+  productos,
+  onGuardar,
+  onCerrar
+}) {
+  const opciones = (productos || []).filter(p => !p.esDispenser);
+  const [producto, setProducto] = useState(cliente.dispenserProducto || (opciones[0] && opciones[0].nombre) || "");
+  const [minimo, setMinimo] = useState(cliente.dispenserMinimoMensual || "");
+  const precioSel = (opciones.find(p => p.nombre === producto) || {}).precio || 0;
+  const pesosEq = precioSel && Number(minimo) ? Math.round(Number(minimo) * precioSel) : null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 2000,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    },
+    onClick: onCerrar
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      width: "100%",
+      maxWidth: 380,
+      margin: 0
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      marginBottom: 2
+    }
+  }, "🌡 Mínimo del dispenser"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: "var(--color-text-secondary)",
+      marginBottom: 14
+    }
+  }, cliente.nombre), /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Producto pactado"), /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...s.select,
+      marginBottom: 12
+    },
+    value: producto,
+    onChange: e => setProducto(e.target.value)
+  }, opciones.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.nombre
+  }, p.nombre))), /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Mínimo por mes (unidades)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    min: 0,
+    value: minimo,
+    placeholder: "Ej: 12",
+    onChange: e => setMinimo(e.target.value),
+    style: {
+      ...s.input,
+      marginBottom: 4
+    }
+  }), pesosEq && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11.5,
+      color: "var(--color-text-tertiary)",
+      marginBottom: 12
+    }
+  }, "≈ ", fmt(pesosEq), " al precio actual de ", producto, " (", fmt(precioSel), " c/u) — si el precio cambia, se recalcula solo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: pesosEq ? 0 : 16
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1,
+      padding: "12px 0"
+    },
+    onClick: onCerrar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      flex: 1,
+      padding: "12px 0"
+    },
+    onClick: () => {
+      const n = Math.max(0, Math.round(Number(minimo)) || 0);
+      if (!producto || n <= 0) return;
+      onGuardar({
+        dispenserProducto: producto,
+        dispenserMinimoMensual: n
+      });
+    }
+  }, "Guardar"))));
+}
 function DetalleCliente({
   cliente,
   ventas,
@@ -1116,6 +1231,7 @@ function DetalleCliente({
   const [mostrarFotoComodato, setMostrarFotoComodato] = useState(false);
   const [razonAjuste, setRazonAjuste] = useState("");
   const [mostrarCambio, setMostrarCambio] = useState(false);
+  const [mostrarDispenserConfig, setMostrarDispenserConfig] = useState(false);
   const pausadoActivo = !!(cliente.pausadoHasta && cliente.pausadoHasta >= fecha);
   // Cliente quincenal: se marca una sola vez (cliente.frecuencia === "quincenal")
   // y el sistema calcula solo si le toca o no esta semana mirando su última
@@ -1283,7 +1399,18 @@ function DetalleCliente({
         frecuencia: "quincenal"
       });
     }
-  }, esQuincenal ? "📅 Quincenal" : "📅 Semanal"), /*#__PURE__*/React.createElement("button", {
+  }, esQuincenal ? "📅 Quincenal" : "📅 Semanal"), (Number(cliente.dispenser) || 0) > 0 && /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "5px 10px",
+      border: Number(cliente.dispenserMinimoMensual) > 0 ? "1px solid #5daaff" : undefined,
+      color: Number(cliente.dispenserMinimoMensual) > 0 ? "#5daaff" : undefined,
+      background: Number(cliente.dispenserMinimoMensual) > 0 ? "transparent" : undefined
+    },
+    title: "Mínimo mensual pactado para el dispenser frío/calor en comodato",
+    onClick: () => setMostrarDispenserConfig(true)
+  }, Number(cliente.dispenserMinimoMensual) > 0 ? `🌡 ${cliente.dispenserMinimoMensual}/mes` : "🌡 Configurar mínimo"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       fontSize: 12,
@@ -1348,6 +1475,14 @@ function DetalleCliente({
     onGuardar: cambios => {
       onEditar(cambios);
       setMostrarPausa(false);
+    }
+  }), mostrarDispenserConfig && /*#__PURE__*/React.createElement(DispenserConfigModal, {
+    cliente: cliente,
+    productos: productos,
+    onCerrar: () => setMostrarDispenserConfig(false),
+    onGuardar: cambios => {
+      onEditar(cambios);
+      setMostrarDispenserConfig(false);
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {

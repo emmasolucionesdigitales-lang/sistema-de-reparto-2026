@@ -3792,6 +3792,21 @@ function App() {
         saldo: (Number(x.saldo) || 0) + monto
       } : x));
     }
+  })), pantalla === "dispensersFrioCalor" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
+    activo: "dispenser",
+    onIr: irA
+  }), /*#__PURE__*/React.createElement(DispensersFrioCalor, {
+    clientes: clientes,
+    ventas: ventas,
+    productos: productos,
+    onVolver: () => window.history.back(),
+    onCobrarFaltante: (clienteId, saldoNuevo, vt) => {
+      saveVentas(prev => [...prev, vt]);
+      saveClientes(prev => prev.map(c => c.id === clienteId ? {
+        ...c,
+        saldo: saldoNuevo
+      } : c));
+    }
   })), pantalla === "stock" && /*#__PURE__*/React.createElement(StockGeneral, {
     stock: stockNorm,
     setStock: ns => {
