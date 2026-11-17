@@ -60,7 +60,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     const atendido = atendidos.has(c.id),
       est = noVMap[c.id];
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
-    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido;
+    const pausadoActivo = !!(c.pausadoHasta && c.pausadoHasta >= fecha);
+    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido && !pausadoActivo;
     const expandido = clienteExpandidoId === c.id;
     const irAlSiguientePendiente = () => {
       const idx = pendientes.findIndex(x => x.id === c.id);
@@ -139,7 +140,21 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         flexShrink: 0,
         marginLeft: 3
       }
-    }, "📷")), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
+    }, "📷")), pausadoActivo && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        padding: "2px 8px",
+        borderRadius: 20,
+        color: "#EF9F27",
+        border: "0.5px solid #EF9F27",
+        flexShrink: 0
+      },
+      title: c.pausadoMotivo || ""
+    }, "⏸ Pausado hasta ", (() => {
+      const [y, m, d] = String(c.pausadoHasta).split("-");
+      return d && m ? `${d}/${m}` : c.pausadoHasta;
+    })()), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 13,
         flexShrink: 0
@@ -493,6 +508,7 @@ function ListaClientes({
     pendientes,
     sinEntrega,
     listos,
+    pausados,
     todosListos
   } = React.useMemo(() => {
     const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
@@ -505,11 +521,17 @@ function ListaClientes({
     const visitados = new Set([...atendidos, ...visitadosSinVenta]);
     const clientesOrdenados = [...clientes].sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
     const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
-    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta");
-    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
+    // Pausa manual: el cliente avisó que no va a estar X días — evita ir en
+    // vano. Mientras pausadoHasta sea hoy o futuro no cuenta como pendiente
+    // de hoy ni exige visita para cerrar la ronda; tiene su propia sección
+    // para seguir visible. Portado de La Catalina.
+    const esPausado = c => !!(c.pausadoHasta && c.pausadoHasta >= fecha);
+    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && !esPausado(c));
+    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id) && !esPausado(c));
     const pendientes = [...pendientesNormales, ...volverAlFinal];
     const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
     const listos = filtrados.filter(c => atendidos.has(c.id));
+    const pausados = filtrados.filter(c => esPausado(c) && !visitados.has(c.id));
     const todosListos = pendientesNormales.length === 0 && visitados.size > 0;
     return {
       atendidos,
@@ -523,6 +545,7 @@ function ListaClientes({
       pendientes,
       sinEntrega,
       listos,
+      pausados,
       todosListos
     };
   }, [clientes, ventas, noVisitas, fecha, busqueda]);
@@ -765,6 +788,14 @@ function ListaClientes({
   }, "🔄 Volver a visitar (", volverAlFinal.length, ")"), volverAlFinal.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
     ...cardProps(c)
+  }))), pausados.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...s.sectionTitle,
+      color: "#EF9F27"
+    }
+  }, "⏸ Pausados (", pausados.length, ")"), pausados.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
+    key: c.id,
+    ...cardProps(c)
   }))), listos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
   }, "Entregado (", listos.length, ")"), listos.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
@@ -794,7 +825,87 @@ function ListaClientes({
       width: "100%",
       boxShadow: "0 4px 16px rgba(15,110,86,0.4)"
     }
-  }, "✅ Reparto completo — Ver planilla del día →")));
+  }, "✅ Reparto completo — Ver planilla del día →")), rutaSugerida && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 2000,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      maxWidth: 380,
+      width: "100%",
+      margin: 0,
+      maxHeight: "80vh",
+      overflowY: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      marginBottom: 6
+    }
+  }, "✨ Ruta sugerida"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-tertiary)",
+      margin: "0 0 12px"
+    }
+  }, "Orden propuesto según el historial de horarios de cada cliente en este día. No se aplica sola — la aplicás vos si te convence."), rutaSugerida.orden.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "7px 0",
+      borderTop: i > 0 ? "0.5px solid var(--color-border-tertiary)" : undefined,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--color-text-primary)"
+    }
+  }, i + 1, ". ", c.nombre), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-tertiary)"
+    }
+  }, rutaSugerida.horaPorId[c.id] != null ? `🕐 ~${String(Math.floor(rutaSugerida.horaPorId[c.id] / 60)).padStart(2, "0")}:${String(rutaSugerida.horaPorId[c.id] % 60).padStart(2, "0")}` : rutaSugerida.sinUbicarIds.has(c.id) ? "sin datos" : "sin historial"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1
+    },
+    onClick: () => setRutaSugerida(null)
+  }, "Cerrar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      background: "#1d9e75",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer"
+    },
+    onClick: aplicarRutaSugerida
+  }, "Aplicar este orden")))));
 }
 function DetalleCliente({
   cliente,
