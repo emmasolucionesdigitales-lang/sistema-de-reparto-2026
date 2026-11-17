@@ -2873,6 +2873,29 @@ function App() {
       saldo: (Number(x.saldo) || 0) + netDeltaCambio
     } : x));
   };
+  // Edición rápida del monto efectivamente transferido en una venta pendiente
+  // de confirmar — evita abrir el formulario completo de edición solo para
+  // corregir un monto que llegó mal por transferencia. Reusa editarVenta
+  // (arriba) para que el saldo del cliente se recalcule igual que siempre.
+  // Portado de La Catalina.
+  const editarMontoVenta = (ventaId, nuevoMonto) => {
+    const vE = ventas.find(v => v.id === ventaId);
+    if (!vE || vE._esCobro) return;
+    const esTransfPura = vE.pago === "transferencia";
+    const esMixtoConTransf = vE.pago === "mixto" && (Number(vE.montoTrans) || 0) > 0;
+    if (!esTransfPura && !esMixtoConTransf) return;
+    const nm = Math.round(Number(nuevoMonto) || 0);
+    if (nm <= 0) {
+      alert("El monto tiene que ser mayor a $0.");
+      return;
+    }
+    const detalleArr = Array.isArray(vE.detalle) ? vE.detalle : Object.values(vE.detalle || {});
+    if (esMixtoConTransf) {
+      editarVenta(ventaId, detalleArr, "mixto", String(vE.montoEfec || 0), vE.saldoAplicado, vE.obs, String(nm), vE.transConfirmada);
+    } else {
+      editarVenta(ventaId, detalleArr, vE.pago, String(nm), vE.saldoAplicado, vE.obs, undefined, vE.transConfirmada);
+    }
+  };
   window._setDarkModeLC = setDarkMode;
   window._setScaleIdxLC = setScaleIdx;
   const VAPID_PUBLIC_RM = 'BFuTmJkcfVwxPMmCX7T749Mfx4ebmmiyz3ozxEZSA15H3KbvXJQsBgzBA53Z0itfMKJb5ky82OmPA0qrR-ZZUDY';
@@ -3050,6 +3073,7 @@ function App() {
     dia: diaActual || "todos los días",
     ventas: ventas.filter(v => v.pago === "transferencia" && (!diaActual || v.dia === diaActual)),
     clientes: clientes,
+    onEditarMonto: editarMontoVenta,
     onConfirmar: ventaId => {
       saveVentas(prev => prev.map(v => v.id === ventaId ? {
         ...v,
@@ -3104,6 +3128,7 @@ function App() {
     // cliente) — mismas funciones ya usadas en el resto de la app. Portado
     // de La Catalina.
     onEditarVenta: editarVenta,
+    onEditarMontoVenta: editarMontoVenta,
     onEliminarVenta: eliminarVenta,
     onEditarCliente: (id, cambios) => {
       const antes = clientes.find(c => c.id === id);
@@ -3317,6 +3342,7 @@ function App() {
     onPerdidaCliente: registrarPerdidaCliente,
     onEliminarVenta: eliminarVenta,
     onEditarVenta: editarVenta,
+    onEditarMontoVenta: editarMontoVenta,
     onEliminarCliente: () => {
       eliminarCliente(cliente.id);
       irA(pantallaOrigenDetalle());

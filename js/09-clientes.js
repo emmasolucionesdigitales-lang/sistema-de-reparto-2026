@@ -727,6 +727,7 @@ function DetalleCliente({
   onEditar,
   onEliminarVenta,
   onEditarVenta,
+  onEditarMontoVenta,
   onEliminarCliente,
   onEliminarNoVisita,
   onRetirarCliente,
@@ -1818,7 +1819,19 @@ function DetalleCliente({
           padding: "3px 8px"
         },
         onClick: () => setEditandoVentaId(v.id)
-      }, "Editar"), /*#__PURE__*/React.createElement("button", {
+      }, "Editar"), onEditarMontoVenta && !v.transConfirmada && (v.pago === "transferencia" || v.pago === "mixto" && (Number(v.montoTrans) || 0) > 0) && /*#__PURE__*/React.createElement("button", {
+        style: {
+          ...s.btn,
+          fontSize: 11,
+          padding: "3px 8px"
+        },
+        onClick: () => {
+          const actual = v.pago === "mixto" ? v.montoTrans : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
+          const nuevo = window.prompt("Monto transferido:", String(actual || 0));
+          if (nuevo == null) return;
+          onEditarMontoVenta(v.id, nuevo);
+        }
+      }, "✏️ Editar monto transferido"), /*#__PURE__*/React.createElement("button", {
         style: {
           ...s.btnDanger,
           fontSize: 11,

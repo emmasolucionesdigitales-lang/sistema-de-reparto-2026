@@ -1484,6 +1484,7 @@ function ConfirmacionesDia({
   ventas,
   clientes,
   onConfirmar,
+  onEditarMonto,
   onVolver
 }) {
   const [abiertos, setAbiertos] = React.useState({});
@@ -1670,7 +1671,26 @@ function ConfirmacionesDia({
       cursor: "pointer"
     },
     onClick: () => onConfirmar(v.id)
-  }, "✓ Confirmar transferencia"))))), fechasConf.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "✓ Confirmar transferencia"), onEditarMonto && /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      padding: "6px",
+      marginTop: 4,
+      borderRadius: 8,
+      border: "0.5px solid var(--color-border-tertiary)",
+      background: "transparent",
+      color: "var(--color-text-secondary)",
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      const actual = (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
+      const nuevo = window.prompt("Monto transferido:", String(actual));
+      if (nuevo == null) return;
+      onEditarMonto(v.id, nuevo);
+    }
+  }, "✏️ Editar monto transferido"))))), fechasConf.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 5
     }

@@ -1042,6 +1042,7 @@ function DetalleVentasDia({
   productos,
   todasLasVentas,
   onEditarVenta,
+  onEditarMontoVenta,
   onEliminarVenta,
   onEditarCliente,
   onPerdidaCliente,
@@ -1204,7 +1205,19 @@ function DetalleVentasDia({
         padding: "3px 8px"
       },
       onClick: () => setEditandoVentaId(v.id)
-    }, "✏️ Editar"), /*#__PURE__*/React.createElement("button", {
+    }, "✏️ Editar"), esCompraReal && onEditarMontoVenta && !v.transConfirmada && (v.pago === "transferencia" || esMixto) && /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        fontSize: 11,
+        padding: "3px 8px"
+      },
+      onClick: () => {
+        const actual = v.pago === "mixto" ? v.montoTrans : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
+        const nuevo = window.prompt("Monto transferido:", String(actual || 0));
+        if (nuevo == null) return;
+        onEditarMontoVenta(v.id, nuevo);
+      }
+    }, "✏️ Editar monto transferido"), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btnDanger,
         fontSize: 11,
@@ -1460,6 +1473,7 @@ function PlanillaDelDia({
   noVisitas,
   cargasDia,
   onEditarVenta,
+  onEditarMontoVenta,
   onEliminarVenta,
   onEditarCliente,
   onPerdidaCliente,
@@ -2710,6 +2724,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
     productos: productos,
     todasLasVentas: todasLasVentas,
     onEditarVenta: onEditarVenta,
+    onEditarMontoVenta: onEditarMontoVenta,
     onEliminarVenta: onEliminarVenta,
     onEditarCliente: onEditarCliente,
     onPerdidaCliente: onPerdidaCliente,
