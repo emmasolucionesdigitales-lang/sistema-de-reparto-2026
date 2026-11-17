@@ -472,6 +472,7 @@ function ListaClientes({
   const [busqueda, setBusqueda] = useState("");
   const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
+  const [rutaSugerida, setRutaSugerida] = useState(null); // preview de "✨ Sugerir ruta" — nunca se aplica sola
   // Auto-scroll al botón "Ver planilla del día" apenas se termina de
   // registrar el último cliente pendiente.
   const btnPlanillaRef = React.useRef(null);
@@ -582,6 +583,79 @@ function ListaClientes({
     const afuera = conMaps.length - conCoords.length;
     if (afuera > 0) setTimeout(() => alert(`Nota: ${afuera} cliente(s) quedaron afuera de la ruta óptima porque su link de Maps no trae coordenadas.`), 400);
   };
+
+  // "Sugerir ruta": a diferencia de 🧭 Ruta óptima (que ordena por cercanía
+  // GPS y abre Google Maps), esto propone un ORDEN para la lista misma,
+  // basado en a qué hora se le suele cargar la venta a cada cliente —
+  // siempre como preview en un modal; nunca reordena solo. Portado de
+  // La Catalina.
+  const _horaAMinutos = hhmm => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || "").trim());
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const sugerirRuta = () => {
+    const base = pendientes;
+    if (base.length < 3) {
+      alert("Hace falta al menos 3 clientes pendientes en el día.");
+      return;
+    }
+    const conHora = [],
+      sinHora = [];
+    base.forEach(c => {
+      const horas = (todasVentas || ventas).filter(v => v.clienteId === c.id && v.dia === dia && v.hora && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio).sort((a, b) => (b.fechaKey || "").localeCompare(a.fechaKey || "")).slice(0, 8).map(v => _horaAMinutos(v.hora)).filter(n => n != null).sort((a, b) => a - b);
+      if (horas.length) conHora.push({
+        c,
+        min: horas[Math.floor(horas.length / 2)]
+      });else sinHora.push(c);
+    });
+    if (conHora.length < 2) {
+      alert("Todavía no hay suficiente historial de horarios.");
+      return;
+    }
+    conHora.sort((a, b) => a.min - b.min);
+    let secuencia = conHora.map(x => x.c);
+    const sinUbicar = [];
+    sinHora.forEach(c => {
+      const co = extraerCoordsDeURL(c.maps);
+      if (!co) {
+        sinUbicar.push(c);
+        return;
+      }
+      let mejorIdx = -1,
+        mejorD = Infinity;
+      secuencia.forEach((sc, i) => {
+        const sco = extraerCoordsDeURL(sc.maps);
+        if (!sco) return;
+        const d = (sco.lat - co.lat) ** 2 + (sco.lng - co.lng) ** 2;
+        if (d < mejorD) {
+          mejorD = d;
+          mejorIdx = i;
+        }
+      });
+      if (mejorIdx === -1) {
+        sinUbicar.push(c);
+        return;
+      }
+      secuencia = [...secuencia.slice(0, mejorIdx + 1), c, ...secuencia.slice(mejorIdx + 1)];
+    });
+    setRutaSugerida({
+      orden: [...secuencia, ...sinUbicar],
+      horaPorId: Object.fromEntries(conHora.map(x => [x.c.id, x.min])),
+      sinUbicarIds: new Set(sinUbicar.map(c => c.id))
+    });
+  };
+  const aplicarRutaSugerida = () => {
+    if (!rutaSugerida) return;
+    const posMap = {};
+    rutaSugerida.orden.forEach((c, i) => {
+      posMap[c.id] = i + 1;
+    });
+    onReordenar(clientes.map(c => posMap[c.id] !== undefined ? {
+      ...c,
+      orden: posMap[c.id]
+    } : c));
+    setRutaSugerida(null);
+  };
   const moverCliente = (idOrigen, idDestino) => {
     if (idOrigen === idDestino) return;
     const ordenActual = clientesOrdenados.map(c => c.id);
@@ -651,6 +725,13 @@ function ListaClientes({
     },
     onClick: abrirRutaOptima
   }, "🧭 Ruta óptima"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 11,
+      padding: "3px 10px"
+    },
+    onClick: sugerirRuta
+  }, "✨ Sugerir ruta"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       fontSize: 11,
