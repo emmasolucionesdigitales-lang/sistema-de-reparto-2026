@@ -2257,7 +2257,7 @@ function DetalleCliente({
         style: {
           fontSize: 18
         }
-      }, v._esCargoMinimo ? "💧" : "✏️"), /*#__PURE__*/React.createElement("div", {
+      }, v._esAjusteDispenser ? "🌡" : v._esCargoMinimo ? "💧" : "✏️"), /*#__PURE__*/React.createElement("div", {
         style: {
           flex: 1
         }
@@ -2267,7 +2267,7 @@ function DetalleCliente({
           fontWeight: 700,
           color: "#818cf8"
         }
-      }, v._esCargoMinimo ? "Cargo por consumo mínimo" : "Ajuste de saldo"), /*#__PURE__*/React.createElement("div", {
+      }, v._esAjusteDispenser ? "Cobro dispenser frío/calor" : v._esCargoMinimo ? "Cargo por consumo mínimo" : "Ajuste de saldo"), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 12,
           color: "var(--color-text-secondary)",
