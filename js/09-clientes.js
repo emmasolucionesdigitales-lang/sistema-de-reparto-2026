@@ -61,7 +61,17 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       est = noVMap[c.id];
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
     const pausadoActivo = !!(c.pausadoHasta && c.pausadoHasta >= fecha);
-    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido && !pausadoActivo;
+    // Cliente quincenal: compra, saltea la visita siguiente y recién vuelve
+    // a la otra — "no le toca esta semana" si su última venta real fue hace
+    // menos de 10 días. Portado de La Catalina.
+    const esQuincenal = c.frecuencia === "quincenal";
+    const noLeTocaQuincenal = esQuincenal && (() => {
+      const compras = (todasVentas || ventas).filter(v => v.clienteId === c.id && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans && v.fechaKey).map(v => v.fechaKey).sort().reverse();
+      if (!compras.length) return false;
+      const dias = Math.floor((new Date(fecha + "T12:00:00") - new Date(compras[0] + "T12:00:00")) / 86400000);
+      return dias < 10;
+    })();
+    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido && !pausadoActivo && !noLeTocaQuincenal;
     const expandido = clienteExpandidoId === c.id;
     const irAlSiguientePendiente = () => {
       const idx = pendientes.findIndex(x => x.id === c.id);
@@ -154,7 +164,17 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     }, "⏸ Pausado hasta ", (() => {
       const [y, m, d] = String(c.pausadoHasta).split("-");
       return d && m ? `${d}/${m}` : c.pausadoHasta;
-    })()), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
+    })()), esQuincenal && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        padding: "2px 8px",
+        borderRadius: 20,
+        color: "#5daaff",
+        border: "0.5px solid #5daaff",
+        flexShrink: 0
+      }
+    }, noLeTocaQuincenal ? "📅 No le toca esta semana" : "📅 Quincenal"), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 13,
         flexShrink: 0
@@ -509,6 +529,7 @@ function ListaClientes({
     sinEntrega,
     listos,
     pausados,
+    quincenales,
     todosListos
   } = React.useMemo(() => {
     const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
@@ -526,12 +547,32 @@ function ListaClientes({
     // de hoy ni exige visita para cerrar la ronda; tiene su propia sección
     // para seguir visible. Portado de La Catalina.
     const esPausado = c => !!(c.pausadoHasta && c.pausadoHasta >= fecha);
-    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && !esPausado(c));
-    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id) && !esPausado(c));
+    // Clientes quincenales: compran, saltean la visita siguiente y recién
+    // vuelven a la otra — se marca una sola vez en el cliente (frecuencia:
+    // "quincenal") y el sistema solo mira la última venta REAL para avisar
+    // si "no le toca esta semana" (menos de 10 días desde esa compra). Sin
+    // historial se asume que sí le toca. Portado de La Catalina.
+    const ultimaCompraReal = {};
+    (todasVentas || ventas).forEach(v => {
+      if (v._esCobro || v._esAjuste || v._esAjusteEnvases || v._esCambio || v._esMixtoTrans) return;
+      const fk = v.fechaKey;
+      if (!fk) return;
+      if (!ultimaCompraReal[v.clienteId] || fk > ultimaCompraReal[v.clienteId]) ultimaCompraReal[v.clienteId] = fk;
+    });
+    const noLeTocaQuincenal = c => {
+      if (c.frecuencia !== "quincenal") return false;
+      const fk = ultimaCompraReal[c.id];
+      if (!fk) return false;
+      const dias = Math.floor((new Date(fecha + "T12:00:00") - new Date(fk + "T12:00:00")) / 86400000);
+      return dias < 10;
+    };
+    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && !esPausado(c) && !noLeTocaQuincenal(c));
+    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id) && !esPausado(c) && !noLeTocaQuincenal(c));
     const pendientes = [...pendientesNormales, ...volverAlFinal];
     const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
     const listos = filtrados.filter(c => atendidos.has(c.id));
     const pausados = filtrados.filter(c => esPausado(c) && !visitados.has(c.id));
+    const quincenales = filtrados.filter(c => noLeTocaQuincenal(c) && !esPausado(c) && !visitados.has(c.id));
     const todosListos = pendientesNormales.length === 0 && visitados.size > 0;
     return {
       atendidos,
@@ -546,6 +587,7 @@ function ListaClientes({
       sinEntrega,
       listos,
       pausados,
+      quincenales,
       todosListos
     };
   }, [clientes, ventas, noVisitas, fecha, busqueda]);
@@ -794,6 +836,14 @@ function ListaClientes({
       color: "#EF9F27"
     }
   }, "⏸ Pausados (", pausados.length, ")"), pausados.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
+    key: c.id,
+    ...cardProps(c)
+  }))), quincenales.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...s.sectionTitle,
+      color: "#5daaff"
+    }
+  }, "📅 Quincenales — no les toca esta semana (", quincenales.length, ")"), quincenales.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
     ...cardProps(c)
   }))), listos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
@@ -1067,6 +1117,16 @@ function DetalleCliente({
   const [razonAjuste, setRazonAjuste] = useState("");
   const [mostrarCambio, setMostrarCambio] = useState(false);
   const pausadoActivo = !!(cliente.pausadoHasta && cliente.pausadoHasta >= fecha);
+  // Cliente quincenal: se marca una sola vez (cliente.frecuencia === "quincenal")
+  // y el sistema calcula solo si le toca o no esta semana mirando su última
+  // venta real. Portado de La Catalina.
+  const esQuincenal = cliente.frecuencia === "quincenal";
+  const noLeTocaQuincenal = esQuincenal && (() => {
+    const compras = ventas.filter(v => !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans && v.fechaKey).map(v => v.fechaKey).sort().reverse();
+    if (!compras.length) return false;
+    const dias = Math.floor((new Date(fecha + "T12:00:00") - new Date(compras[0] + "T12:00:00")) / 86400000);
+    return dias < 10;
+  })();
   const recActivos = (recordatorios || []).filter(r => r.clienteId === cliente.id && !r.confirmado);
   const historial = [...ventas].sort((a, b) => (b.fechaKey || "").localeCompare(a.fechaKey || "") || (b.id || 0) - (a.id || 0));
   const ventaHoy = fecha ? ventas.find(v => v.fechaKey === fecha && !v._esCobro && !v._esAjuste && !v._esCambio) : null;
@@ -1206,6 +1266,27 @@ function DetalleCliente({
     style: {
       ...s.btn,
       fontSize: 12,
+      padding: "5px 10px",
+      border: esQuincenal ? "1px solid #5daaff" : undefined,
+      color: esQuincenal ? "#5daaff" : undefined,
+      background: esQuincenal ? "transparent" : undefined
+    },
+    title: "Cliente quincenal: compra, saltea la visita siguiente y recién vuelve a la otra — el sistema calcula solo si le toca esta semana",
+    onClick: () => {
+      if (esQuincenal) {
+        if (window.confirm("¿Volver a reparto semanal normal para este cliente?")) onEditar({
+          frecuencia: null
+        });
+        return;
+      }
+      if (window.confirm("¿Marcar como cliente quincenal? El sistema va a avisar solo cuando no le toque esa semana.")) onEditar({
+        frecuencia: "quincenal"
+      });
+    }
+  }, esQuincenal ? "📅 Quincenal" : "📅 Semanal"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 12,
       padding: "5px 10px"
     },
     onClick: () => {
@@ -1324,7 +1405,28 @@ function DetalleCliente({
         pausadoMotivo: null
       });
     }
-  }, "Quitar")), recActivos.length > 0 && !editandoCliente && /*#__PURE__*/React.createElement("div", {
+  }, "Quitar")), noLeTocaQuincenal && !editandoCliente && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: "rgba(93,170,255,0.1)",
+      border: "1px solid #5daaff",
+      display: "flex",
+      gap: 10,
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      flexShrink: 0
+    }
+  }, "📅"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#5daaff"
+    }
+  }, "Cliente quincenal — no le toca esta semana, el sistema lo calcula solo")), recActivos.length > 0 && !editandoCliente && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
     }

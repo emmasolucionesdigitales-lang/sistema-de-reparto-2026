@@ -552,7 +552,17 @@ function GestionClientes({
       flexShrink: 0
     },
     title: c.pausadoMotivo || ""
-  }, "⏸ Pausado")), /*#__PURE__*/React.createElement("div", {
+  }, "⏸ Pausado"), c.frecuencia === "quincenal" && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "1px 7px",
+      borderRadius: 20,
+      color: "#5daaff",
+      border: "0.5px solid #5daaff",
+      flexShrink: 0
+    }
+  }, "📅 Quincenal")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 17,
       color: "#e2eaf4",
