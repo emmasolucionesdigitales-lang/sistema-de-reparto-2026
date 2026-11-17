@@ -541,7 +541,18 @@ function GestionClientes({
       fontWeight: 700,
       flexShrink: 0
     }
-  }, c.dia)), /*#__PURE__*/React.createElement("div", {
+  }, c.dia), c.pausadoHasta && c.pausadoHasta >= new Date().toLocaleDateString("en-CA") && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "1px 7px",
+      borderRadius: 20,
+      color: "#EF9F27",
+      border: "0.5px solid #EF9F27",
+      flexShrink: 0
+    },
+    title: c.pausadoMotivo || ""
+  }, "⏸ Pausado")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 17,
       color: "#e2eaf4",
