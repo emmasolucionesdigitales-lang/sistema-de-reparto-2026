@@ -550,6 +550,13 @@ function App() {
     localStorage.setItem("sr_cobros_dia_migrados_v1", "1");
   }, [ventas, clientes]);
   const [productos, setProductos] = useLS("sr_productos_v3", PRODUCTOS_INICIALES);
+  // Pedido de Guillermo (19/11/2026, portado de La Catalina): mantiene
+  // KEY_PROD_ENV (04-utils.js) al día con la lista real de productos en
+  // cada render, y expone esa lista como global para que PieEnvases/
+  // FormCliente (05-componentes.js) puedan armar sus claves dinámicas sin
+  // que haya que pasarles un prop nuevo en cada pantalla que los usa.
+  actualizarKeyProdEnv(productos);
+  window._srProductos = productos;
   const normStock = s => {
     const e = () => ({
       sifon: 0,
