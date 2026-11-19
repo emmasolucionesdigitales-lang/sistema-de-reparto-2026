@@ -263,11 +263,6 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         marginTop: 7
       }
     }, (() => {
-      const real = {
-        sifon: Math.max(0, (Number(c.sifon) || 0) + prestadoClienteDe(c, "sifon", todasVentas || ventas)),
-        bidon10: Math.max(0, (Number(c.bidon10) || 0) + prestadoClienteDe(c, "bidon10", todasVentas || ventas)),
-        bidon20: Math.max(0, (Number(c.bidon20) || 0) + prestadoClienteDe(c, "bidon20", todasVentas || ventas))
-      };
       const pill = txt => /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
@@ -278,7 +273,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
           color: "var(--color-text-primary)"
         }
       }, txt);
-      return /*#__PURE__*/React.createElement(React.Fragment, null, real.sifon > 0 && pill(`Sifón×${real.sifon}`), real.bidon10 > 0 && pill(`10L×${real.bidon10}`), real.bidon20 > 0 && pill(`20L×${real.bidon20}`), c.dispenser > 0 && pill(`Disp×${c.dispenser}`));
+      return /*#__PURE__*/React.createElement(React.Fragment, null, PRODS_BADGE.map(([k, lbl]) => {
+        const real = Math.max(0, (Number(c[k]) || 0) + prestadoClienteDe(c, k, todasVentas || ventas));
+        return real > 0 ? /*#__PURE__*/React.createElement(React.Fragment, { key: k }, pill(`${lbl.replace(" 1.5L", "")}×${real}`)) : null;
+      }));
     })(), atendido && /*#__PURE__*/React.createElement("span", {
       style: s.badge("success")
     }, "✓ Listo"), est === "noesta" && !atendido && /*#__PURE__*/React.createElement("span", {
