@@ -1490,6 +1490,19 @@ function PlanillaDelDia({
   // Extras = cualquier venta de ese fecha que NO sea de un cliente del día
   //   incluye: clientes de otros días, cobros de deuda de cualquier día
   const ventasExtraDia = todasFecha.filter(v => !clientesDia.has(v.clienteId));
+  // Pedido de Guillermo (19/11/2026, portado de La Catalina): el cierre
+  // del dia usaba 3 claves cortas fijas (soda/b10/b20) sin relacion con
+  // las de stock, y dejaba afuera cualquier producto nuevo. Ahora se arma
+  // sola, a partir de los productos reales marcados para ir al camion
+  // (ver productosDeCarga/claveCargaDeProducto en 04-utils.js).
+  const productosCarga = productosDeCarga(productos);
+  const clavesCarga = productosCarga.map(claveCargaDeProducto);
+  const ceroCarga = () => Object.fromEntries(clavesCarga.map(k => [k, 0]));
+  const ceroCargaSk = () => Object.fromEntries(productosCarga.map(p => [claveStockDeProducto(p), 0]));
+  const dispProd = (productos || []).find(p => p.esDispenser);
+  const dispNombre = dispProd ? dispProd.nombre : "Dispenser";
+  const nombreAPk = Object.fromEntries(productosCarga.map(p => [p.nombre, claveCargaDeProducto(p)]));
+  const labelCorto = p => (p && p.nombre || "").replace(" 1.5L", "");
   const CAJON_SODA = 6;
   const getProdCosto = nombre => {
     const p = (productos || []).find(x => x.nombre === nombre);
@@ -1499,11 +1512,7 @@ function PlanillaDelDia({
   const costB10 = getProdCosto("Bidón 10L") || 800;
   const costB20 = getProdCosto("Bidón 20L") || 1100;
   const COSTO_CAJON_SODA = costSifon * CAJON_SODA;
-  const prodKey = {
-    "Bidón 10L": "b10",
-    "Bidón 20L": "b20",
-    "Sifón 1.5L": "soda"
-  };
+  const prodKey = nombreAPk;
   // BUG RAÍZ (ver La Catalina, mismo arreglo 2026-10-17): esto incluía
   // ventasExtraDia (ventas de clientes de OTRO día que cayeron en esta
   // misma fecha calendario) en TODOS los cálculos de plata y envases de
@@ -1514,24 +1523,10 @@ function PlanillaDelDia({
   // días se siguen mostrando aparte (tarjeta "Ventas de otros días"), pero
   // ya NUNCA se suman a la plata/stock de ESTE día.
   const todasVentasDia = ventasPropias;
-  const totalesPorProd = {
-    b10: {
-      vacios: 0,
-      plata: 0,
-      llenar: 0
-    },
-    b20: {
-      vacios: 0,
-      plata: 0,
-      llenar: 0
-    },
-    soda: {
-      vacios: 0,
-      plata: 0,
-      llenar: 0,
-      cajones: 0
-    }
-  };
+  const totalesPorProd = Object.fromEntries(clavesCarga.map(pk => [
+    pk,
+    pk === "soda" ? { vacios: 0, plata: 0, llenar: 0, cajones: 0 } : { vacios: 0, plata: 0, llenar: 0 }
+  ]));
   todasVentasDia.forEach(v => {
     v.detalle.forEach(d => {
       const k = prodKey[d.nombre];
@@ -1549,12 +1544,24 @@ function PlanillaDelDia({
   totalesPorProd.soda.llenar = sodaCajones * COSTO_CAJON_SODA;
   totalesPorProd.b10.llenar = totalesPorProd.b10.vacios * costB10;
   totalesPorProd.b20.llenar = totalesPorProd.b20.vacios * costB20;
+  productosCarga.forEach(p => {
+    const pk = claveCargaDeProducto(p);
+    if (pk === "soda" || pk === "b10" || pk === "b20") return;
+    totalesPorProd[pk].llenar = totalesPorProd[pk].vacios * (p.costo || 0);
+  });
   const sifonesCargados = Number(planilla?.productos?.soda?.llenos || 0);
   const b10Cargados = Number(planilla?.productos?.b10?.llenos || 0);
   const b20Cargados = Number(planilla?.productos?.b20?.llenos || 0);
   const cajonesCargados = calcCajones(sifonesCargados);
-  const pesoAuto = cajonesCargados * 13 + b10Cargados * 10 + b20Cargados * 20;
-  const bultosAuto = cajonesCargados + b10Cargados + b20Cargados;
+  // Pedido de Guillermo (19/11/2026, portado de La Catalina): el peso/bultos
+  // es solo un dato informativo de cuanto lleva el camion. Un producto
+  // nuevo suma su propio peso SOLO si se le cargo un "peso" (kg por
+  // unidad) al crearlo -- si no, no inventa un numero, no suma nada.
+  const otrosProdsPeso = productosCarga.filter(p => !["soda", "b10", "b20"].includes(claveCargaDeProducto(p)));
+  const pesoExtra = otrosProdsPeso.reduce((acc, p) => acc + Number(planilla?.productos?.[claveCargaDeProducto(p)]?.llenos || 0) * (Number(p.peso) || 0), 0);
+  const bultosExtra = otrosProdsPeso.reduce((acc, p) => acc + Number(planilla?.productos?.[claveCargaDeProducto(p)]?.llenos || 0), 0);
+  const pesoAuto = cajonesCargados * 13 + b10Cargados * 10 + b20Cargados * 20 + pesoExtra;
+  const bultosAuto = cajonesCargados + b10Cargados + b20Cargados + bultosExtra;
   const totalVentaPlata = Object.values(totalesPorProd).reduce((a, p) => a + p.plata, 0);
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a, p) => a + p.llenar, 0);
   const extraEfectivo = ventasExtraDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
@@ -1635,16 +1642,8 @@ function PlanillaDelDia({
   // piensa en bultos (igual que "Bultos auto" más arriba): sifones a cajón,
   // bidones 1 bulto cada uno.
   const totalBultosIngresados = calcCajones(num(datos.productos.soda?.llenos)) + num(datos.productos.b10?.llenos) + num(datos.productos.b20?.llenos);
-  const planKeyToStockKey = {
-    "soda": "sifon",
-    "b10": "bidon10",
-    "b20": "bidon20"
-  };
-  const PROD_LABEL = {
-    soda: "Sifones",
-    b10: "Bidón 10L",
-    b20: "Bidón 20L"
-  };
+  const planKeyToStockKey = Object.fromEntries(productosCarga.map(p => [claveCargaDeProducto(p), claveStockDeProducto(p)]));
+  const PROD_LABEL = Object.fromEntries(productosCarga.map(p => [claveCargaDeProducto(p), claveCargaDeProducto(p) === "soda" ? "Sifones" : p.nombre]));
   const cierreKey = `cierre_${dia}_${fecha}`;
   const yaConfirmado = !!localStorage.getItem(cierreKey) || !!planilla._diaCerrado;
   const [mostrarCierre, setMostrarCierre] = useState(!!(initCierre && !yaConfirmado));
@@ -1653,21 +1652,10 @@ function PlanillaDelDia({
   // antes de entrar a la pantalla de Cierre, porque el botón "Enviar
   // informe" vive en la pantalla de Planilla y saca su propia foto fresca
   // en el momento en que el dueño decide mandarlo.
-  const [realesLlenos, setRealesLlenos] = useState({
-    soda: "",
-    b10: "",
-    b20: ""
-  });
-  const [realesVacios, setRealesVacios] = useState({
-    soda: "",
-    b10: "",
-    b20: ""
-  });
-  const [realesParaLlenar, setRealesParaLlenar] = useState({
-    soda: "",
-    b10: "",
-    b20: ""
-  });
+  const ceroCargaStr = () => Object.fromEntries(clavesCarga.map(k => [k, ""]));
+  const [realesLlenos, setRealesLlenos] = useState(ceroCargaStr());
+  const [realesVacios, setRealesVacios] = useState(ceroCargaStr());
+  const [realesParaLlenar, setRealesParaLlenar] = useState(ceroCargaStr());
   const [editandoCapFija, setEditandoCapFija] = useState(null);
   // Cartel de confirmación antes de mover algo del/al Depósito — pedido del
   // usuario: la app tiene que avisar y preguntar, no mover en silencio.
@@ -1675,7 +1663,7 @@ function PlanillaDelDia({
 const guardarCapacidadFija = (pk, valorStr) => {
   const cajon = pk === "soda" ? CAJON_SODA : 1;
   const s2 = JSON.parse(JSON.stringify(stock || {}));
-  if (!s2.capacidadFija) s2.capacidadFija = { soda: 0, b10: 0, b20: 0 };
+  if (!s2.capacidadFija) s2.capacidadFija = ceroCarga();
   const num = Number(valorStr);
   s2.capacidadFija[pk] = valorStr !== "" && !isNaN(num) ? Math.round(num * cajon) : CAPACIDAD_FIJA[pk];
   setStock(s2);
@@ -1687,33 +1675,14 @@ const guardarCapacidadFija = (pk, valorStr) => {
   // sincronizada vuelva a bajar como prop), no hay que volver a pedir la
   // verificación de envases — se pasa directo al botón de enviar informe.
   const yaCerrado = !!planilla._diaCerrado || !!localStorage.getItem(cierreKey);
-  const llenosCargados = {
-    soda: Number(datos.productos?.soda?.llenos || 0),
-    b10: Number(datos.productos?.b10?.llenos || 0),
-    b20: Number(datos.productos?.b20?.llenos || 0)
-  };
-  const vendidosDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
+  const llenosCargados = Object.fromEntries(clavesCarga.map(pk => [pk, Number(datos.productos?.[pk]?.llenos || 0)]));
+  const vendidosDia = { ...ceroCarga(), disp: 0 };
   ventas.forEach(v => v.detalle.forEach(d => {
     const k = prodKey[d.nombre];
     if (k) vendidosDia[k] += d.cantidad;
   }));
-  const prestadosDia = {
-      soda: 0,
-      b10: 0,
-      b20: 0,
-      disp: 0
-    },
-    devueltosDia = {
-      soda: 0,
-      b10: 0,
-      b20: 0,
-      disp: 0
-    };
+  const prestadosDia = { ...ceroCarga(), disp: 0 },
+    devueltosDia = { ...ceroCarga(), disp: 0 };
   ventas.forEach(v => {
     (v.envPrest || []).forEach(e => {
       const k = prodKey[e.prod];
@@ -1732,7 +1701,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
   });
   const sobrantes = {},
     vaciosRec = {};
-  ["soda", "b10", "b20"].forEach(pk => {
+  clavesCarga.forEach(pk => {
     sobrantes[pk] = Math.max(0, llenosCargados[pk] - vendidosDia[pk]);
     vaciosRec[pk] = Math.max(0, vendidosDia[pk] + devueltosDia[pk] - prestadosDia[pk]);
   });
@@ -1769,7 +1738,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
     b10: 0,
     b20: 0
   };
-  ["soda", "b10", "b20"].forEach(pk => {
+  clavesCarga.forEach(pk => {
     const sk = planKeyToStockKey[pk];
     const cajon = pk === "soda" ? CAJON_SODA : 1;
     const llenosHoy = Math.floor(sobrantes[pk] / (pk === "soda" ? CAJON_SODA : 1));
@@ -1788,18 +1757,17 @@ const guardarCapacidadFija = (pk, valorStr) => {
   //    cada cliente y el depósito NO forman parte de este número: son otra
   //    cosa (mismo criterio que la app Multiple, unificado acá).
   const clientesReales = clientes || [];
-  const enClientesPrestado = { soda: 0, b10: 0, b20: 0 };
+  const enClientesPrestado = ceroCarga();
   clientesReales.forEach(c => {
-    ["soda", "b10", "b20"].forEach(pk => {
+    clavesCarga.forEach(pk => {
       const sk = planKeyToStockKey[pk];
       enClientesPrestado[pk] += prestadoClienteDe(c, sk, ventas);
     });
   });
-  const CAPACIDAD_FIJA = stock?.capacidadFija && (stock.capacidadFija.soda || stock.capacidadFija.b10 || stock.capacidadFija.b20) ? stock.capacidadFija : {
-    soda: (stock?.soderia?.sifon || 0) + (stock?.soderia_vacios?.sifon || 0) + enClientesPrestado.soda,
-    b10: (stock?.soderia?.bidon10 || 0) + (stock?.soderia_vacios?.bidon10 || 0) + enClientesPrestado.b10,
-    b20: (stock?.soderia?.bidon20 || 0) + (stock?.soderia_vacios?.bidon20 || 0) + enClientesPrestado.b20
-  };
+  const CAPACIDAD_FIJA = stock?.capacidadFija && clavesCarga.some(pk => stock.capacidadFija[pk]) ? stock.capacidadFija : Object.fromEntries(clavesCarga.map(pk => {
+    const sk = planKeyToStockKey[pk];
+    return [pk, (stock?.soderia?.[sk] || 0) + (stock?.soderia_vacios?.[sk] || 0) + (enClientesPrestado[pk] || 0)];
+  }));
   // Calcula cuánto hay que sumar o sacar del Depósito para que sodería
   // vuelva a su número fijo (misma cuenta que antes hacía confirmarCierre
   // al vuelo, pero SIN tocar el stock) — se separa para poder mostrar el
@@ -1809,7 +1777,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
     const diffDeposito = {};
     const llenTotalFijo = {};
     const vacRealFijo = {};
-    ["soda", "b10", "b20"].forEach(pk => {
+    clavesCarga.forEach(pk => {
       const CAJON_F = pk === "soda" ? CAJON_SODA : 1;
       // Si el cajón de soda quedó a medio vender, los sifones sueltos que le
       // quedan siguen llenos — no se pierden solo porque no llenan un cajón
@@ -1891,7 +1859,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
       llenTotalFijo,
       vacRealFijo
     } = calcularMovimientoDeposito();
-    ["soda", "b10", "b20"].forEach(pk => {
+    clavesCarga.forEach(pk => {
       const sk = planKeyToStockKey[pk];
       s.soderia[sk] = (s.soderia[sk] || 0) + llenTotalFijo[pk];
       s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacRealFijo[pk];
@@ -1909,7 +1877,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
     });
     if (window._srRegistrarMovimientoStock) {
       const detalleCierre = {};
-      ["soda", "b10", "b20"].forEach(pk => {
+      clavesCarga.forEach(pk => {
         const sk = planKeyToStockKey[pk];
         const soderiaVuelta = (llenTotalFijo[pk] || 0) + (vacRealFijo[pk] || 0);
         const deposito = diffDeposito[pk] || 0;
@@ -1947,7 +1915,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
     const {
       diffDeposito
     } = calcularMovimientoDeposito();
-    const hayMovimiento = ["soda", "b10", "b20"].some(pk => diffDeposito[pk] !== 0);
+    const hayMovimiento = clavesCarga.some(pk => diffDeposito[pk] !== 0);
     if (hayMovimiento) setMostrarConfirmDeposito(true);else confirmarCierre();
   };
   if (mostrarCierre) {
@@ -2028,7 +1996,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
         textAlign: h ? "center" : "left",
         fontWeight: 500
       }
-    }, h))), [["Soda", "soda"], ["10L", "b10"], ["20L", "b20"], ["Dispenser", "disp"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
+    }, h))), [...productosCarga.map(p => [claveCargaDeProducto(p) === "soda" ? "Soda" : labelCorto(p), claveCargaDeProducto(p)]), [dispNombre, "disp"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
       key: pk,
       style: {
         display: "grid",
@@ -2080,7 +2048,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
         margin: "0 0 16px",
         padding: "10px 12px"
       }
-    }, [["Soda", "soda"], ["10L", "b10"], ["20L", "b20"]].map(([label, pk]) => {
+    }, productosCarga.map(p => [claveCargaDeProducto(p) === "soda" ? "Soda" : labelCorto(p), claveCargaDeProducto(p)]).map(([label, pk]) => {
       const cajon = pk === "soda" ? CAJON_SODA : 1;
       const unidad = pk === "soda" ? "cajones" : "unidades";
       const div = n => pk === "soda" ? Math.floor(n / cajon) : n;
@@ -2268,8 +2236,8 @@ const guardarCapacidadFija = (pk, valorStr) => {
       disabled: enviandoCierre
     }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Confirmar y cerrar día"), mostrarConfirmDeposito && (() => {
       const { diffDeposito } = calcularMovimientoDeposito();
-      const LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L" };
-      const filas = ["soda", "b10", "b20"].filter(pk => diffDeposito[pk] !== 0);
+      const LBL = Object.fromEntries(productosCarga.map(p => [claveCargaDeProducto(p), labelCorto(p)]));
+      const filas = clavesCarga.filter(pk => diffDeposito[pk] !== 0);
       return /*#__PURE__*/React.createElement("div", {
         style: {
           position: "fixed",
