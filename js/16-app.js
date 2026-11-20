@@ -557,44 +557,59 @@ function App() {
   // que haya que pasarles un prop nuevo en cada pantalla que los usa.
   actualizarKeyProdEnv(productos);
   window._srProductos = productos;
+  const BASE_DEFAULT_FIJA = {
+    sifon: 150,
+    bidon10: 70,
+    bidon20: 21,
+    dispenser: 0
+  };
+  // Pedido de Guillermo (19/11/2026, portado de La Catalina): el stock
+  // antes solo conocia estas 4 claves fijas -- y normStock, por donde pasa
+  // TODO guardado de stock (ver setStock mas abajo), ni siquiera
+  // preservaba capacidadFija (la base del checksum "cuadra con el fijo").
+  // Ahora se arma solo a partir de la lista real de productos (los 4 de
+  // siempre quedan con la misma clave de toda la vida, asi no se pierde ni
+  // se mueve ningun dato guardado) y capacidadFija viaja siempre.
+  const clavesStock = productos.filter(p => p.trackStock !== false).map(p => ({
+    clave: claveStockDeProducto(p),
+    capacidadBase: p.capacidadBase ?? BASE_DEFAULT_FIJA[claveStockDeProducto(p)] ?? 0
+  }));
   const normStock = s => {
-    const e = () => ({
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
-    });
+    const e = () => {
+      const o = {};
+      clavesStock.forEach(c => { o[c.clave] = 0; });
+      return o;
+    };
     const pick = o => {
-      const r = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0,
-        dispenser: 0
-      };
-      if (o && typeof o === "object") {
-        for (const k in o) {
-          r[k] = Math.max(0, Math.round(Number(o[k]) || 0));
-        }
-      }
+      const r = {};
+      clavesStock.forEach(c => { r[c.clave] = Math.max(0, Math.round(Number(o?.[c.clave]) || 0)); });
+      return r;
+    };
+    const pickFija = o => {
+      const r = {};
+      clavesStock.forEach(c => { r[c.clave] = o?.[c.clave] ?? c.capacidadBase; });
       return r;
     };
     const base = {
       soderia: e(),
       soderia_vacios: e(),
-      casa: e()
+      casa: e(),
+      capacidadFija: pickFija({})
     };
     if (!s || typeof s !== "object") return base;
     if (s.soderia && typeof s.soderia === "object") {
       return {
         soderia: pick(s.soderia),
         soderia_vacios: pick(s.soderia_vacios),
-        casa: pick(s.casa)
+        casa: pick(s.casa),
+        capacidadFija: pickFija(s.capacidadFija)
       };
     }
     return {
       soderia: pick(s),
       soderia_vacios: e(),
-      casa: e()
+      casa: e(),
+      capacidadFija: pickFija(s.capacidadFija)
     };
   };
   const [stockRaw, setStockRaw] = useLS("sr_stock_v4", {
