@@ -1503,6 +1503,7 @@ function PlanillaDelDia({
   const dispNombre = dispProd ? dispProd.nombre : "Dispenser";
   const nombreAPk = Object.fromEntries(productosCarga.map(p => [p.nombre, claveCargaDeProducto(p)]));
   const labelCorto = p => (p && p.nombre || "").replace(" 1.5L", "");
+  const prodsCargaUI = productosCarga.map(p => ({ id: claveCargaDeProducto(p), nombre: p.nombre, costoUnit: p.costo || 0 }));
   const CAJON_SODA = 6;
   const getProdCosto = nombre => {
     const p = (productos || []).find(x => x.nombre === nombre);
@@ -2416,7 +2417,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
       fontWeight: 500,
       textAlign: h === "Producto" ? "left" : "right"
     }
-  }, h))), PRODUCTOS_CONFIG.map(p => {
+  }, h))), prodsCargaUI.map(p => {
     const auto = totalesPorProd[p.id];
     const esSoda = p.id === "soda";
     return /*#__PURE__*/React.createElement("div", {
