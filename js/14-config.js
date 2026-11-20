@@ -734,17 +734,6 @@ function Config({
       mantVeh: lista
     });
   };
-  const prestados = {
-    sifon: clientes.reduce((a, c) => a + (c.sifon || 0), 0),
-    bidon10: clientes.reduce((a, c) => a + (c.bidon10 || 0), 0),
-    bidon20: clientes.reduce((a, c) => a + (c.bidon20 || 0), 0)
-  };
-  const stockKeys = {
-    "Sifón 1.5L": "sifon",
-    "Bidón 10L": "bidon10",
-    "Bidón 20L": "bidon20",
-    "Dispenser": "dispenser"
-  };
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
@@ -1109,6 +1098,9 @@ function Config({
       b20: 0
     };
     var cajones = Math.floor((c.soda || 0) / 6);
+    var otrosProdsCarga = productosDeCarga(productos || []).filter(function (p) {
+      return claveCargaDeProducto(p) !== "soda";
+    });
     return /*#__PURE__*/React.createElement("div", {
       key: dia,
       style: {
@@ -1123,7 +1115,7 @@ function Config({
         marginBottom: 8
       }
     }, dia), /*#__PURE__*/React.createElement("div", {
-      style: s.grid3
+      style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 10 }
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
       style: {
         ...s.label,
@@ -1153,49 +1145,31 @@ function Config({
         textAlign: "center",
         marginTop: 2
       }
-    }, c.soda || 0, " unidades")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-      style: {
-        ...s.label,
-        textAlign: "center"
-      }
-    }, "Bidón 10L"), /*#__PURE__*/React.createElement("input", {
-      style: {
-        ...s.inputNum,
-        textAlign: "center"
-      },
-      type: "number",
-      min: 0,
-      value: c.b10 || "",
-      placeholder: "0",
-      onChange: e => {
-        var nuevo = Object.assign({}, cargasDia || CARGA_DIA_DEFAULT);
-        nuevo[dia] = Object.assign({}, c, {
-          b10: Number(e.target.value) || 0
-        });
-        setCargasDia(nuevo);
-      }
-    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-      style: {
-        ...s.label,
-        textAlign: "center"
-      }
-    }, "Bidón 20L"), /*#__PURE__*/React.createElement("input", {
-      style: {
-        ...s.inputNum,
-        textAlign: "center"
-      },
-      type: "number",
-      min: 0,
-      value: c.b20 || "",
-      placeholder: "0",
-      onChange: e => {
-        var nuevo = Object.assign({}, cargasDia || CARGA_DIA_DEFAULT);
-        nuevo[dia] = Object.assign({}, c, {
-          b20: Number(e.target.value) || 0
-        });
-        setCargasDia(nuevo);
-      }
-    }))));
+    }, c.soda || 0, " unidades")), otrosProdsCarga.map(function (p) {
+      var pk = claveCargaDeProducto(p);
+      return /*#__PURE__*/React.createElement("div", { key: pk }, /*#__PURE__*/React.createElement("label", {
+        style: {
+          ...s.label,
+          textAlign: "center"
+        }
+      }, p.nombre), /*#__PURE__*/React.createElement("input", {
+        style: {
+          ...s.inputNum,
+          textAlign: "center"
+        },
+        type: "number",
+        min: 0,
+        value: c[pk] || "",
+        placeholder: "0",
+        onChange: e => {
+          var nuevo = Object.assign({}, cargasDia || CARGA_DIA_DEFAULT);
+          var cambio = {};
+          cambio[pk] = Number(e.target.value) || 0;
+          nuevo[dia] = Object.assign({}, c, cambio);
+          setCargasDia(nuevo);
+        }
+      }));
+    })));
   }), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => {
