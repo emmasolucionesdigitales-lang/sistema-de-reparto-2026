@@ -3216,11 +3216,7 @@ function InicioReparto({
   onGuardar,
   onVolver
 }) {
-  const prodKeys = {
-    "Sifón 1.5L": "soda",
-    "Bidón 10L": "b10",
-    "Bidón 20L": "b20"
-  };
+  const prodKeys = Object.fromEntries(productosDeCarga(productos).map(p => [p.nombre, claveCargaDeProducto(p)]));
   const CAJON = 6;
   const [llenos, setLlenos] = useState(() => {
     const precarga = (cargasDia || CARGA_DIA_DEFAULT)[dia] || CARGA_DIA_DEFAULT[dia] || {};
@@ -3390,7 +3386,7 @@ function InicioReparto({
       display: "flex",
       gap: 16
     }
-  }, [["Sifón", stock?.soderia?.sifon || 0], ["Bidón 10L", stock?.soderia?.bidon10 || 0], ["Bidón 20L", stock?.soderia?.bidon20 || 0]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+  }, productosDeCarga(productos).map(p => { const sk = claveStockDeProducto(p); return [p.nombre.replace(" 1.5L", ""), stock?.soderia?.[sk] || 0]; }).map(([l, v]) => /*#__PURE__*/React.createElement("div", {
     key: l,
     style: {
       textAlign: "center"
