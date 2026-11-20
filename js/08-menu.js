@@ -1868,7 +1868,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
     // Sembrar la capacidad fija (si todavía no está guardada) para que el
     // checksum "cuadra con el fijo" tenga una referencia estable de acá en
     // más — se puede corregir después desde Config.
-    if (!s.capacidadFija || !(s.capacidadFija.soda || s.capacidadFija.b10 || s.capacidadFija.b20)) {
+    if (!s.capacidadFija || !clavesCarga.some(pk => s.capacidadFija[pk])) {
       s.capacidadFija = CAPACIDAD_FIJA;
     }
     setStock(s);
@@ -1957,7 +1957,7 @@ const guardarCapacidadFija = (pk, valorStr) => {
         margin: "0 0 8px",
         padding: "10px 12px"
       }
-    }, [["Soda", llenosCargados.soda > 0 ? `${Math.floor(llenosCargados.soda / CAJON_SODA)} cajones (${llenosCargados.soda} un)` : "—"], ["Bidón 10L", llenosCargados.b10 > 0 ? `${llenosCargados.b10} unidades` : "—"], ["Bidón 20L", llenosCargados.b20 > 0 ? `${llenosCargados.b20} unidades` : "—"]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+    }, productosCarga.map(p => { const pk = claveCargaDeProducto(p); const l = pk === "soda" ? "Soda" : labelCorto(p); const v = llenosCargados[pk] > 0 ? (pk === "soda" ? `${Math.floor(llenosCargados[pk] / CAJON_SODA)} cajones (${llenosCargados[pk]} un)` : `${llenosCargados[pk]} unidades`) : "—"; return [l, v]; }).map(([l, v]) => /*#__PURE__*/React.createElement("div", {
       key: l,
       style: {
         display: "flex",
