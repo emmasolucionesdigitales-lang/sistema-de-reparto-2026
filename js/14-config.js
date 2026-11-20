@@ -1036,15 +1036,16 @@ function Config({
       marginBottom: 6
     }
   }, titulo), /*#__PURE__*/React.createElement("div", {
-    style: s.grid3
-  }, [["sifon", "Sifón"], ["bidon10", "Bidón 10L"], ["bidon20", "Bidón 20L"]].map(([k, l]) => /*#__PURE__*/React.createElement("div", {
-    key: k
+    style: { display: "flex", flexWrap: "wrap", gap: 10 }
+  }, (productos || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre]).map(([k, l]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: { minWidth: 72 }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
       ...s.label,
       textAlign: "center"
     }
-  }, l), /*#__PURE__*/React.createElement("input", {
+  }, l.replace(" 1.5L", "")), /*#__PURE__*/React.createElement("input", {
     style: {
       ...s.inputNum,
       textAlign: "center"
@@ -1054,11 +1055,7 @@ function Config({
     value: stock?.[lugar]?.[k] ?? 0,
     onChange: e => {
       const ns = JSON.parse(JSON.stringify(stock || {}));
-      if (!ns[lugar]) ns[lugar] = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0
-      };
+      if (!ns[lugar]) ns[lugar] = {};
       ns[lugar][k] = Number(e.target.value) || 0;
       setStock(ns);
     }
